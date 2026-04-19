@@ -1,9 +1,13 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { PlacedFixture, Person, StageElement } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
+
+export interface Scene3DHandle {
+  screenshot: () => string | null;
+}
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -16,7 +20,7 @@ interface Props {
   onSelect: (id: string | null) => void;
 }
 
-const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, heatMapTarget, onSelect }) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -38,7 +42,7 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
     camera.position.set(15, 15, 15);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -356,7 +360,16 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
     }
   }, [fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, heatMapTarget]);
 
+  useImperativeHandle(ref, () => ({
+    screenshot: () => {
+      const s = sceneRef.current;
+      if (!s) return null;
+      s.renderer.render(s.scene, s.camera);
+      return s.renderer.domElement.toDataURL('image/png');
+    },
+  }));
+
   return <div ref={containerRef} className="scene3d-container" />;
-};
+});
 
 export default Scene3D;

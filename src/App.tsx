@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData } from './types';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
@@ -8,6 +8,7 @@ import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import { generate3PointLighting, generateEvenDistribution } from './utils/autoLighting';
 import type { ThreePointConfig } from './utils/autoLighting';
+import type { Scene3DHandle } from './components/Scene3D';
 import './App.css';
 
 const Scene3D = lazy(() => import('./components/Scene3D'));
@@ -34,6 +35,7 @@ const App: React.FC = () => {
   const [projectDialogMode, setProjectDialogMode] = useState<'save' | 'load' | null>(null);
   const [projectMeta, setProjectMeta] = useState<ProjectMeta | undefined>(undefined);
   const [projectId, setProjectId] = useState<string>('proj-' + Date.now());
+  const scene3DRef = useRef<Scene3DHandle>(null);
   const defaultMountingHeight = 6;
 
   // ── Fixture handlers ──
@@ -289,13 +291,22 @@ const App: React.FC = () => {
   }, []);
 
   const handleExport = useCallback(() => {
+    if (viewMode === '3d') {
+      const dataUrl = scene3DRef.current?.screenshot();
+      if (!dataUrl) return;
+      const link = document.createElement('a');
+      link.download = 'lichtplan-3d.png';
+      link.href = dataUrl;
+      link.click();
+      return;
+    }
     const canvas = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
     if (!canvas) return;
     const link = document.createElement('a');
     link.download = 'lichtplan.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
-  }, []);
+  }, [viewMode]);
 
   const handleAddShape = useCallback((shape: Shape) => { setShapes((prev) => [...prev, shape]); }, []);
   const handleAddCustomFixture = useCallback((f: Fixture) => { setCustomFixtures((prev) => [...prev, f]); }, []);
@@ -365,6 +376,7 @@ const App: React.FC = () => {
           ) : (
             <Suspense fallback={<div className="loading-3d">3D-Ansicht wird geladen…</div>}>
               <Scene3D
+                ref={scene3DRef}
                 fixtures={fixtures}
                 persons={persons}
                 stageElements={stageElements}
