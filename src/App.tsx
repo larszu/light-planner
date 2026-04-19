@@ -40,6 +40,55 @@ const App: React.FC = () => {
   const exportCounterRef = useRef(1);
   const defaultMountingHeight = 6;
 
+  // ── Undo / Redo ──
+  interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[] }
+  const historyRef = useRef<Snapshot[]>([]);
+  const futureRef = useRef<Snapshot[]>([]);
+  const lastPushRef = useRef(0);
+  const stateRef = useRef<Snapshot>({ fixtures, persons, stageElements, shapes, fixtureGroups });
+  stateRef.current = { fixtures, persons, stageElements, shapes, fixtureGroups };
+
+  const pushHistory = useCallback(() => {
+    if (historyRef.current.length >= 50) historyRef.current.shift();
+    historyRef.current.push({ ...stateRef.current });
+    futureRef.current = [];
+    lastPushRef.current = Date.now();
+  }, []);
+
+  const pushHistoryThrottled = useCallback(() => {
+    if (Date.now() - lastPushRef.current > 400) pushHistory();
+  }, [pushHistory]);
+
+  const restoreSnapshot = useCallback((snap: Snapshot) => {
+    setFixtures(snap.fixtures);
+    setPersons(snap.persons);
+    setStageElements(snap.stageElements);
+    setShapes(snap.shapes);
+    setFixtureGroups(snap.fixtureGroups);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (historyRef.current.length === 0) return;
+    futureRef.current.push({ ...stateRef.current });
+    restoreSnapshot(historyRef.current.pop()!);
+  }, [restoreSnapshot]);
+
+  const handleRedo = useCallback(() => {
+    if (futureRef.current.length === 0) return;
+    historyRef.current.push({ ...stateRef.current });
+    restoreSnapshot(futureRef.current.pop()!);
+  }, [restoreSnapshot]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); handleUndo(); }
+      else if (e.key === 'y' || e.key === 'Z' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); handleRedo(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo, handleRedo]);
+
   // ── Selection helpers ──
   const selectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
   const handleSelect = useCallback((id: string | null, ctrlKey = false) => {
@@ -73,12 +122,14 @@ const App: React.FC = () => {
   }), [defaultMountingHeight]);
 
   const handlePlaceFixture = useCallback((fixture: Fixture, x: number, y: number) => {
+    pushHistory();
     const placed = createPlacedFixture(fixture, x, y);
     setFixtures((prev) => [...prev, placed]);
     setSelectedIds(new Set([placed.id]));
   }, [createPlacedFixture]);
 
   const handleDropFixture = useCallback((fixture: Fixture, x: number, y: number) => {
+    pushHistory();
     const placed = createPlacedFixture(fixture, x, y);
     setFixtures((prev) => [...prev, placed]);
     setSelectedIds(new Set([placed.id]));
@@ -86,6 +137,7 @@ const App: React.FC = () => {
   }, [createPlacedFixture]);
 
   const handleMoveFixture = useCallback((id: string, x: number, y: number) => {
+    pushHistoryThrottled();
     setFixtures((prev) => {
       const target = prev.find((f) => f.id === id);
       if (!target) return prev;
@@ -101,30 +153,36 @@ const App: React.FC = () => {
   }, [selectedIds]);
 
   const handleUpdateFixture = useCallback((id: string, updates: Partial<PlacedFixture>) => {
+    pushHistoryThrottled();
     setFixtures((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
-  }, []);
+  }, [pushHistoryThrottled]);
 
   const handleMoveAim = useCallback((id: string, aimX: number, aimY: number) => {
+    pushHistoryThrottled();
     setFixtures((prev) => prev.map((f) => (f.id === id ? { ...f, aimX, aimY } : f)));
-  }, []);
+  }, [pushHistoryThrottled]);
 
   // ── Person handlers ──
   const handleAddPerson = useCallback((x: number, y: number) => {
+    pushHistory();
     const p: Person = { id: uid('per'), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, height: 1.75, label: '' };
     setPersons((prev) => [...prev, p]);
     setSelectedIds(new Set([p.id]));
   }, []);
 
   const handleMovePerson = useCallback((id: string, x: number, y: number) => {
+    pushHistoryThrottled();
     setPersons((prev) => prev.map((p) => (p.id === id ? { ...p, x, y } : p)));
-  }, []);
+  }, [pushHistoryThrottled]);
 
   const handleUpdatePerson = useCallback((id: string, updates: Partial<Person>) => {
+    pushHistoryThrottled();
     setPersons((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
-  }, []);
+  }, [pushHistoryThrottled]);
 
   // ── Stage element handlers ──
   const handleAddStageElement = useCallback((x: number, y: number) => {
+    pushHistory();
     const se: StageElement = {
       id: uid('stg'), type: 'podest-1x1',
       x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
@@ -135,15 +193,18 @@ const App: React.FC = () => {
   }, []);
 
   const handleMoveStageElement = useCallback((id: string, x: number, y: number) => {
+    pushHistoryThrottled();
     setStageElements((prev) => prev.map((s) => (s.id === id ? { ...s, x, y } : s)));
-  }, []);
+  }, [pushHistoryThrottled]);
 
   const handleUpdateStageElement = useCallback((id: string, updates: Partial<StageElement>) => {
+    pushHistoryThrottled();
     setStageElements((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
-  }, []);
+  }, [pushHistoryThrottled]);
 
   // ── Delete any element ──
   const handleDelete = useCallback((id: string) => {
+    pushHistory();
     setFixtures((prev) => prev.filter((f) => f.id !== id));
     setPersons((prev) => prev.filter((p) => p.id !== id));
     setStageElements((prev) => prev.filter((s) => s.id !== id));
@@ -162,15 +223,17 @@ const App: React.FC = () => {
   const handleAutoThreePoint = useCallback(() => {
     const targetPersons = selectedId ? persons.filter((p) => p.id === selectedId) : persons;
     if (targetPersons.length === 0) return;
+    pushHistory();
     const newFixtures = targetPersons.flatMap((p) => generate3PointLighting(p, defaultMountingHeight, {
       targetLux: heatMapTarget,
     }));
     setFixtures((prev) => [...prev, ...newFixtures]);
-  }, [persons, selectedId, defaultMountingHeight, heatMapTarget]);
+  }, [persons, selectedId, defaultMountingHeight, heatMapTarget, pushHistory]);
 
   const handleAutoThreePointForPerson = useCallback((personId: string) => {
     const person = persons.find((p) => p.id === personId);
     if (!person) return;
+    pushHistory();
     const newFixtures = generate3PointLighting(person, defaultMountingHeight, {
       targetLux: heatMapTarget,
     });
@@ -180,15 +243,17 @@ const App: React.FC = () => {
   const handleAutoThreePointConfigured = useCallback((config: ThreePointConfig) => {
     const targetPersons = selectedId ? persons.filter((p) => p.id === selectedId) : persons;
     if (targetPersons.length === 0) return;
+    pushHistory();
     const newFixtures = targetPersons.flatMap((p) =>
       generate3PointLighting(p, defaultMountingHeight, config),
     );
     setFixtures((prev) => [...prev, ...newFixtures]);
     setShowThreePointDialog(false);
-  }, [persons, selectedId, defaultMountingHeight]);
+  }, [persons, selectedId, defaultMountingHeight, pushHistory]);
 
   const handleAutoDistribute = useCallback(() => {
     if (persons.length === 0 && stageElements.length === 0) return;
+    pushHistory();
     const newFixtures = generateEvenDistribution(persons, defaultMountingHeight, {
       targetLux: heatMapTarget,
     }, stageElements);
@@ -199,18 +264,21 @@ const App: React.FC = () => {
   const handleGroupSelection = useCallback(() => {
     const selFixtureIds = fixtures.filter((f) => selectedIds.has(f.id)).map((f) => f.id);
     if (selFixtureIds.length < 2) return;
+    pushHistory();
     const group: FixtureGroup = { id: uid('grp'), label: `Gruppe ${fixtureGroups.length + 1}`, fixtureIds: selFixtureIds };
     setFixtureGroups((prev) => [...prev, group]);
   }, [fixtures, selectedIds, fixtureGroups.length]);
 
   const handleUngroupSelection = useCallback(() => {
+    pushHistory();
     setFixtureGroups((prev) => prev.filter((g) => !g.fixtureIds.some((id) => selectedIds.has(id))));
-  }, [selectedIds]);
+  }, [selectedIds, pushHistory]);
 
   const handleRotateSelectionAroundPerson = useCallback((angleDeg: number) => {
     // Find the first selected person as pivot, or first person in project
     const pivotPerson = persons.find((p) => selectedIds.has(p.id)) ?? persons[0];
     if (!pivotPerson) return;
+    pushHistory();
     const cx = pivotPerson.x, cy = pivotPerson.y;
     const rad = (angleDeg * Math.PI) / 180;
     const cosA = Math.cos(rad), sinA = Math.sin(rad);
@@ -250,7 +318,7 @@ const App: React.FC = () => {
 
   // ── Auto-align / distribute ──
   const handleAlignH = useCallback(() => {
-    // Align fixtures to same Y as selected fixture (or average)
+    pushHistory();
     const selF = fixtures.find((f) => f.id === selectedId);
     const selSe = stageElements.find((s) => s.id === selectedId);
     if (selF) {
@@ -263,6 +331,7 @@ const App: React.FC = () => {
   }, [fixtures, stageElements, selectedId]);
 
   const handleAlignV = useCallback(() => {
+    pushHistory();
     const selF = fixtures.find((f) => f.id === selectedId);
     const selSe = stageElements.find((s) => s.id === selectedId);
     if (selF) {
@@ -276,6 +345,7 @@ const App: React.FC = () => {
 
   const handleDistributeH = useCallback(() => {
     if (fixtures.length < 2 && stageElements.length < 2) return;
+    pushHistory();
     if (fixtures.length >= 2) {
       const sorted = [...fixtures].sort((a, b) => a.x - b.x);
       const minX = sorted[0].x, maxX = sorted[sorted.length - 1].x;
@@ -299,6 +369,7 @@ const App: React.FC = () => {
 
   const handleDistributeV = useCallback(() => {
     if (fixtures.length < 2 && stageElements.length < 2) return;
+    pushHistory();
     if (fixtures.length >= 2) {
       const sorted = [...fixtures].sort((a, b) => a.y - b.y);
       const minY = sorted[0].y, maxY = sorted[sorted.length - 1].y;
@@ -337,6 +408,8 @@ const App: React.FC = () => {
   }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
+    historyRef.current = [];
+    futureRef.current = [];
     setFixtures(data.fixtures);
     setShapes(data.shapes);
     setPersons(data.persons);
@@ -395,7 +468,7 @@ const App: React.FC = () => {
     link.click();
   }, [viewMode, projectMeta]);
 
-  const handleAddShape = useCallback((shape: Shape) => { setShapes((prev) => [...prev, shape]); }, []);
+  const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
   const handleAddCustomFixture = useCallback((f: Fixture) => { setCustomFixtures((prev) => [...prev, f]); }, []);
 
   return (
