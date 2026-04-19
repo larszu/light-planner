@@ -702,6 +702,34 @@ kbd {
   accent-color: var(--accent);
 }
 
+.pos-nudge-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pos-nudge-group input[type='number'] {
+  width: 70px;
+  text-align: center;
+}
+.nudge-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--panel-alt);
+  color: var(--text);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nudge-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 .prop-derived {
   font-size: 11px;
   color: var(--text2);

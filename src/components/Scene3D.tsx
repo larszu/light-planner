@@ -254,7 +254,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const aimPos = new THREE.Vector3(f.aimX, 0, f.aimY);
       const coneVec = aimPos.clone().sub(fixturePos);
       const coneHeight = coneVec.length();
-      const beamRadAtBase = Math.tan((beamAngle / 2) * (Math.PI / 180)) * coneHeight * (f.dimming / 100);
+      const beamRadAtBase = Math.tan((beamAngle / 2) * (Math.PI / 180)) * coneHeight;
+      const dimOpacity = 0.04 * (f.dimming / 100);
 
       if (coneHeight > 0.1) {
         const coneGeo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
@@ -264,7 +265,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         const coneMat = new THREE.MeshBasicMaterial({
           color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
           transparent: true,
-          opacity: 0.04,
+          opacity: isSel ? Math.max(dimOpacity, 0.02) : dimOpacity,
           side: THREE.DoubleSide,
           depthWrite: false,
         });

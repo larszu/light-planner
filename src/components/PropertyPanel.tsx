@@ -115,8 +115,30 @@ const PropertyPanel: React.FC<Props> = ({
 
         <div className="prop-section">
           <span className="prop-section-title">Position</span>
-          {numField('X (m)', f.x, (v) => onUpdateFixture(f.id, { x: v }))}
-          {numField('Y (m)', f.y, (v) => onUpdateFixture(f.id, { y: v }))}
+          <label className="prop-field prop-pos-field">
+            <span>X (m)</span>
+            <div className="pos-nudge-group">
+              <button className="nudge-btn" onClick={() => onUpdateFixture(f.id, { x: f.x - 0.5, aimX: f.aimX - 0.5 })}>◀</button>
+              <input type="number" value={f.x} step={0.1}
+                onChange={(e) => {
+                  const dx = Number(e.target.value) - f.x;
+                  onUpdateFixture(f.id, { x: f.x + dx, aimX: f.aimX + dx });
+                }} />
+              <button className="nudge-btn" onClick={() => onUpdateFixture(f.id, { x: f.x + 0.5, aimX: f.aimX + 0.5 })}>▶</button>
+            </div>
+          </label>
+          <label className="prop-field prop-pos-field">
+            <span>Y (m)</span>
+            <div className="pos-nudge-group">
+              <button className="nudge-btn" onClick={() => onUpdateFixture(f.id, { y: f.y - 0.5, aimY: f.aimY - 0.5 })}>◀</button>
+              <input type="number" value={f.y} step={0.1}
+                onChange={(e) => {
+                  const dy = Number(e.target.value) - f.y;
+                  onUpdateFixture(f.id, { y: f.y + dy, aimY: f.aimY + dy });
+                }} />
+              <button className="nudge-btn" onClick={() => onUpdateFixture(f.id, { y: f.y + 0.5, aimY: f.aimY + 0.5 })}>▶</button>
+            </div>
+          </label>
           {numField('Höhe (m)', f.mountingHeight, (v) => onUpdateFixture(f.id, { mountingHeight: v }), 0.5, 0.5, 30)}
         </div>
 

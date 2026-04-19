@@ -359,7 +359,8 @@ const PlanCanvas: React.FC<Props> = ({
       const isSel = f.id === selectedId;
       const rad = 0.3;
       const beamAngle = f.currentBeamAngle ?? f.fixture.beamAngle;
-      const beamRad = Math.tan((beamAngle / 2) * (Math.PI / 180)) * f.mountingHeight * (f.dimming / 100);
+      const beamRad = Math.tan((beamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
+      const dimAlpha = f.dimming / 100;
 
       // Beam cone visualization – emanates FROM the fixture toward aim
       const aimDx = f.aimX - f.x;
@@ -370,9 +371,9 @@ const PlanCanvas: React.FC<Props> = ({
         // Aiming straight down – show circle around fixture
         ctx.beginPath();
         ctx.arc(f.x, f.y, beamRad, 0, Math.PI * 2);
-        ctx.fillStyle = isSel ? getBeamColorRgba(f, 0.14) : getBeamColorRgba(f, 0.08);
+        ctx.fillStyle = isSel ? getBeamColorRgba(f, 0.14 * dimAlpha) : getBeamColorRgba(f, 0.08 * dimAlpha);
         ctx.fill();
-        ctx.strokeStyle = isSel ? getBeamColorRgba(f, 0.40) : getBeamColorRgba(f, 0.18);
+        ctx.strokeStyle = isSel ? getBeamColorRgba(f, 0.40 * dimAlpha) : getBeamColorRgba(f, 0.18 * dimAlpha);
         ctx.lineWidth = 1 / v.scale;
         ctx.stroke();
       } else {
@@ -390,9 +391,9 @@ const PlanCanvas: React.FC<Props> = ({
         ctx.arc(f.aimX, f.aimY, beamRad, perpAngle, perpAngle - Math.PI, true);
         ctx.lineTo(f.x, f.y);
         ctx.closePath();
-        ctx.fillStyle = isSel ? getBeamColorRgba(f, 0.12) : getBeamColorRgba(f, 0.06);
+        ctx.fillStyle = isSel ? getBeamColorRgba(f, 0.12 * dimAlpha) : getBeamColorRgba(f, 0.06 * dimAlpha);
         ctx.fill();
-        ctx.strokeStyle = isSel ? getBeamColorRgba(f, 0.30) : getBeamColorRgba(f, 0.14);
+        ctx.strokeStyle = isSel ? getBeamColorRgba(f, 0.30 * dimAlpha) : getBeamColorRgba(f, 0.14 * dimAlpha);
         ctx.lineWidth = 1 / v.scale;
         ctx.stroke();
       }
