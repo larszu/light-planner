@@ -196,37 +196,41 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
       // Aim direction
       const dx = f.aimX - f.x;
       const dy = f.aimY - f.y;
-      const hDist = Math.sqrt(dx * dx + dy * dy);
       const angle = Math.atan2(dy, dx);
       bodyMesh.rotation.y = -angle;
 
-      // Beam cone (transparent)
+      // Beam cone – originates FROM fixture, spreads toward aim point
       const beamAngle = f.currentBeamAngle ?? f.fixture.beamAngle;
-      const beamRadAtFloor = Math.tan((beamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
-      const coneHeight = Math.sqrt(f.mountingHeight * f.mountingHeight + hDist * hDist);
-      const coneGeo = new THREE.ConeGeometry(beamRadAtFloor * (f.dimming / 100), coneHeight, 24, 1, true);
-      const coneMat = new THREE.MeshBasicMaterial({
-        color: isSel ? '#ffcc33' : '#ffee88',
-        transparent: true,
-        opacity: 0.04,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      });
-      const cone = new THREE.Mesh(coneGeo, coneMat);
+      const fixturePos = new THREE.Vector3(f.x, f.mountingHeight, f.y);
+      const aimPos = new THREE.Vector3(f.aimX, 0, f.aimY);
+      const coneVec = aimPos.clone().sub(fixturePos);
+      const coneHeight = coneVec.length();
+      const beamRadAtBase = Math.tan((beamAngle / 2) * (Math.PI / 180)) * coneHeight * (f.dimming / 100);
 
-      // Position and orient cone
-      const midX = (f.x + f.aimX) / 2;
-      const midY = f.mountingHeight / 2;
-      const midZ = (f.y + f.aimY) / 2;
-      cone.position.set(midX, midY, midZ);
+      if (coneHeight > 0.1) {
+        const coneGeo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
+        // Shift geometry so tip is at local origin (tip at y=+h/2, base at y=-h/2)
+        coneGeo.translate(0, -coneHeight / 2, 0);
 
-      // Orient cone from fixture to aim point
-      const dir = new THREE.Vector3(f.aimX - f.x, -f.mountingHeight, f.aimY - f.y).normalize();
-      const up = new THREE.Vector3(0, 1, 0);
-      const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
-      cone.setRotationFromQuaternion(quat);
+        const coneMat = new THREE.MeshBasicMaterial({
+          color: isSel ? '#ffcc33' : '#ffee88',
+          transparent: true,
+          opacity: 0.04,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        });
+        const cone = new THREE.Mesh(coneGeo, coneMat);
+        cone.position.copy(fixturePos);
 
-      group.add(cone);
+        // Orient: local -Y (base direction) should point toward aim
+        const coneDirNorm = coneVec.clone().normalize();
+        const quat = new THREE.Quaternion().setFromUnitVectors(
+          new THREE.Vector3(0, -1, 0),
+          coneDirNorm,
+        );
+        cone.setRotationFromQuaternion(quat);
+        group.add(cone);
+      }
 
       // Thin line from fixture to aim point
       const lineGeo = new THREE.BufferGeometry().setFromPoints([

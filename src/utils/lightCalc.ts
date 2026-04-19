@@ -1,4 +1,5 @@
 import type { PlacedFixture, Attachment, PhotometricData } from '../types';
+import { combinedTransmission, effectiveBeamAngleWithFrost } from '../data/gelLibrary';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -101,8 +102,18 @@ export function luxFromFixture(
   if (dimFactor <= 0) return 0;
 
   const eff = getEffectiveBeam(f);
-  const beamAngle = eff.beamAngle;
+  let beamAngle = eff.beamAngle;
   const ratio = eff.beamRatioWH;
+
+  // Apply frost/diffusion gel widening
+  if (f.gelFilterIds && f.gelFilterIds.length > 0) {
+    beamAngle = effectiveBeamAngleWithFrost(beamAngle, f.gelFilterIds);
+  }
+
+  // Gel transmission factor
+  const gelTransmission = (f.gelFilterIds && f.gelFilterIds.length > 0)
+    ? combinedTransmission(f.gelFilterIds)
+    : 1;
 
   // Vector from fixture projection to floor point
   const dx = px - f.x;
@@ -168,7 +179,7 @@ export function luxFromFixture(
   }
 
   const sigma = beamSigma(beamAngle);
-  const Ipeak = peakIntensity(eff.lumens, beamAngle, ratio, eff.photometric) * dimFactor;
+  const Ipeak = peakIntensity(eff.lumens, beamAngle, ratio, eff.photometric) * dimFactor * gelTransmission;
   const I = Ipeak * Math.exp(-(effectiveTheta * effectiveTheta) / (2 * sigma * sigma));
 
   const cosIncidence = h / dist;

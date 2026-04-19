@@ -114,6 +114,8 @@ export interface PlacedFixture {
   activeAttachmentId?: string; // id of currently mounted attachment
   // ── Color temperature setting ──
   currentColorTemp?: number;   // current CCT for tunable fixtures
+  // ── Gel filters ──
+  gelFilterIds?: string[];     // ids of mounted gel filters (from gelLibrary)
 }
 
 // ── Person on stage ──
@@ -161,4 +163,37 @@ export interface FloorPlan {
   image: HTMLImageElement;
   widthMeters: number;
   heightMeters: number;
+}
+
+// ── Gel Filters (CTO, CTB, Frost) ──
+export type GelType = 'CTO' | 'CTB' | 'frost' | 'diffusion' | 'color';
+
+export interface GelFilter {
+  id: string;
+  name: string;
+  brand: 'LEE' | 'Rosco';
+  code: string;
+  type: GelType;
+  transmissionFactor: number;
+  miredShift?: number;
+  diffusionLevel?: number;
+}
+
+// ── Project save/load ──
+export interface ProjectMeta {
+  name: string;
+  author: string;
+  version: string;
+  createdAt: string;
+  updatedAt: string;
+  notes?: string;
+}
+
+export interface ProjectData {
+  meta: ProjectMeta;
+  fixtures: PlacedFixture[];
+  shapes: Shape[];
+  persons: Person[];
+  stageElements: StageElement[];
+  customFixtures: Fixture[];
 }

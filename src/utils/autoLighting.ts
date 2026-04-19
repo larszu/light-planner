@@ -28,14 +28,24 @@ function nextId(): string {
  *
  * "Front" is defined as the negative Y direction (audience is at larger Y).
  * The person faces towards negative Y (towards audience).
+ *
+ * Accepts optional fixture overrides and dimming levels per role.
  */
 export function generate3PointLighting(
   person: Person,
   mountingHeight: number = 5,
+  keyFixture?: Fixture,
+  fillFixture?: Fixture,
+  backFixture?: Fixture,
+  keyDimming: number = 100,
+  fillDimming: number = 50,
+  backDimming: number = 70,
 ): PlacedFixture[] {
   const px = person.x;
   const py = person.y;
-  const profile = defaultProfile();
+  const keyF = keyFixture ?? defaultProfile();
+  const fillF = fillFixture ?? defaultFresnel();
+  const backF = backFixture ?? defaultProfile();
 
   // Key light: 45° left, 45° elevation
   const keyDist = mountingHeight / Math.tan(45 * DEG2RAD);
@@ -57,36 +67,36 @@ export function generate3PointLighting(
   return [
     {
       id: nextId(),
-      fixture: profile,
+      fixture: keyF,
       x: keyX,
       y: keyY,
       mountingHeight,
       aimX: px,
       aimY: py,
       bodyRotation: 0,
-      dimming: 100,
+      dimming: keyDimming,
     },
     {
       id: nextId(),
-      fixture: profile,
+      fixture: fillF,
       x: fillX,
       y: fillY,
       mountingHeight,
       aimX: px,
       aimY: py,
       bodyRotation: 0,
-      dimming: 50,
+      dimming: fillDimming,
     },
     {
       id: nextId(),
-      fixture: profile,
+      fixture: backF,
       x: backX,
       y: backY,
       mountingHeight,
       aimX: px,
       aimY: py,
       bodyRotation: 0,
-      dimming: 70,
+      dimming: backDimming,
     },
   ];
 }

@@ -1,9 +1,11 @@
 import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData } from './types';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import PlanCanvas from './components/PlanCanvas';
 import PropertyPanel from './components/PropertyPanel';
+import ThreePointDialog from './components/ThreePointDialog';
+import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import { generate3PointLighting, generateEvenDistribution } from './utils/autoLighting';
 import './App.css';
 
@@ -26,6 +28,10 @@ const App: React.FC = () => {
   const [heatMapScale, setHeatMapScale] = useState(1000);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
   const [cursorLux, setCursorLux] = useState<number | null>(null);
+  const [showThreePointDialog, setShowThreePointDialog] = useState(false);
+  const [projectDialogMode, setProjectDialogMode] = useState<'save' | 'load' | null>(null);
+  const [projectMeta, setProjectMeta] = useState<ProjectMeta | undefined>(undefined);
+  const [projectId, setProjectId] = useState<string>('proj-' + Date.now());
   const defaultMountingHeight = 6;
 
   // ── Fixture handlers ──
@@ -135,11 +141,125 @@ const App: React.FC = () => {
     setFixtures((prev) => [...prev, ...newFixtures]);
   }, [persons, defaultMountingHeight]);
 
+  const handleAutoThreePointConfigured = useCallback((keyF: Fixture, fillF: Fixture, backF: Fixture, keyDim: number, fillDim: number, backDim: number) => {
+    const targetPersons = selectedId ? persons.filter((p) => p.id === selectedId) : persons;
+    if (targetPersons.length === 0) return;
+    const newFixtures = targetPersons.flatMap((p) =>
+      generate3PointLighting(p, defaultMountingHeight, keyF, fillF, backF, keyDim, fillDim, backDim),
+    );
+    setFixtures((prev) => [...prev, ...newFixtures]);
+    setShowThreePointDialog(false);
+  }, [persons, selectedId, defaultMountingHeight]);
+
   const handleAutoDistribute = useCallback(() => {
     if (persons.length === 0) return;
     const newFixtures = generateEvenDistribution(persons, defaultMountingHeight);
     setFixtures((prev) => [...prev, ...newFixtures]);
   }, [persons, defaultMountingHeight]);
+
+  // ── Auto-align / distribute ──
+  const handleAlignH = useCallback(() => {
+    // Align fixtures to same Y as selected fixture (or average)
+    const selF = fixtures.find((f) => f.id === selectedId);
+    const selSe = stageElements.find((s) => s.id === selectedId);
+    if (selF) {
+      const targetY = selF.y;
+      setFixtures((prev) => prev.map((f) => ({ ...f, y: targetY, aimY: f.aimY + (targetY - f.y) })));
+    } else if (selSe) {
+      const targetY = selSe.y;
+      setStageElements((prev) => prev.map((s) => ({ ...s, y: targetY })));
+    }
+  }, [fixtures, stageElements, selectedId]);
+
+  const handleAlignV = useCallback(() => {
+    const selF = fixtures.find((f) => f.id === selectedId);
+    const selSe = stageElements.find((s) => s.id === selectedId);
+    if (selF) {
+      const targetX = selF.x;
+      setFixtures((prev) => prev.map((f) => ({ ...f, x: targetX, aimX: f.aimX + (targetX - f.x) })));
+    } else if (selSe) {
+      const targetX = selSe.x;
+      setStageElements((prev) => prev.map((s) => ({ ...s, x: targetX })));
+    }
+  }, [fixtures, stageElements, selectedId]);
+
+  const handleDistributeH = useCallback(() => {
+    if (fixtures.length < 2 && stageElements.length < 2) return;
+    if (fixtures.length >= 2) {
+      const sorted = [...fixtures].sort((a, b) => a.x - b.x);
+      const minX = sorted[0].x, maxX = sorted[sorted.length - 1].x;
+      const step = (maxX - minX) / (sorted.length - 1);
+      const idMap = new Map(sorted.map((f, i) => [f.id, minX + i * step]));
+      setFixtures((prev) => prev.map((f) => {
+        const newX = idMap.get(f.id);
+        return newX !== undefined ? { ...f, x: Math.round(newX * 10) / 10, aimX: f.aimX + (Math.round(newX * 10) / 10 - f.x) } : f;
+      }));
+    } else {
+      const sorted = [...stageElements].sort((a, b) => a.x - b.x);
+      const minX = sorted[0].x, maxX = sorted[sorted.length - 1].x;
+      const step = (maxX - minX) / (sorted.length - 1);
+      const idMap = new Map(sorted.map((s, i) => [s.id, minX + i * step]));
+      setStageElements((prev) => prev.map((s) => {
+        const newX = idMap.get(s.id);
+        return newX !== undefined ? { ...s, x: Math.round(newX * 10) / 10 } : s;
+      }));
+    }
+  }, [fixtures, stageElements]);
+
+  const handleDistributeV = useCallback(() => {
+    if (fixtures.length < 2 && stageElements.length < 2) return;
+    if (fixtures.length >= 2) {
+      const sorted = [...fixtures].sort((a, b) => a.y - b.y);
+      const minY = sorted[0].y, maxY = sorted[sorted.length - 1].y;
+      const step = (maxY - minY) / (sorted.length - 1);
+      const idMap = new Map(sorted.map((f, i) => [f.id, minY + i * step]));
+      setFixtures((prev) => prev.map((f) => {
+        const newY = idMap.get(f.id);
+        return newY !== undefined ? { ...f, y: Math.round(newY * 10) / 10, aimY: f.aimY + (Math.round(newY * 10) / 10 - f.y) } : f;
+      }));
+    } else {
+      const sorted = [...stageElements].sort((a, b) => a.y - b.y);
+      const minY = sorted[0].y, maxY = sorted[sorted.length - 1].y;
+      const step = (maxY - minY) / (sorted.length - 1);
+      const idMap = new Map(sorted.map((s, i) => [s.id, minY + i * step]));
+      setStageElements((prev) => prev.map((s) => {
+        const newY = idMap.get(s.id);
+        return newY !== undefined ? { ...s, y: Math.round(newY * 10) / 10 } : s;
+      }));
+    }
+  }, [fixtures, stageElements]);
+
+  // ── Project save/load ──
+  const handleSaveProject = useCallback((meta: ProjectMeta) => {
+    const data: ProjectData = {
+      meta,
+      fixtures,
+      shapes,
+      persons,
+      stageElements,
+      customFixtures,
+    };
+    saveProjectToStorage(projectId, meta, data);
+    setProjectMeta(meta);
+    setProjectDialogMode(null);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, projectId]);
+
+  const handleLoadProject = useCallback((data: ProjectData) => {
+    setFixtures(data.fixtures);
+    setShapes(data.shapes);
+    setPersons(data.persons);
+    setStageElements(data.stageElements);
+    setCustomFixtures(data.customFixtures);
+    setProjectMeta(data.meta);
+    const newId = 'proj-' + Date.now();
+    setProjectId(newId);
+    setSelectedId(null);
+    setProjectDialogMode(null);
+  }, []);
+
+  const handleDeleteProject = useCallback((id: string) => {
+    deleteProjectFromStorage(id);
+  }, []);
 
   // ── Floor plan ──
   const handleUploadFloorPlan = useCallback((file: File) => {
@@ -182,8 +302,16 @@ const App: React.FC = () => {
         onUploadFloorPlan={handleUploadFloorPlan}
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
+        onAutoThreePointConfig={() => setShowThreePointDialog(true)}
         onAutoDistribute={handleAutoDistribute}
+        onAlignH={handleAlignH}
+        onAlignV={handleAlignV}
+        onDistributeH={handleDistributeH}
+        onDistributeV={handleDistributeV}
+        onSaveProject={() => setProjectDialogMode('save')}
+        onLoadProject={() => setProjectDialogMode('load')}
         hasPersons={persons.length > 0}
+        hasSelection={!!selectedId}
       />
       <div className="app-body">
         <Sidebar
@@ -252,6 +380,22 @@ const App: React.FC = () => {
           onAutoThreePointForPerson={handleAutoThreePointForPerson}
         />
       </div>
+      {showThreePointDialog && (
+        <ThreePointDialog
+          onGenerate={handleAutoThreePointConfigured}
+          onCancel={() => setShowThreePointDialog(false)}
+        />
+      )}
+      {projectDialogMode && (
+        <ProjectDialog
+          mode={projectDialogMode}
+          currentMeta={projectMeta}
+          onSave={handleSaveProject}
+          onLoad={handleLoadProject}
+          onDelete={handleDeleteProject}
+          onCancel={() => setProjectDialogMode(null)}
+        />
+      )}
     </div>
   );
 };

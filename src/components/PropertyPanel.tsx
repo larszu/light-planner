@@ -1,6 +1,7 @@
 import React from 'react';
 import type { PlacedFixture, Person, StageElement } from '../types';
 import { luxFromFixture } from '../utils/lightCalc';
+import { gelLibrary, effectiveColorTemp } from '../data/gelLibrary';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -170,6 +171,57 @@ const PropertyPanel: React.FC<Props> = ({
           </div>
         )}
 
+        {/* Gel Filter Selector (CTO/CTB/Frost) */}
+        <div className="prop-section">
+          <span className="prop-section-title">Filter / Gel</span>
+          <label className="prop-field">
+            <span>Gel hinzufügen</span>
+            <select
+              value=""
+              onChange={(e) => {
+                if (!e.target.value) return;
+                const current = f.gelFilterIds ?? [];
+                onUpdateFixture(f.id, { gelFilterIds: [...current, e.target.value] });
+              }}
+            >
+              <option value="">– Auswählen –</option>
+              <optgroup label="CTO (Warm)">
+                {gelLibrary.filter((g) => g.type === 'CTO').map((g) => (
+                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% Verlust)</option>
+                ))}
+              </optgroup>
+              <optgroup label="CTB (Kalt)">
+                {gelLibrary.filter((g) => g.type === 'CTB').map((g) => (
+                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% Verlust)</option>
+                ))}
+              </optgroup>
+              <optgroup label="Frost / Diffusion">
+                {gelLibrary.filter((g) => g.type === 'frost').map((g) => (
+                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% Verlust)</option>
+                ))}
+              </optgroup>
+            </select>
+          </label>
+          {f.gelFilterIds && f.gelFilterIds.length > 0 && (
+            <div className="gel-stack">
+              {f.gelFilterIds.map((gid, idx) => {
+                const gel = gelLibrary.find((g) => g.id === gid);
+                return gel ? (
+                  <div key={idx} className="gel-chip">
+                    <span className={`gel-type-badge gel-type-${gel.type.toLowerCase()}`}>{gel.type}</span>
+                    <span>{gel.brand} {gel.code}</span>
+                    <button className="gel-remove" onClick={() => {
+                      const updated = [...(f.gelFilterIds ?? [])];
+                      updated.splice(idx, 1);
+                      onUpdateFixture(f.id, { gelFilterIds: updated.length > 0 ? updated : undefined });
+                    }}>✕</button>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          )}
+        </div>
+
         <div className="prop-section">
           <span className="prop-section-title">Info</span>
           <div className="prop-info-grid">
@@ -191,6 +243,14 @@ const PropertyPanel: React.FC<Props> = ({
             {f.fixture.tlci && <span>TLCI {f.fixture.tlci}</span>}
             {f.fixture.ipRating && <span>IP{f.fixture.ipRating}</span>}
             {f.fixture.dmxChannels && <span>{f.fixture.dmxChannels} DMX-Ch</span>}
+            {f.gelFilterIds && f.gelFilterIds.length > 0 && (() => {
+              const baseCCT = f.currentColorTemp ?? (f.fixture.colorTempRange ? f.fixture.colorTempRange[0] : f.fixture.colorTemp);
+              if (baseCCT > 0) {
+                const effCCT = effectiveColorTemp(baseCCT, f.gelFilterIds!);
+                return <span>Eff. CCT: {effCCT} K</span>;
+              }
+              return null;
+            })()}
           </div>
         </div>
         <button className="delete-btn" onClick={() => onDelete(f.id)}>Leuchte löschen</button>

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement } from '../types';
 import { computeHeatMap, luxToColor, totalLux } from '../utils/lightCalc';
+import { drawFixtureSymbol } from '../utils/fixtureSymbols';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -350,17 +351,46 @@ const PlanCanvas: React.FC<Props> = ({
       const isSel = f.id === selectedId;
       const rad = 0.3;
       const beamAngle = f.currentBeamAngle ?? f.fixture.beamAngle;
-      const beamRad = Math.tan((beamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
+      const beamRad = Math.tan((beamAngle / 2) * (Math.PI / 180)) * f.mountingHeight * (f.dimming / 100);
 
-      // Beam circle
-      ctx.beginPath(); ctx.arc(f.aimX, f.aimY, beamRad * (f.dimming / 100), 0, Math.PI * 2);
-      ctx.fillStyle = isSel ? 'rgba(255,200,50,0.10)' : 'rgba(255,230,100,0.06)';
-      ctx.fill();
-      ctx.strokeStyle = isSel ? 'rgba(255,200,50,0.35)' : 'rgba(255,230,100,0.15)';
-      ctx.lineWidth = 1 / v.scale; ctx.stroke();
+      // Beam cone visualization – emanates FROM the fixture toward aim
+      const aimDx = f.aimX - f.x;
+      const aimDy = f.aimY - f.y;
+      const aimDist2D = Math.sqrt(aimDx * aimDx + aimDy * aimDy);
+
+      if (aimDist2D < 0.1) {
+        // Aiming straight down – show circle around fixture
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, beamRad, 0, Math.PI * 2);
+        ctx.fillStyle = isSel ? 'rgba(255,200,50,0.10)' : 'rgba(255,230,100,0.06)';
+        ctx.fill();
+        ctx.strokeStyle = isSel ? 'rgba(255,200,50,0.35)' : 'rgba(255,230,100,0.15)';
+        ctx.lineWidth = 1 / v.scale;
+        ctx.stroke();
+      } else {
+        // Angled – draw cone projection from fixture to beam spread at aim
+        const coneAngle = Math.atan2(aimDy, aimDx);
+        const perpAngle = coneAngle + Math.PI / 2;
+        const ex1x = f.aimX + beamRad * Math.cos(perpAngle);
+        const ex1y = f.aimY + beamRad * Math.sin(perpAngle);
+        const ex2x = f.aimX - beamRad * Math.cos(perpAngle);
+        const ex2y = f.aimY - beamRad * Math.sin(perpAngle);
+
+        ctx.beginPath();
+        ctx.moveTo(f.x, f.y);
+        ctx.lineTo(ex1x, ex1y);
+        ctx.arc(f.aimX, f.aimY, beamRad, perpAngle, perpAngle - Math.PI, true);
+        ctx.lineTo(f.x, f.y);
+        ctx.closePath();
+        ctx.fillStyle = isSel ? 'rgba(255,200,50,0.08)' : 'rgba(255,230,100,0.04)';
+        ctx.fill();
+        ctx.strokeStyle = isSel ? 'rgba(255,200,50,0.25)' : 'rgba(255,230,100,0.10)';
+        ctx.lineWidth = 1 / v.scale;
+        ctx.stroke();
+      }
 
       // Aim line
-      if (Math.abs(f.aimX - f.x) > 0.01 || Math.abs(f.aimY - f.y) > 0.01) {
+      if (aimDist2D > 0.01) {
         ctx.beginPath();
         ctx.setLineDash([4 / v.scale, 4 / v.scale]);
         ctx.moveTo(f.x, f.y); ctx.lineTo(f.aimX, f.aimY);
@@ -376,18 +406,12 @@ const PlanCanvas: React.FC<Props> = ({
         ctx.stroke();
       }
 
-      // Fixture body (direction-aware)
+      // Fixture body – standardized symbol based on category
       const angle = Math.atan2(f.aimY - f.y, f.aimX - f.x);
       ctx.save();
       ctx.translate(f.x, f.y);
       ctx.rotate(angle);
-      ctx.fillStyle = isSel ? '#ffcc33' : '#4fc3f7';
-      ctx.fillRect(-rad, -rad * 0.6, rad * 2, rad * 1.2);
-      ctx.fillStyle = isSel ? '#fff' : '#2196f3';
-      ctx.fillRect(rad * 0.7, -rad * 0.4, rad * 0.5, rad * 0.8);
-      ctx.strokeStyle = isSel ? '#fff' : '#1a1a2e';
-      ctx.lineWidth = 1.5 / v.scale;
-      ctx.strokeRect(-rad, -rad * 0.6, rad * 2, rad * 1.2);
+      drawFixtureSymbol(ctx, f.fixture.category, rad, isSel, v.scale);
       ctx.restore();
 
       // Labels

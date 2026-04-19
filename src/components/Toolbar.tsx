@@ -13,8 +13,16 @@ interface Props {
   onUploadFloorPlan: (file: File) => void;
   onExport: () => void;
   onAutoThreePoint: () => void;
+  onAutoThreePointConfig: () => void;
   onAutoDistribute: () => void;
+  onAlignH: () => void;
+  onAlignV: () => void;
+  onDistributeH: () => void;
+  onDistributeV: () => void;
+  onSaveProject: () => void;
+  onLoadProject: () => void;
   hasPersons: boolean;
+  hasSelection: boolean;
 }
 
 const Toolbar: React.FC<Props> = ({
@@ -29,8 +37,16 @@ const Toolbar: React.FC<Props> = ({
   onUploadFloorPlan,
   onExport,
   onAutoThreePoint,
+  onAutoThreePointConfig,
   onAutoDistribute,
+  onAlignH,
+  onAlignV,
+  onDistributeH,
+  onDistributeV,
+  onSaveProject,
+  onLoadProject,
   hasPersons,
+  hasSelection,
 }) => {
   const tools: { id: Tool; label: string; icon: string }[] = [
     { id: 'select', label: 'Auswahl', icon: '⊹' },
@@ -132,10 +148,19 @@ const Toolbar: React.FC<Props> = ({
           className="tool-btn auto-btn"
           onClick={onAutoThreePoint}
           disabled={!hasPersons}
-          title="3-Punkt-Beleuchtung für ausgewählte/alle Personen"
+          title="3-Punkt-Beleuchtung (Standard)"
         >
           <span className="tool-icon">💡</span>
           <span className="tool-label">3-Punkt</span>
+        </button>
+        <button
+          className="tool-btn auto-btn"
+          onClick={onAutoThreePointConfig}
+          disabled={!hasPersons}
+          title="3-Punkt mit Leuchtenauswahl"
+        >
+          <span className="tool-icon">⚙</span>
+          <span className="tool-label">Konfig.</span>
         </button>
         <button
           className="tool-btn auto-btn"
@@ -148,11 +173,41 @@ const Toolbar: React.FC<Props> = ({
         </button>
       </div>
 
+      <div className="toolbar-separator" />
+
+      {/* Align / Distribute */}
+      <div className="toolbar-group">
+        <button className="tool-btn" onClick={onAlignH} disabled={!hasSelection} title="Horizontal ausrichten (gleiche Y)">
+          <span className="tool-icon">⫶</span>
+          <span className="tool-label">H-Align</span>
+        </button>
+        <button className="tool-btn" onClick={onAlignV} disabled={!hasSelection} title="Vertikal ausrichten (gleiche X)">
+          <span className="tool-icon">⫴</span>
+          <span className="tool-label">V-Align</span>
+        </button>
+        <button className="tool-btn" onClick={onDistributeH} title="Horizontal verteilen">
+          <span className="tool-icon">⋯</span>
+          <span className="tool-label">H-Dist</span>
+        </button>
+        <button className="tool-btn" onClick={onDistributeV} title="Vertikal verteilen">
+          <span className="tool-icon">⋮</span>
+          <span className="tool-label">V-Dist</span>
+        </button>
+      </div>
+
       <div className="toolbar-spacer" />
 
       <div className="toolbar-group">
-        <button className="tool-btn" onClick={onExport} title="Plan als Bild exportieren">
+        <button className="tool-btn" onClick={onSaveProject} title="Projekt speichern">
           <span className="tool-icon">💾</span>
+          <span className="tool-label">Speichern</span>
+        </button>
+        <button className="tool-btn" onClick={onLoadProject} title="Projekt laden">
+          <span className="tool-icon">📂</span>
+          <span className="tool-label">Laden</span>
+        </button>
+        <button className="tool-btn" onClick={onExport} title="Plan als Bild exportieren">
+          <span className="tool-icon">🖼</span>
           <span className="tool-label">Export</span>
         </button>
       </div>

@@ -872,3 +872,166 @@ kbd {
 .prop-field select:focus {
   border-color: var(--accent);
 }
+
+/* ── Gel Filter Chips ──────────────────────────────────── */
+.gel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.gel-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: var(--panel-alt);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text);
+}
+
+.gel-type-badge {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.gel-type-cto { background: #ff8c00; color: #111; }
+.gel-type-ctb { background: #4488ff; color: #fff; }
+.gel-type-frost { background: #bbccdd; color: #111; }
+
+.gel-remove {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+}
+
+/* ── Three-Point Dialog ────────────────────────────────── */
+.three-point-modal {
+  width: 520px;
+  max-width: 95vw;
+}
+
+.three-point-role {
+  margin-bottom: 12px;
+  padding: 10px;
+  background: var(--panel-alt);
+  border-radius: var(--radius);
+}
+
+.three-point-role-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--warn);
+}
+
+.three-point-role select {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+
+.three-point-dim {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text2);
+}
+
+.three-point-dim input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.dim-val {
+  font-family: monospace;
+  min-width: 36px;
+  text-align: right;
+}
+
+.dialog-hint {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 12px;
+}
+
+/* ── Project Dialog ────────────────────────────────────── */
+.project-modal {
+  width: 460px;
+  max-width: 95vw;
+}
+
+.project-list {
+  max-height: 45vh;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.project-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.project-list-item:hover {
+  background: var(--panel-alt);
+}
+
+.project-list-info {
+  flex: 1;
+}
+
+.project-list-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.project-list-meta {
+  font-size: 10px;
+  color: var(--text2);
+  margin-top: 2px;
+}
+
+.project-list-notes {
+  font-size: 10px;
+  color: var(--text2);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.project-delete-btn {
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+}
+
+.project-delete-btn:hover {
+  background: rgba(239, 83, 80, 0.15);
+  border-radius: 3px;
+}

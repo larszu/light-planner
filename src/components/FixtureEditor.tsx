@@ -182,6 +182,5 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
     </div>
   );
 };
-};
 
 export default FixtureEditor;
