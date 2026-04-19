@@ -78,6 +78,10 @@ const App: React.FC = () => {
     setFixtures((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
   }, []);
 
+  const handleMoveAim = useCallback((id: string, aimX: number, aimY: number) => {
+    setFixtures((prev) => prev.map((f) => (f.id === id ? { ...f, aimX, aimY } : f)));
+  }, []);
+
   // ── Person handlers ──
   const handleAddPerson = useCallback((x: number, y: number) => {
     const p: Person = { id: uid('per'), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, height: 1.75, label: '' };
@@ -348,6 +352,7 @@ const App: React.FC = () => {
               onCursorLux={setCursorLux}
               onToolChange={setActiveTool}
               onDropFixture={handleDropFixture}
+              onMoveAim={handleMoveAim}
             />
           ) : (
             <Suspense fallback={<div className="loading-3d">3D-Ansicht wird geladen…</div>}>

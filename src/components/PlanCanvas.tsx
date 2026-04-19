@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux } from '../utils/lightCalc';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
+import { getBeamColorRgba } from '../utils/colorTemp';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -26,6 +27,7 @@ interface Props {
   onCursorLux: (lux: number | null) => void;
   onToolChange: (tool: Tool) => void;
   onDropFixture: (fixture: Fixture, x: number, y: number) => void;
+  onMoveAim: (id: string, aimX: number, aimY: number) => void;
 }
 
 const GRID_COLOR = '#2a2a3c';
@@ -57,12 +59,13 @@ const PlanCanvas: React.FC<Props> = ({
   onCursorLux,
   onToolChange,
   onDropFixture,
+  onMoveAim,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-person' | 'move-stage' | 'draw-rect' | 'draw-line' | 'draw-measure';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'draw-rect' | 'draw-line' | 'draw-measure';
     startScreenX: number;
     startScreenY: number;
     startWorldX: number;
@@ -367,9 +370,9 @@ const PlanCanvas: React.FC<Props> = ({
         // Aiming straight down – show circle around fixture
         ctx.beginPath();
         ctx.arc(f.x, f.y, beamRad, 0, Math.PI * 2);
-        ctx.fillStyle = isSel ? 'rgba(255,200,50,0.10)' : 'rgba(255,230,100,0.06)';
+        ctx.fillStyle = isSel ? getBeamColorRgba(f, 0.14) : getBeamColorRgba(f, 0.08);
         ctx.fill();
-        ctx.strokeStyle = isSel ? 'rgba(255,200,50,0.35)' : 'rgba(255,230,100,0.15)';
+        ctx.strokeStyle = isSel ? getBeamColorRgba(f, 0.40) : getBeamColorRgba(f, 0.18);
         ctx.lineWidth = 1 / v.scale;
         ctx.stroke();
       } else {
@@ -387,14 +390,14 @@ const PlanCanvas: React.FC<Props> = ({
         ctx.arc(f.aimX, f.aimY, beamRad, perpAngle, perpAngle - Math.PI, true);
         ctx.lineTo(f.x, f.y);
         ctx.closePath();
-        ctx.fillStyle = isSel ? 'rgba(255,200,50,0.08)' : 'rgba(255,230,100,0.04)';
+        ctx.fillStyle = isSel ? getBeamColorRgba(f, 0.12) : getBeamColorRgba(f, 0.06);
         ctx.fill();
-        ctx.strokeStyle = isSel ? 'rgba(255,200,50,0.25)' : 'rgba(255,230,100,0.10)';
+        ctx.strokeStyle = isSel ? getBeamColorRgba(f, 0.30) : getBeamColorRgba(f, 0.14);
         ctx.lineWidth = 1 / v.scale;
         ctx.stroke();
       }
 
-      // Aim line
+      // Aim line + handle
       if (aimDist2D > 0.01) {
         ctx.beginPath();
         ctx.setLineDash([4 / v.scale, 4 / v.scale]);
@@ -402,13 +405,49 @@ const PlanCanvas: React.FC<Props> = ({
         ctx.strokeStyle = isSel ? '#ffcc33' : '#888';
         ctx.lineWidth = 1 / v.scale; ctx.stroke();
         ctx.setLineDash([]);
-        const cs = 0.12;
-        ctx.strokeStyle = isSel ? '#ffcc33' : '#666';
-        ctx.lineWidth = 1.5 / v.scale;
-        ctx.beginPath();
-        ctx.moveTo(f.aimX - cs, f.aimY); ctx.lineTo(f.aimX + cs, f.aimY);
-        ctx.moveTo(f.aimX, f.aimY - cs); ctx.lineTo(f.aimX, f.aimY + cs);
-        ctx.stroke();
+
+        if (isSel) {
+          // Draggable aim handle – filled circle with crosshair and arrowhead
+          const hr = 0.22;
+          ctx.beginPath();
+          ctx.arc(f.aimX, f.aimY, hr, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,204,51,0.25)';
+          ctx.fill();
+          ctx.strokeStyle = '#ffcc33';
+          ctx.lineWidth = 1.5 / v.scale;
+          ctx.stroke();
+          // Crosshair inside
+          const cs = 0.15;
+          ctx.beginPath();
+          ctx.moveTo(f.aimX - cs, f.aimY); ctx.lineTo(f.aimX + cs, f.aimY);
+          ctx.moveTo(f.aimX, f.aimY - cs); ctx.lineTo(f.aimX, f.aimY + cs);
+          ctx.strokeStyle = '#ffcc33';
+          ctx.lineWidth = 1.5 / v.scale;
+          ctx.stroke();
+          // Arrow along aim line pointing to target
+          const arrAngle = Math.atan2(f.aimY - f.y, f.aimX - f.x);
+          const arrLen = 0.3;
+          const arrW = 0.12;
+          const tipX = f.aimX - (hr + 0.02) * Math.cos(arrAngle);
+          const tipY = f.aimY - (hr + 0.02) * Math.sin(arrAngle);
+          ctx.beginPath();
+          ctx.moveTo(tipX - arrLen * Math.cos(arrAngle) - arrW * Math.sin(arrAngle),
+                     tipY - arrLen * Math.sin(arrAngle) + arrW * Math.cos(arrAngle));
+          ctx.lineTo(tipX, tipY);
+          ctx.lineTo(tipX - arrLen * Math.cos(arrAngle) + arrW * Math.sin(arrAngle),
+                     tipY - arrLen * Math.sin(arrAngle) - arrW * Math.cos(arrAngle));
+          ctx.strokeStyle = '#ffcc33';
+          ctx.lineWidth = 1.5 / v.scale;
+          ctx.stroke();
+        } else {
+          const cs = 0.12;
+          ctx.strokeStyle = '#666';
+          ctx.lineWidth = 1.5 / v.scale;
+          ctx.beginPath();
+          ctx.moveTo(f.aimX - cs, f.aimY); ctx.lineTo(f.aimX + cs, f.aimY);
+          ctx.moveTo(f.aimX, f.aimY - cs); ctx.lineTo(f.aimX, f.aimY + cs);
+          ctx.stroke();
+        }
       }
 
       // Fixture body – standardized symbol based on category
@@ -551,6 +590,14 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     if (activeTool === 'select') {
+      // Check aim-point handles first (only for selected fixture)
+      const aimHitR = 0.35;
+      for (const f of fixtures) {
+        if (f.id === selectedId && Math.sqrt((wx - f.aimX) ** 2 + (wy - f.aimY) ** 2) < aimHitR) {
+          dragRef.current = { type: 'move-aim', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: f.id };
+          return;
+        }
+      }
       const cr = 0.5;
       for (const f of fixtures) {
         if (Math.sqrt((wx - f.x) ** 2 + (wy - f.y) ** 2) < cr) {
@@ -597,6 +644,10 @@ const PlanCanvas: React.FC<Props> = ({
         onMoveFixture(d.targetId, Math.round((f.x + wx - d.startWorldX) * 10) / 10, Math.round((f.y + wy - d.startWorldY) * 10) / 10);
         d.startWorldX = wx; d.startWorldY = wy;
       }
+      return;
+    }
+    if (d.type === 'move-aim' && d.targetId) {
+      onMoveAim(d.targetId, Math.round(wx * 10) / 10, Math.round(wy * 10) / 10);
       return;
     }
     if (d.type === 'move-person' && d.targetId) {

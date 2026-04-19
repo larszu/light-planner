@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { PlacedFixture, Person, StageElement } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget } from '../utils/lightCalc';
+import { getBeamColorHex } from '../utils/colorTemp';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -257,7 +258,7 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
         coneGeo.translate(0, -coneHeight / 2, 0);
 
         const coneMat = new THREE.MeshBasicMaterial({
-          color: isSel ? '#ffcc33' : '#ffee88',
+          color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
           transparent: true,
           opacity: 0.04,
           side: THREE.DoubleSide,

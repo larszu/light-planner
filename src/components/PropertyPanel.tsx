@@ -1,7 +1,9 @@
 import React from 'react';
-import type { PlacedFixture, Person, StageElement } from '../types';
+import type { PlacedFixture, Person, StageElement, Fixture } from '../types';
 import { luxFromFixture } from '../utils/lightCalc';
 import { gelLibrary, effectiveColorTemp } from '../data/gelLibrary';
+import { fixtureLibrary } from '../data/fixtureLibrary';
+import { getFixtureCCT, cctToRgb } from '../utils/colorTemp';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -82,6 +84,34 @@ const PropertyPanel: React.FC<Props> = ({
       <div className="property-panel">
         <h3>{f.fixture.name}</h3>
         {activeAtt && <div className="prop-attachment-badge">+ {activeAtt.name}</div>}
+
+        {/* Fixture swap */}
+        <div className="prop-section">
+          <span className="prop-section-title">Leuchte tauschen</span>
+          <label className="prop-field">
+            <span>Typ</span>
+            <select
+              value={f.fixture.id}
+              onChange={(e) => {
+                const newFixture = fixtureLibrary.find((fx) => fx.id === e.target.value);
+                if (newFixture) {
+                  onUpdateFixture(f.id, {
+                    fixture: newFixture,
+                    activeAttachmentId: undefined,
+                    currentBeamAngle: undefined,
+                    currentColorTemp: undefined,
+                  });
+                }
+              }}
+            >
+              {fixtureLibrary.map((fx) => (
+                <option key={fx.id} value={fx.id}>
+                  {fx.manufacturer} {fx.name} ({fx.category}, {fx.wattage}W)
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <div className="prop-section">
           <span className="prop-section-title">Position</span>
