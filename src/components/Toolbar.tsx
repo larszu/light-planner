@@ -6,10 +6,12 @@ interface Props {
   viewMode: ViewMode;
   showHeatMap: boolean;
   heatMapScale: number;
+  heatMapTarget: number;
   onToolChange: (t: Tool) => void;
   onViewModeChange: (m: ViewMode) => void;
   onToggleHeatMap: () => void;
   onHeatMapScaleChange: (v: number) => void;
+  onHeatMapTargetChange: (v: number) => void;
   onUploadFloorPlan: (file: File) => void;
   onExport: () => void;
   onAutoThreePoint: () => void;
@@ -30,10 +32,12 @@ const Toolbar: React.FC<Props> = ({
   viewMode,
   showHeatMap,
   heatMapScale,
+  heatMapTarget,
   onToolChange,
   onViewModeChange,
   onToggleHeatMap,
   onHeatMapScaleChange,
+  onHeatMapTargetChange,
   onUploadFloorPlan,
   onExport,
   onAutoThreePoint,
@@ -134,6 +138,20 @@ const Toolbar: React.FC<Props> = ({
               step={10}
               value={heatMapScale}
               onChange={(e) => onHeatMapScaleChange(Number(e.target.value))}
+            />
+            <span>lx</span>
+          </label>
+        )}
+        {showHeatMap && (
+          <label className="heat-scale-label" title="Beleuchtungsziel (0 = aus)">
+            <span>Ziel:</span>
+            <input
+              type="number"
+              min={0}
+              max={100000}
+              step={10}
+              value={heatMapTarget}
+              onChange={(e) => onHeatMapTargetChange(Number(e.target.value))}
             />
             <span>lx</span>
           </label>

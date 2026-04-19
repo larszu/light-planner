@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement } from '../types';
-import { computeHeatMap, luxToColor, totalLux } from '../utils/lightCalc';
+import { computeHeatMap, luxToColor, luxToColorTarget, totalLux } from '../utils/lightCalc';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   selectedId: string | null;
   showHeatMap: boolean;
   heatMapScale: number;
+  heatMapTarget: number;
   onPlaceFixture: (fixture: Fixture, x: number, y: number) => void;
   onMoveFixture: (id: string, x: number, y: number) => void;
   onSelect: (id: string | null) => void;
@@ -44,6 +45,7 @@ const PlanCanvas: React.FC<Props> = ({
   selectedId,
   showHeatMap,
   heatMapScale,
+  heatMapTarget,
   onPlaceFixture,
   onMoveFixture,
   onSelect,
@@ -307,13 +309,16 @@ const PlanCanvas: React.FC<Props> = ({
       const hmWidth = Math.min(right, floorPlan ? floorPlan.widthMeters : 50) - hmLeft;
       const hmHeight = Math.min(bottom, floorPlan ? floorPlan.heightMeters : 30) - hmTop;
       if (hmWidth > 0 && hmHeight > 0) {
-        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}`).join('|')}|${heatMapScale}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
+        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
         let imgData = heatMapCacheRef.current.imageData;
         if (heatMapCacheRef.current.key !== cacheKey || !imgData) {
           const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY);
           imgData = new ImageData(hmResX, hmResY);
+          const useTarget = heatMapTarget > 0;
           for (let i = 0; i < data.length; i++) {
-            const [r, g, b, a] = luxToColor(data[i], heatMapScale);
+            const [r, g, b, a] = useTarget
+              ? luxToColorTarget(data[i], heatMapTarget)
+              : luxToColor(data[i], heatMapScale);
             imgData.data[i * 4] = r; imgData.data[i * 4 + 1] = g;
             imgData.data[i * 4 + 2] = b; imgData.data[i * 4 + 3] = a;
           }

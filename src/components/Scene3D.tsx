@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { PlacedFixture, Person, StageElement } from '../types';
-import { computeHeatMap, luxToColor } from '../utils/lightCalc';
+import { computeHeatMap, luxToColor, luxToColorTarget } from '../utils/lightCalc';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -11,10 +11,11 @@ interface Props {
   selectedId: string | null;
   showHeatMap: boolean;
   heatMapScale: number;
+  heatMapTarget: number;
   onSelect: (id: string | null) => void;
 }
 
-const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, onSelect }) => {
+const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, heatMapTarget, onSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -69,8 +70,49 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
     const animId = 0;
     sceneRef.current = { scene, camera, renderer, controls, animId };
 
+    // ── WASD keyboard movement ──
+    const keys: Record<string, boolean> = {};
+    const MOVE_SPEED = 0.25;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle when no input/textarea is focused
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      keys[e.key.toLowerCase()] = true;
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keys[e.key.toLowerCase()] = false;
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    const _forward = new THREE.Vector3();
+    const _right = new THREE.Vector3();
+    const applyWASD = () => {
+      // Forward/back direction (horizontal only, from camera look direction)
+      camera.getWorldDirection(_forward);
+      _forward.y = 0;
+      _forward.normalize();
+      // Right direction
+      _right.crossVectors(_forward, camera.up).normalize();
+
+      let dx = 0, dz = 0, dy = 0;
+      if (keys['w'] || keys['arrowup'])    { dx += _forward.x; dz += _forward.z; }
+      if (keys['s'] || keys['arrowdown'])  { dx -= _forward.x; dz -= _forward.z; }
+      if (keys['a'] || keys['arrowleft'])  { dx -= _right.x;   dz -= _right.z; }
+      if (keys['d'] || keys['arrowright']) { dx += _right.x;   dz += _right.z; }
+      if (keys['q'] || keys['pagedown'])   { dy -= 1; }
+      if (keys['e'] || keys['pageup'])     { dy += 1; }
+
+      if (dx !== 0 || dz !== 0 || dy !== 0) {
+        const move = new THREE.Vector3(dx, dy, dz).normalize().multiplyScalar(MOVE_SPEED);
+        camera.position.add(move);
+        controls.target.add(move);
+      }
+    };
+
     const animate = () => {
       sceneRef.current!.animId = requestAnimationFrame(animate);
+      applyWASD();
       controls.update();
       renderer.render(scene, camera);
     };
@@ -110,6 +152,8 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
     return () => {
       cancelAnimationFrame(sceneRef.current!.animId);
       renderer.domElement.removeEventListener('click', handleClick);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
       obs.disconnect();
       renderer.dispose();
       container.removeChild(renderer.domElement);
@@ -257,7 +301,9 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
       const imgData = ctx.createImageData(hmRes, hmRes);
 
       for (let i = 0; i < hmRes * hmRes; i++) {
-        const [r, g, b, a] = luxToColor(data[i], scale);
+        const [r, g, b, a] = heatMapTarget > 0
+          ? luxToColorTarget(data[i], heatMapTarget)
+          : luxToColor(data[i], scale);
         imgData.data[i * 4] = r;
         imgData.data[i * 4 + 1] = g;
         imgData.data[i * 4 + 2] = b;
@@ -307,7 +353,7 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
       sprite.userData = { dynamic: true };
       scene.add(sprite);
     }
-  }, [fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale]);
+  }, [fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, heatMapTarget]);
 
   return <div ref={containerRef} className="scene3d-container" />;
 };

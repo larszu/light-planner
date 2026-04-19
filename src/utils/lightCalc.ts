@@ -257,3 +257,46 @@ export function luxToColor(lux: number, maxScale: number): [number, number, numb
   const alpha = Math.round(40 + t * 160);
   return [r, g, b, alpha];
 }
+
+/**
+ * Map lux to RGBA with a target-based three-zone colour scheme.
+ *   < 80 % target  → blue shades   (under-lit)
+ *   80–120 %       → green shades   (on target)
+ *   > 120 %        → orange/red     (over-lit)
+ * Zero lux stays transparent.
+ */
+export function luxToColorTarget(
+  lux: number,
+  target: number,
+): [number, number, number, number] {
+  if (lux <= 0 || target <= 0) return [0, 0, 0, 0];
+  const ratio = lux / target;
+
+  let r: number, g: number, b: number, alpha: number;
+
+  if (ratio < 0.8) {
+    // Under-lit: dark blue → cyan as it approaches 80 %
+    const t = Math.min(ratio / 0.8, 1);  // 0 → 1
+    r = 0;
+    g = Math.round(t * 180);
+    b = Math.round(100 + t * 155);       // 100 → 255
+    alpha = Math.round(60 + t * 120);
+  } else if (ratio <= 1.2) {
+    // On target: green zone
+    // 0.8 → 1.0 brightens, 1.0 → 1.2 slightly yellows
+    const t = (ratio - 0.8) / 0.4;       // 0 → 1 within zone
+    r = Math.round(t * 60);              // slight yellow tint at upper end
+    g = Math.round(180 + t * 75);        // 180 → 255
+    b = Math.round(40 * (1 - t));        // subtle teal fades out
+    alpha = Math.round(120 + t * 60);
+  } else {
+    // Over-lit: yellow → red
+    const t = Math.min((ratio - 1.2) / 1.8, 1); // 0 → 1 from 120 % to 300 %
+    r = 255;
+    g = Math.round(255 * (1 - t));       // yellow → red
+    b = 0;
+    alpha = Math.round(160 + t * 60);
+  }
+
+  return [r, g, b, alpha];
+}

@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [fixtureToPlace, setFixtureToPlace] = useState<Fixture | null>(null);
   const [showHeatMap, setShowHeatMap] = useState(false);
   const [heatMapScale, setHeatMapScale] = useState(1000);
+  const [heatMapTarget, setHeatMapTarget] = useState(0);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
   const [cursorLux, setCursorLux] = useState<number | null>(null);
   const [showThreePointDialog, setShowThreePointDialog] = useState(false);
@@ -298,7 +299,9 @@ const App: React.FC = () => {
         onToolChange={setActiveTool}
         onViewModeChange={setViewMode}
         onToggleHeatMap={() => setShowHeatMap((v) => !v)}
+        heatMapTarget={heatMapTarget}
         onHeatMapScaleChange={setHeatMapScale}
+        onHeatMapTargetChange={setHeatMapTarget}
         onUploadFloorPlan={handleUploadFloorPlan}
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
@@ -333,6 +336,7 @@ const App: React.FC = () => {
               selectedId={selectedId}
               showHeatMap={showHeatMap}
               heatMapScale={heatMapScale}
+              heatMapTarget={heatMapTarget}
               onPlaceFixture={handlePlaceFixture}
               onMoveFixture={handleMoveFixture}
               onSelect={setSelectedId}
@@ -354,6 +358,7 @@ const App: React.FC = () => {
                 selectedId={selectedId}
                 showHeatMap={showHeatMap}
                 heatMapScale={heatMapScale}
+                heatMapTarget={heatMapTarget}
                 onSelect={setSelectedId}
               />
             </Suspense>
