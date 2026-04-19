@@ -224,6 +224,8 @@ const App: React.FC = () => {
                 persons={persons}
                 stageElements={stageElements}
                 selectedId={selectedId}
+                showHeatMap={showHeatMap}
+                heatMapScale={heatMapScale}
                 onSelect={setSelectedId}
               />
             </Suspense>

@@ -2,16 +2,19 @@ import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { PlacedFixture, Person, StageElement } from '../types';
+import { computeHeatMap, luxToColor } from '../utils/lightCalc';
 
 interface Props {
   fixtures: PlacedFixture[];
   persons: Person[];
   stageElements: StageElement[];
   selectedId: string | null;
+  showHeatMap: boolean;
+  heatMapScale: number;
   onSelect: (id: string | null) => void;
 }
 
-const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId, onSelect }) => {
+const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, onSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -235,7 +238,72 @@ const Scene3D: React.FC<Props> = ({ fixtures, persons, stageElements, selectedId
 
       scene.add(group);
     }
-  }, [fixtures, persons, stageElements, selectedId]);
+
+    // ── 3D Heatmap on ground plane ──
+    if (showHeatMap && fixtures.length > 0) {
+      const hmSize = 60;
+      const hmRes = 128;
+      const { data, maxLux } = computeHeatMap(fixtures, -hmSize / 2, -hmSize / 2, hmSize, hmSize, hmRes, hmRes);
+      const scale = heatMapScale > 0 ? heatMapScale : (maxLux || 1000);
+
+      const canvas2d = document.createElement('canvas');
+      canvas2d.width = hmRes;
+      canvas2d.height = hmRes;
+      const ctx = canvas2d.getContext('2d')!;
+      const imgData = ctx.createImageData(hmRes, hmRes);
+
+      for (let i = 0; i < hmRes * hmRes; i++) {
+        const [r, g, b, a] = luxToColor(data[i], scale);
+        imgData.data[i * 4] = r;
+        imgData.data[i * 4 + 1] = g;
+        imgData.data[i * 4 + 2] = b;
+        imgData.data[i * 4 + 3] = a;
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const hmTexture = new THREE.CanvasTexture(canvas2d);
+      hmTexture.minFilter = THREE.LinearFilter;
+      hmTexture.magFilter = THREE.LinearFilter;
+
+      const hmGeo = new THREE.PlaneGeometry(hmSize, hmSize);
+      const hmMat = new THREE.MeshBasicMaterial({
+        map: hmTexture,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const hmMesh = new THREE.Mesh(hmGeo, hmMat);
+      hmMesh.rotation.x = -Math.PI / 2;
+      hmMesh.position.y = 0.01; // slightly above ground
+      hmMesh.userData = { dynamic: true };
+      scene.add(hmMesh);
+    }
+
+    // ── Dimension annotations (Maßlinien) ──
+    // Add size labels for stage elements
+    for (const se of stageElements) {
+      const label = `${se.width}×${se.depth}m h=${se.height}m`;
+      const canvas2d = document.createElement('canvas');
+      canvas2d.width = 256;
+      canvas2d.height = 64;
+      const ctx = canvas2d.getContext('2d')!;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0, 0, 256, 64);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '24px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, 128, 32);
+
+      const tex = new THREE.CanvasTexture(canvas2d);
+      const sprMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(sprMat);
+      sprite.position.set(se.x + se.width / 2, se.height + 0.5, se.y + se.depth / 2);
+      sprite.scale.set(2, 0.5, 1);
+      sprite.userData = { dynamic: true };
+      scene.add(sprite);
+    }
+  }, [fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale]);
 
   return <div ref={containerRef} className="scene3d-container" />;
 };

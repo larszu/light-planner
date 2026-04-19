@@ -13,6 +13,7 @@ export type FixtureCategory =
   | 'cyc'            // Horizontleuchte / Cyclorama
   | 'flood'          // Fluter / Floodlight
   | 'followspot'     // Verfolger
+  | 'led-panel'      // LED-Flächenleuchte (Aputure, ARRI Skypanel)
   | 'custom';
 
 // ── Beam shape – not all fixtures project a circle ──
@@ -31,6 +32,40 @@ export type LensType =
   | 'pc'             // Plano-Convex
   | 'reflector';     // reiner Reflektor (PAR)
 
+// ── Mount type for attachment compatibility ──
+export type MountType =
+  | 'bowens'         // Bowens S-Mount (Aputure LS, Godox, etc.)
+  | 'prolock-bowens' // Aputure ProLock Bowens (backward compat w/ bowens)
+  | 'junior'         // 1-1/8" Junior Pin
+  | 'baby'           // 5/8" Baby Pin
+  | 'clamp'          // Bügelklemme / C-Clamp
+  | 'yoke'           // integriertes Joch (Moving Heads)
+  | 'none';          // Kein austauschbarer Ansatz
+
+// ── Photometric reference measurement ──
+export interface PhotometricData {
+  lux: number;         // measured illuminance
+  distance: number;    // meters at which measured
+  beamAngle?: number;  // beam angle at which measured (for zoom fixtures)
+  colorTemp?: number;  // CCT at which measured
+}
+
+// ── Attachment / Modifier that mounts on a fixture ──
+export interface Attachment {
+  id: string;
+  name: string;
+  type: 'fresnel' | 'softbox' | 'reflector' | 'spotlight' | 'barndoors' | 'gel-frame' | 'diffusion' | 'snoot' | 'lantern';
+  mountType: MountType;
+  // Overrides when attached
+  beamAngleOverride?: number;
+  fieldAngleOverride?: number;
+  zoomRangeOverride?: [number, number];
+  beamShapeOverride?: BeamShape;
+  lensTypeOverride?: LensType;
+  photometricOverride?: PhotometricData; // measured with attachment on reference fixture
+  weightAdditional: number; // kg added
+}
+
 export interface Fixture {
   id: string;
   name: string;
@@ -38,6 +73,8 @@ export interface Fixture {
   category: FixtureCategory;
   wattage: number;
   lumens: number;
+  // ── Photometric reference (lux at specific distance) ──
+  photometric?: PhotometricData;           // bare/with standard reflector
   // ── Beam geometry ──
   beamAngle: number;      // 50 % peak (degrees)
   fieldAngle: number;     // 10 % peak (degrees)
@@ -45,14 +82,19 @@ export interface Fixture {
   beamRatioWH: number;    // width / height ratio for elliptical (1.0 = circular)
   lensType: LensType;
   zoomRange?: [number, number]; // min/max beam angle if zoom
-  // ── Photometric ──
-  colorTemp: number;      // Kelvin (0 = RGBW variable)
+  // ── Color ──
+  colorTempRange?: [number, number]; // [min, max] Kelvin for bi-color / tunable white
+  colorTemp: number;      // single CCT for fixed, 0 = full RGBW
   cri?: number;           // Color Rendering Index
-  ipRating?: string;
+  tlci?: number;          // Television Lighting Consistency Index
   // ── Physical ──
   weight: number;         // kg
+  mountType: MountType;
+  ipRating?: string;
   powerConnector?: string;
   dmxChannels?: number;
+  // ── Attachments ──
+  compatibleAttachments?: Attachment[];
 }
 
 export interface PlacedFixture {
@@ -68,6 +110,10 @@ export interface PlacedFixture {
   // ── Intensity ──
   dimming: number;        // 0–100 %
   currentBeamAngle?: number; // zoom override
+  // ── Active modifier ──
+  activeAttachmentId?: string; // id of currently mounted attachment
+  // ── Color temperature setting ──
+  currentColorTemp?: number;   // current CCT for tunable fixtures
 }
 
 // ── Person on stage ──

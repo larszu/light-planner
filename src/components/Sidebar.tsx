@@ -24,13 +24,14 @@ const CATEGORY_LABELS: Record<FixtureCategory, string> = {
   cyc: 'Horizontleuchte',
   flood: 'Fluter',
   followspot: 'Verfolger',
+  'led-panel': 'LED-Flächenleuchten',
   custom: 'Eigene',
 };
 
 const CATEGORIES: FixtureCategory[] = [
   'profile', 'fresnel', 'par', 'wash', 'spot', 'beam',
   'moving-wash', 'moving-spot', 'moving-beam',
-  'blinder', 'cyc', 'flood', 'followspot', 'custom',
+  'blinder', 'cyc', 'flood', 'followspot', 'led-panel', 'custom',
 ];
 
 const Sidebar: React.FC<Props> = ({
@@ -105,9 +106,22 @@ const Sidebar: React.FC<Props> = ({
                       {f.zoomRange && ` (${f.zoomRange[0]}–${f.zoomRange[1]}°)`}
                     </div>
                     <div className="fixture-item-info">
-                      {f.lumens.toLocaleString()} lm · {f.colorTemp > 0 ? `${f.colorTemp}K` : 'RGBW'}
+                      {f.photometric
+                        ? `${f.photometric.lux.toLocaleString()} lux@${f.photometric.distance}m`
+                        : `${f.lumens.toLocaleString()} lm`}
+                      {' · '}
+                      {f.colorTempRange
+                        ? `${f.colorTempRange[0]}–${f.colorTempRange[1]}K`
+                        : f.colorTemp > 0
+                        ? `${f.colorTemp}K`
+                        : 'RGBW'}
                       · {f.weight}kg
                     </div>
+                    {f.compatibleAttachments && f.compatibleAttachments.length > 0 && (
+                      <div className="fixture-item-info attachment-hint">
+                        🔧 {f.compatibleAttachments.length} Vorsätze verfügbar
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>

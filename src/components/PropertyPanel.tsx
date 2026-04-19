@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PlacedFixture, Person, StageElement } from '../types';
+import { luxFromFixture } from '../utils/lightCalc';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -13,6 +14,16 @@ interface Props {
   onDelete: (id: string) => void;
   onAutoThreePointForPerson: (personId: string) => void;
 }
+
+const MOUNT_LABELS: Record<string, string> = {
+  bowens: 'Bowens S-Mount',
+  'prolock-bowens': 'ProLock Bowens',
+  junior: 'Junior Pin',
+  baby: 'Baby Pin',
+  clamp: 'C-Clamp',
+  yoke: 'Integriertes Joch',
+  none: 'Kein Ansatz',
+};
 
 const PropertyPanel: React.FC<Props> = ({
   fixtures,
@@ -43,63 +54,141 @@ const PropertyPanel: React.FC<Props> = ({
     const hDist = Math.sqrt((f.aimX - f.x) ** 2 + (f.aimY - f.y) ** 2);
     const tiltDeg = (Math.atan2(hDist, f.mountingHeight) * 180) / Math.PI;
     const panDeg = (Math.atan2(f.aimY - f.y, f.aimX - f.x) * 180) / Math.PI;
-    const beamAngle = f.currentBeamAngle ?? f.fixture.beamAngle;
-    const beamRadAtFloor = Math.tan((beamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
-    const peakLux = (f.fixture.lumens * (f.dimming / 100)) / (2 * Math.PI * (1 - Math.cos((beamAngle / 2) * (Math.PI / 180)))) / (f.mountingHeight * f.mountingHeight);
+
+    // Get effective beam angle considering attachment
+    const activeAtt = f.activeAttachmentId
+      ? f.fixture.compatibleAttachments?.find((a) => a.id === f.activeAttachmentId)
+      : undefined;
+    const effectiveBeamAngle = f.currentBeamAngle ?? activeAtt?.beamAngleOverride ?? f.fixture.beamAngle;
+    const effectiveZoomRange = activeAtt?.zoomRangeOverride ?? f.fixture.zoomRange;
+    const beamRadAtFloor = Math.tan((effectiveBeamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
+
+    // Compute peak lux at aim point using the real engine
+    const peakLux = luxFromFixture(f, f.aimX, f.aimY);
+    const totalWeight = f.fixture.weight + (activeAtt?.weightAdditional ?? 0);
+
+    // Pan/tilt from aim point, allow setting directly
+    const setPanTilt = (newPanDeg: number, newTiltDeg: number) => {
+      const tiltRad = (newTiltDeg * Math.PI) / 180;
+      const panRad = (newPanDeg * Math.PI) / 180;
+      const dist = f.mountingHeight * Math.tan(tiltRad);
+      const aimX = f.x + dist * Math.cos(panRad);
+      const aimY = f.y + dist * Math.sin(panRad);
+      onUpdateFixture(f.id, { aimX, aimY });
+    };
 
     return (
       <div className="property-panel">
         <h3>{f.fixture.name}</h3>
+        {activeAtt && <div className="prop-attachment-badge">+ {activeAtt.name}</div>}
+
         <div className="prop-section">
           <span className="prop-section-title">Position</span>
           {numField('X (m)', f.x, (v) => onUpdateFixture(f.id, { x: v }))}
           {numField('Y (m)', f.y, (v) => onUpdateFixture(f.id, { y: v }))}
           {numField('Höhe (m)', f.mountingHeight, (v) => onUpdateFixture(f.id, { mountingHeight: v }), 0.5, 0.5, 30)}
         </div>
+
         <div className="prop-section">
           <span className="prop-section-title">Ausrichtung</span>
           {numField('Ziel X (m)', f.aimX, (v) => onUpdateFixture(f.id, { aimX: v }))}
           {numField('Ziel Y (m)', f.aimY, (v) => onUpdateFixture(f.id, { aimY: v }))}
-          <div className="prop-derived">
-            Tilt: {tiltDeg.toFixed(1)}° · Pan: {panDeg.toFixed(1)}°
-          </div>
+          <label className="prop-field">
+            <span>Pan ({panDeg.toFixed(1)}°)</span>
+            <input type="range" min={-180} max={180} step={1} value={panDeg}
+              onChange={(e) => setPanTilt(Number(e.target.value), tiltDeg)} />
+          </label>
+          <label className="prop-field">
+            <span>Tilt ({tiltDeg.toFixed(1)}°)</span>
+            <input type="range" min={0} max={90} step={1} value={tiltDeg}
+              onChange={(e) => setPanTilt(panDeg, Number(e.target.value))} />
+          </label>
           {numField('Rotation (°)', f.bodyRotation, (v) => onUpdateFixture(f.id, { bodyRotation: v }), 5, 0, 360)}
         </div>
+
         <div className="prop-section">
           <span className="prop-section-title">Licht</span>
-          {f.fixture.zoomRange && (
-            <>
-              <label className="prop-field">
-                <span>Zoom ({beamAngle.toFixed(0)}°)</span>
-                <input type="range" min={f.fixture.zoomRange[0]} max={f.fixture.zoomRange[1]} step={0.5}
-                  value={beamAngle}
-                  onChange={(e) => onUpdateFixture(f.id, { currentBeamAngle: Number(e.target.value) })} />
-              </label>
-            </>
+          {effectiveZoomRange && (
+            <label className="prop-field">
+              <span>Zoom ({effectiveBeamAngle.toFixed(0)}°)</span>
+              <input type="range" min={effectiveZoomRange[0]} max={effectiveZoomRange[1]} step={0.5}
+                value={effectiveBeamAngle}
+                onChange={(e) => onUpdateFixture(f.id, { currentBeamAngle: Number(e.target.value) })} />
+            </label>
           )}
           <label className="prop-field">
             <span>Dimmer ({f.dimming}%)</span>
             <input type="range" min={0} max={100} step={1} value={f.dimming}
               onChange={(e) => onUpdateFixture(f.id, { dimming: Number(e.target.value) })} />
           </label>
+          {f.fixture.colorTempRange && (
+            <label className="prop-field">
+              <span>CCT ({f.currentColorTemp ?? f.fixture.colorTempRange[0]} K)</span>
+              <input type="range"
+                min={f.fixture.colorTempRange[0]} max={f.fixture.colorTempRange[1]} step={100}
+                value={f.currentColorTemp ?? f.fixture.colorTempRange[0]}
+                onChange={(e) => onUpdateFixture(f.id, { currentColorTemp: Number(e.target.value) })} />
+            </label>
+          )}
           <div className="prop-derived lux-readout">
             Beam Ø: {(beamRadAtFloor * 2).toFixed(1)} m<br />
             Peak: ~{peakLux.toFixed(0)} lux
           </div>
         </div>
+
+        {/* Attachment selector */}
+        {f.fixture.compatibleAttachments && f.fixture.compatibleAttachments.length > 0 && (
+          <div className="prop-section">
+            <span className="prop-section-title">Vorsatz / Attachment</span>
+            <label className="prop-field">
+              <span>Montiert</span>
+              <select
+                value={f.activeAttachmentId ?? ''}
+                onChange={(e) => onUpdateFixture(f.id, {
+                  activeAttachmentId: e.target.value || undefined,
+                  currentBeamAngle: undefined, // reset zoom when switching
+                })}
+              >
+                <option value="">Kein Vorsatz (Bare)</option>
+                {f.fixture.compatibleAttachments.map((att) => (
+                  <option key={att.id} value={att.id}>
+                    {att.name} ({att.type}) +{att.weightAdditional}kg
+                  </option>
+                ))}
+              </select>
+            </label>
+            {activeAtt && (
+              <div className="prop-derived">
+                Typ: {activeAtt.type}<br />
+                {activeAtt.beamAngleOverride && `Beam: ${activeAtt.beamAngleOverride}°`}
+                {activeAtt.zoomRangeOverride && ` (${activeAtt.zoomRangeOverride[0]}–${activeAtt.zoomRangeOverride[1]}°)`}
+                {activeAtt.photometricOverride && (
+                  <><br />Ref: {activeAtt.photometricOverride.lux.toLocaleString()} lux@{activeAtt.photometricOverride.distance}m</>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="prop-section">
           <span className="prop-section-title">Info</span>
           <div className="prop-info-grid">
             <span>{f.fixture.manufacturer}</span>
             <span>{f.fixture.wattage} W</span>
-            <span>{f.fixture.lumens.toLocaleString()} lm</span>
+            {f.fixture.photometric
+              ? <span>{f.fixture.photometric.lux.toLocaleString()} lux@{f.fixture.photometric.distance}m</span>
+              : <span>{f.fixture.lumens.toLocaleString()} lm</span>}
             <span>Beam: {f.fixture.beamAngle}°</span>
             <span>Field: {f.fixture.fieldAngle}°</span>
             <span>{f.fixture.beamShape}</span>
             <span>{f.fixture.lensType}</span>
-            <span>{f.fixture.colorTemp > 0 ? `${f.fixture.colorTemp} K` : 'RGBW'}</span>
-            <span>{f.fixture.weight} kg</span>
+            <span>{f.fixture.colorTempRange
+              ? `${f.fixture.colorTempRange[0]}–${f.fixture.colorTempRange[1]} K`
+              : f.fixture.colorTemp > 0 ? `${f.fixture.colorTemp} K` : 'RGBW'}</span>
+            <span>{MOUNT_LABELS[f.fixture.mountType] ?? f.fixture.mountType}</span>
+            <span>{totalWeight.toFixed(1)} kg</span>
             {f.fixture.cri && <span>CRI {f.fixture.cri}</span>}
+            {f.fixture.tlci && <span>TLCI {f.fixture.tlci}</span>}
             {f.fixture.ipRating && <span>IP{f.fixture.ipRating}</span>}
             {f.fixture.dmxChannels && <span>{f.fixture.dmxChannels} DMX-Ch</span>}
           </div>

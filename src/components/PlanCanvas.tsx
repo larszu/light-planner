@@ -216,6 +216,48 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'center';
       ctx.fillText(`${se.width}×${se.depth}m h=${se.height}m`, 0, 4 / v.scale);
       if (se.label) ctx.fillText(se.label, 0, -se.depth / 2 - 4 / v.scale);
+
+      // Blueprint-style dimension annotations (Maßlinien)
+      const dimOffset = 8 / v.scale; // offset of dimension line from edge
+      const tickLen = 4 / v.scale;
+      ctx.strokeStyle = '#6af';
+      ctx.fillStyle = '#6af';
+      ctx.lineWidth = 0.8 / v.scale;
+      ctx.setLineDash([]);
+      ctx.font = `${8 / v.scale}px monospace`;
+
+      // Width dimension (bottom)
+      const wDimY = se.depth / 2 + dimOffset;
+      ctx.beginPath();
+      ctx.moveTo(-se.width / 2, wDimY - tickLen / 2);
+      ctx.lineTo(-se.width / 2, wDimY + tickLen / 2);
+      ctx.moveTo(-se.width / 2, wDimY);
+      ctx.lineTo(se.width / 2, wDimY);
+      ctx.moveTo(se.width / 2, wDimY - tickLen / 2);
+      ctx.lineTo(se.width / 2, wDimY + tickLen / 2);
+      ctx.stroke();
+      ctx.textBaseline = 'top';
+      ctx.fillText(`${se.width} m`, 0, wDimY + 2 / v.scale);
+
+      // Depth dimension (right)
+      const dDimX = se.width / 2 + dimOffset;
+      ctx.beginPath();
+      ctx.moveTo(dDimX - tickLen / 2, -se.depth / 2);
+      ctx.lineTo(dDimX + tickLen / 2, -se.depth / 2);
+      ctx.moveTo(dDimX, -se.depth / 2);
+      ctx.lineTo(dDimX, se.depth / 2);
+      ctx.moveTo(dDimX - tickLen / 2, se.depth / 2);
+      ctx.lineTo(dDimX + tickLen / 2, se.depth / 2);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(dDimX + 2 / v.scale, 0);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textBaseline = 'bottom';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${se.depth} m`, 0, 0);
+      ctx.restore();
+      ctx.textBaseline = 'alphabetic';
+
       ctx.restore();
     }
 
@@ -356,6 +398,16 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.fillStyle = '#999';
       ctx.font = `${9 / v.scale}px sans-serif`;
       ctx.fillText(`h=${f.mountingHeight}m`, f.x, f.y + rad + 12 / v.scale);
+      // Show aim distance as dimension line annotation
+      const aimDist = Math.sqrt((f.aimX - f.x) ** 2 + (f.aimY - f.y) ** 2);
+      if (aimDist > 0.3) {
+        const realDist = Math.sqrt(aimDist * aimDist + f.mountingHeight * f.mountingHeight);
+        ctx.fillStyle = '#6af';
+        ctx.font = `${8 / v.scale}px monospace`;
+        const lmx = (f.x + f.aimX) / 2;
+        const lmy = (f.y + f.aimY) / 2;
+        ctx.fillText(`${realDist.toFixed(1)}m`, lmx + 4 / v.scale, lmy - 4 / v.scale);
+      }
       ctx.textAlign = 'start';
     }
 

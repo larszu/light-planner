@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Fixture, FixtureCategory, BeamShape, LensType } from '../types';
+import type { Fixture, FixtureCategory, BeamShape, LensType, MountType } from '../types';
 
 interface Props {
   onSave: (fixture: Fixture) => void;
@@ -26,6 +26,15 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
   const [cri, setCri] = useState(initial?.cri ?? 90);
   const [ipRating, setIpRating] = useState(initial?.ipRating ?? '');
   const [dmxChannels, setDmxChannels] = useState(initial?.dmxChannels ?? 1);
+  // New fields
+  const [mountType, setMountType] = useState<MountType>(initial?.mountType ?? 'clamp');
+  const [hasColorTempRange, setHasColorTempRange] = useState(!!initial?.colorTempRange);
+  const [colorTempMin, setColorTempMin] = useState(initial?.colorTempRange?.[0] ?? 2700);
+  const [colorTempMax, setColorTempMax] = useState(initial?.colorTempRange?.[1] ?? 6500);
+  const [hasPhotometric, setHasPhotometric] = useState(!!initial?.photometric);
+  const [photoLux, setPhotoLux] = useState(initial?.photometric?.lux ?? 10000);
+  const [photoDistance, setPhotoDistance] = useState(initial?.photometric?.distance ?? 1);
+  const [tlci, setTlci] = useState(initial?.tlci ?? 0);
 
   const handleSave = () => {
     if (!name.trim()) return;
@@ -41,12 +50,16 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
       beamShape,
       beamRatioWH,
       lensType,
-      colorTemp,
+      colorTemp: hasColorTempRange ? 0 : colorTemp,
+      colorTempRange: hasColorTempRange ? [colorTempMin, colorTempMax] : undefined,
       weight,
+      mountType,
       zoomRange: hasZoom ? [zoomMin, zoomMax] : undefined,
       cri,
+      tlci: tlci || undefined,
       ipRating: ipRating || undefined,
       dmxChannels: dmxChannels || undefined,
+      photometric: hasPhotometric ? { lux: photoLux, distance: photoDistance, beamAngle, colorTemp: colorTemp || 5600 } : undefined,
     };
     onSave(fixture);
   };
@@ -75,7 +88,20 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
               <option value="cyc">Horizontleuchte</option>
               <option value="flood">Fluter</option>
               <option value="followspot">Verfolger</option>
+              <option value="led-panel">LED-Flächenleuchte</option>
               <option value="custom">Eigene</option>
+            </select>
+          </label>
+
+          <label>Befestigung
+            <select value={mountType} onChange={(e) => setMountType(e.target.value as MountType)}>
+              <option value="bowens">Bowens S-Mount</option>
+              <option value="prolock-bowens">ProLock Bowens</option>
+              <option value="junior">Junior Pin (1-1/8")</option>
+              <option value="baby">Baby Pin (5/8")</option>
+              <option value="clamp">C-Clamp / Bügelklemme</option>
+              <option value="yoke">Integriertes Joch</option>
+              <option value="none">Kein Ansatz</option>
             </select>
           </label>
 
@@ -109,9 +135,21 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
             </select>
           </label>
 
-          <label>Farbtemperatur (K, 0=RGBW)<input type="number" value={colorTemp} onChange={(e) => setColorTemp(Number(e.target.value))} min={0} /></label>
+          <label className="checkbox-field">
+            <input type="checkbox" checked={hasColorTempRange} onChange={(e) => setHasColorTempRange(e.target.checked)} /> Farbtemperatur-Bereich (Bi-Color)
+          </label>
+          {hasColorTempRange ? (
+            <>
+              <label>CCT Min (K)<input type="number" value={colorTempMin} onChange={(e) => setColorTempMin(Number(e.target.value))} min={1800} max={10000} /></label>
+              <label>CCT Max (K)<input type="number" value={colorTempMax} onChange={(e) => setColorTempMax(Number(e.target.value))} min={1800} max={10000} /></label>
+            </>
+          ) : (
+            <label>Farbtemperatur (K, 0=RGBW)<input type="number" value={colorTemp} onChange={(e) => setColorTemp(Number(e.target.value))} min={0} /></label>
+          )}
+
           <label>Gewicht (kg)<input type="number" value={weight} step={0.1} onChange={(e) => setWeight(Number(e.target.value))} min={0} /></label>
           <label>CRI<input type="number" value={cri} onChange={(e) => setCri(Number(e.target.value))} min={0} max={100} /></label>
+          <label>TLCI<input type="number" value={tlci} onChange={(e) => setTlci(Number(e.target.value))} min={0} max={100} /></label>
           <label>IP-Schutzart<input value={ipRating} onChange={(e) => setIpRating(e.target.value)} placeholder="z.B. 65" /></label>
           <label>DMX-Kanäle<input type="number" value={dmxChannels} onChange={(e) => setDmxChannels(Number(e.target.value))} min={0} /></label>
 
@@ -124,6 +162,16 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
               <label>Zoom Max (°)<input type="number" value={zoomMax} step={0.5} onChange={(e) => setZoomMax(Number(e.target.value))} min={1} /></label>
             </>
           )}
+
+          <label className="checkbox-field">
+            <input type="checkbox" checked={hasPhotometric} onChange={(e) => setHasPhotometric(e.target.checked)} /> Photometrische Referenz
+          </label>
+          {hasPhotometric && (
+            <>
+              <label>Lux (gemessen)<input type="number" value={photoLux} onChange={(e) => setPhotoLux(Number(e.target.value))} min={1} /></label>
+              <label>Messabstand (m)<input type="number" value={photoDistance} step={0.5} onChange={(e) => setPhotoDistance(Number(e.target.value))} min={0.5} /></label>
+            </>
+          )}
         </div>
 
         <div className="modal-actions">
@@ -133,6 +181,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
       </div>
     </div>
   );
+};
 };
 
 export default FixtureEditor;

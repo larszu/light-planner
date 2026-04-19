@@ -1,20 +1,74 @@
-import type { PlacedFixture } from '../types';
+import type { PlacedFixture, Attachment, PhotometricData } from '../types';
 
 const DEG2RAD = Math.PI / 180;
 
 /**
- * Peak luminous intensity (candela) for a fixture.
- * Uses the effective solid-angle integral over the beam.
- * For elliptical beams we approximate with the geometric mean of both half-angles.
+ * Get the active attachment for a placed fixture, if any.
  */
-function peakIntensity(lumens: number, beamAngleDeg: number, ratio: number): number {
-  // For an elliptical cone with half-angles α and β:
-  // solid angle ≈ 2π(1 − cos(sqrt(α·β)))  (geometric mean approximation)
+function getActiveAttachment(f: PlacedFixture): Attachment | undefined {
+  if (!f.activeAttachmentId || !f.fixture.compatibleAttachments) return undefined;
+  return f.fixture.compatibleAttachments.find((a) => a.id === f.activeAttachmentId);
+}
+
+/**
+ * Get effective beam parameters, considering active attachment overrides.
+ */
+function getEffectiveBeam(f: PlacedFixture): {
+  beamAngle: number;
+  beamShape: typeof f.fixture.beamShape;
+  beamRatioWH: number;
+  lumens: number;
+  photometric: PhotometricData | undefined;
+} {
+  const att = getActiveAttachment(f);
+  const fix = f.fixture;
+  const beamAngle = f.currentBeamAngle
+    ?? att?.beamAngleOverride
+    ?? fix.beamAngle;
+  const beamShape = att?.beamShapeOverride ?? fix.beamShape;
+  const photometric = att?.photometricOverride ?? fix.photometric;
+  return {
+    beamAngle,
+    beamShape,
+    beamRatioWH: fix.beamRatioWH,
+    lumens: fix.lumens,
+    photometric,
+  };
+}
+
+/**
+ * Peak luminous intensity (candela) from photometric reference data.
+ * candela = lux × distance²
+ */
+function candelaFromPhotometric(p: PhotometricData): number {
+  return p.lux * p.distance * p.distance;
+}
+
+/**
+ * Peak luminous intensity (candela) for a fixture using lumens.
+ * Fallback when no photometric measurement is available.
+ */
+function peakIntensityFromLumens(lumens: number, beamAngleDeg: number, ratio: number): number {
   const halfW = (beamAngleDeg / 2) * DEG2RAD;
   const halfH = halfW / Math.max(ratio, 0.1);
   const geoMean = Math.sqrt(halfW * halfH);
   const solidAngle = 2 * Math.PI * (1 - Math.cos(geoMean));
   return solidAngle > 0 ? lumens / solidAngle : 0;
+}
+
+/**
+ * Peak luminous intensity (candela) – prefers photometric data over lumens.
+ */
+function peakIntensity(
+  lumens: number,
+  beamAngleDeg: number,
+  ratio: number,
+  photometric?: PhotometricData,
+): number {
+  if (photometric && photometric.lux > 0 && photometric.distance > 0) {
+    return candelaFromPhotometric(photometric);
+  }
+  return peakIntensityFromLumens(lumens, beamAngleDeg, ratio);
 }
 
 /**
@@ -46,9 +100,9 @@ export function luxFromFixture(
   const dimFactor = f.dimming / 100;
   if (dimFactor <= 0) return 0;
 
-  const fix = f.fixture;
-  const beamAngle = f.currentBeamAngle ?? fix.beamAngle;
-  const ratio = fix.beamRatioWH;
+  const eff = getEffectiveBeam(f);
+  const beamAngle = eff.beamAngle;
+  const ratio = eff.beamRatioWH;
 
   // Vector from fixture projection to floor point
   const dx = px - f.x;
@@ -114,7 +168,7 @@ export function luxFromFixture(
   }
 
   const sigma = beamSigma(beamAngle);
-  const Ipeak = peakIntensity(fix.lumens, beamAngle, ratio) * dimFactor;
+  const Ipeak = peakIntensity(eff.lumens, beamAngle, ratio, eff.photometric) * dimFactor;
   const I = Ipeak * Math.exp(-(effectiveTheta * effectiveTheta) / (2 * sigma * sigma));
 
   const cosIncidence = h / dist;
