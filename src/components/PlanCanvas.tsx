@@ -12,13 +12,13 @@ interface Props {
   floorPlan: FloorPlan | null;
   activeTool: Tool;
   fixtureToPlace: Fixture | null;
-  selectedId: string | null;
+  selectedIds: Set<string>;
   showHeatMap: boolean;
   heatMapScale: number;
   heatMapTarget: number;
   onPlaceFixture: (fixture: Fixture, x: number, y: number) => void;
   onMoveFixture: (id: string, x: number, y: number) => void;
-  onSelect: (id: string | null) => void;
+  onSelect: (id: string | null, ctrlKey?: boolean) => void;
   onAddShape: (shape: Shape) => void;
   onAddPerson: (x: number, y: number) => void;
   onAddStageElement: (x: number, y: number) => void;
@@ -44,7 +44,7 @@ const PlanCanvas: React.FC<Props> = ({
   floorPlan,
   activeTool,
   fixtureToPlace,
-  selectedId,
+  selectedIds,
   showHeatMap,
   heatMapScale,
   heatMapTarget,
@@ -211,7 +211,7 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.save();
       ctx.translate(se.x + se.width / 2, se.y + se.depth / 2);
       ctx.rotate((se.rotation * Math.PI) / 180);
-      const isSel = se.id === selectedId;
+      const isSel = selectedIds.has(se.id);
       ctx.fillStyle = isSel ? 'rgba(139,69,19,0.35)' : 'rgba(139,69,19,0.2)';
       ctx.strokeStyle = isSel ? '#ffcc33' : '#8B4513';
       ctx.lineWidth = 2 / v.scale;
@@ -336,7 +336,7 @@ const PlanCanvas: React.FC<Props> = ({
 
     // Persons
     for (const p of persons) {
-      const isSel = p.id === selectedId;
+      const isSel = selectedIds.has(p.id);
       const r = 0.25;
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fillStyle = isSel ? 'rgba(255,150,50,0.6)' : 'rgba(255,150,50,0.3)';
@@ -356,7 +356,7 @@ const PlanCanvas: React.FC<Props> = ({
 
     // Fixtures
     for (const f of fixtures) {
-      const isSel = f.id === selectedId;
+      const isSel = selectedIds.has(f.id);
       const rad = 0.3;
       const beamAngle = f.currentBeamAngle ?? f.fixture.beamAngle;
       const beamRad = Math.tan((beamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
@@ -506,7 +506,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, floorPlan, selectedId, showHeatMap, heatMapScale, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, floorPlan, selectedIds, showHeatMap, heatMapScale, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -542,7 +542,7 @@ const PlanCanvas: React.FC<Props> = ({
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
-  }, [selectedId, onSelect, onToolChange]);
+  }, [selectedIds, onSelect, onToolChange]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; };
   const handleDrop = (e: React.DragEvent) => {
@@ -591,10 +591,11 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     if (activeTool === 'select') {
+      const ctrl = e.ctrlKey || e.metaKey;
       // Check aim-point handles first (only for selected fixture)
       const aimHitR = 0.35;
       for (const f of fixtures) {
-        if (f.id === selectedId && Math.sqrt((wx - f.aimX) ** 2 + (wy - f.aimY) ** 2) < aimHitR) {
+        if (selectedIds.has(f.id) && Math.sqrt((wx - f.aimX) ** 2 + (wy - f.aimY) ** 2) < aimHitR) {
           dragRef.current = { type: 'move-aim', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: f.id };
           return;
         }
@@ -602,21 +603,21 @@ const PlanCanvas: React.FC<Props> = ({
       const cr = 0.5;
       for (const f of fixtures) {
         if (Math.sqrt((wx - f.x) ** 2 + (wy - f.y) ** 2) < cr) {
-          onSelect(f.id);
+          onSelect(f.id, ctrl);
           dragRef.current = { type: 'move', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: f.id };
           return;
         }
       }
       for (const p of persons) {
         if (Math.sqrt((wx - p.x) ** 2 + (wy - p.y) ** 2) < 0.4) {
-          onSelect(p.id);
+          onSelect(p.id, ctrl);
           dragRef.current = { type: 'move-person', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: p.id };
           return;
         }
       }
       for (const se of stageElements) {
         if (wx >= se.x && wx <= se.x + se.width && wy >= se.y && wy <= se.y + se.depth) {
-          onSelect(se.id);
+          onSelect(se.id, ctrl);
           dragRef.current = { type: 'move-stage', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: se.id };
           return;
         }

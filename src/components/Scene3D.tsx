@@ -13,14 +13,14 @@ interface Props {
   fixtures: PlacedFixture[];
   persons: Person[];
   stageElements: StageElement[];
-  selectedId: string | null;
+  selectedIds: Set<string>;
   showHeatMap: boolean;
   heatMapScale: number;
   heatMapTarget: number;
-  onSelect: (id: string | null) => void;
+  onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -182,7 +182,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     // Stage elements (podeste)
     for (const se of stageElements) {
       const geo = new THREE.BoxGeometry(se.width, se.height, se.depth);
-      const isSel = se.id === selectedId;
+      const isSel = selectedIds.has(se.id);
       const mat = new THREE.MeshStandardMaterial({
         color: isSel ? '#cc8833' : '#8B4513',
         roughness: 0.7,
@@ -197,7 +197,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
 
     // Persons (cylinder body + sphere head)
     for (const p of persons) {
-      const isSel = p.id === selectedId;
+      const isSel = selectedIds.has(p.id);
       const group = new THREE.Group();
       group.userData = { dynamic: true, selectId: p.id };
 
@@ -230,7 +230,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
 
     // Fixtures
     for (const f of fixtures) {
-      const isSel = f.id === selectedId;
+      const isSel = selectedIds.has(f.id);
       const group = new THREE.Group();
       group.userData = { dynamic: true, selectId: f.id };
 
@@ -359,7 +359,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       sprite.userData = { dynamic: true };
       scene.add(sprite);
     }
-  }, [fixtures, persons, stageElements, selectedId, showHeatMap, heatMapScale, heatMapTarget]);
+  }, [fixtures, persons, stageElements, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {

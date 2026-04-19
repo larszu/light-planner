@@ -9,7 +9,7 @@ interface Props {
   fixtures: PlacedFixture[];
   persons: Person[];
   stageElements: StageElement[];
-  selectedId: string | null;
+  selectedIds: Set<string>;
   cursorLux: number | null;
   onUpdateFixture: (id: string, updates: Partial<PlacedFixture>) => void;
   onUpdatePerson: (id: string, updates: Partial<Person>) => void;
@@ -32,7 +32,7 @@ const PropertyPanel: React.FC<Props> = ({
   fixtures,
   persons,
   stageElements,
-  selectedId,
+  selectedIds,
   cursorLux,
   onUpdateFixture,
   onUpdatePerson,
@@ -40,9 +40,14 @@ const PropertyPanel: React.FC<Props> = ({
   onDelete,
   onAutoThreePointForPerson,
 }) => {
+  const selectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
   const selFixture = fixtures.find((f) => f.id === selectedId);
   const selPerson = persons.find((p) => p.id === selectedId);
   const selStage = stageElements.find((s) => s.id === selectedId);
+
+  // Multi-selection info
+  const multiFixtures = fixtures.filter((f) => selectedIds.has(f.id));
+  const multiCount = selectedIds.size;
 
   const numField = (label: string, value: number, onChange: (v: number) => void, step = 0.1, min?: number, max?: number) => (
     <label className="prop-field">
@@ -350,6 +355,35 @@ const PropertyPanel: React.FC<Props> = ({
           </label>
         </div>
         <button className="delete-btn" onClick={() => onDelete(se.id)}>Element löschen</button>
+      </div>
+    );
+  }
+
+  // Multi-selection panel
+  if (multiCount > 1) {
+    return (
+      <div className="property-panel">
+        <h3>{multiCount} Elemente ausgewählt</h3>
+        {multiFixtures.length > 0 && (
+          <div className="prop-section">
+            <span className="prop-section-title">{multiFixtures.length} Leuchte(n)</span>
+            <ul className="multi-sel-list">
+              {multiFixtures.map((f) => (
+                <li key={f.id}>{f.fixture.name}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="prop-section">
+          <span className="prop-section-title">Aktionen</span>
+          <p className="prop-hint">
+            Verschieben: Ziehe eine der markierten Leuchten.<br />
+            Drehen: Nutze die Toolbar-Buttons zum Rotieren um eine Person.
+          </p>
+        </div>
+        <button className="delete-btn" onClick={() => { for (const sid of selectedIds) onDelete(sid); }}>
+          Alle {multiCount} löschen
+        </button>
       </div>
     );
   }

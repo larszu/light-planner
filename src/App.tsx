@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup } from './types';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import PlanCanvas from './components/PlanCanvas';
@@ -24,7 +24,7 @@ const App: React.FC = () => {
   const [customFixtures, setCustomFixtures] = useState<Fixture[]>([]);
   const [activeTool, setActiveTool] = useState<Tool>('select');
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [fixtureToPlace, setFixtureToPlace] = useState<Fixture | null>(null);
   const [showHeatMap, setShowHeatMap] = useState(false);
   const [heatMapScale, setHeatMapScale] = useState(1000);
@@ -35,8 +35,24 @@ const App: React.FC = () => {
   const [projectDialogMode, setProjectDialogMode] = useState<'save' | 'load' | null>(null);
   const [projectMeta, setProjectMeta] = useState<ProjectMeta | undefined>(undefined);
   const [projectId, setProjectId] = useState<string>('proj-' + Date.now());
+  const [fixtureGroups, setFixtureGroups] = useState<FixtureGroup[]>([]);
   const scene3DRef = useRef<Scene3DHandle>(null);
+  const exportCounterRef = useRef(1);
   const defaultMountingHeight = 6;
+
+  // ── Selection helpers ──
+  const selectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
+  const handleSelect = useCallback((id: string | null, ctrlKey = false) => {
+    if (id === null) { setSelectedIds(new Set()); return; }
+    setSelectedIds((prev) => {
+      if (ctrlKey) {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      }
+      return new Set([id]);
+    });
+  }, []);
 
   // ── Fixture handlers ──
   const handleSelectFixtureToPlace = useCallback((f: Fixture) => {
@@ -59,23 +75,30 @@ const App: React.FC = () => {
   const handlePlaceFixture = useCallback((fixture: Fixture, x: number, y: number) => {
     const placed = createPlacedFixture(fixture, x, y);
     setFixtures((prev) => [...prev, placed]);
-    setSelectedId(placed.id);
+    setSelectedIds(new Set([placed.id]));
   }, [createPlacedFixture]);
 
   const handleDropFixture = useCallback((fixture: Fixture, x: number, y: number) => {
     const placed = createPlacedFixture(fixture, x, y);
     setFixtures((prev) => [...prev, placed]);
-    setSelectedId(placed.id);
+    setSelectedIds(new Set([placed.id]));
     setFixtureToPlace(null);
   }, [createPlacedFixture]);
 
   const handleMoveFixture = useCallback((id: string, x: number, y: number) => {
-    setFixtures((prev) => prev.map((f) => {
-      if (f.id !== id) return f;
-      const dx = x - f.x, dy = y - f.y;
-      return { ...f, x, y, aimX: f.aimX + dx, aimY: f.aimY + dy };
-    }));
-  }, []);
+    setFixtures((prev) => {
+      const target = prev.find((f) => f.id === id);
+      if (!target) return prev;
+      const dx = x - target.x, dy = y - target.y;
+      // Move all selected fixtures together if the dragged one is in the selection
+      const moveIds = selectedIds.has(id) ? selectedIds : new Set([id]);
+      return prev.map((f) => {
+        if (!moveIds.has(f.id)) return f;
+        if (f.id === id) return { ...f, x, y, aimX: f.aimX + dx, aimY: f.aimY + dy };
+        return { ...f, x: f.x + dx, y: f.y + dy, aimX: f.aimX + dx, aimY: f.aimY + dy };
+      });
+    });
+  }, [selectedIds]);
 
   const handleUpdateFixture = useCallback((id: string, updates: Partial<PlacedFixture>) => {
     setFixtures((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
@@ -89,7 +112,7 @@ const App: React.FC = () => {
   const handleAddPerson = useCallback((x: number, y: number) => {
     const p: Person = { id: uid('per'), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, height: 1.75, label: '' };
     setPersons((prev) => [...prev, p]);
-    setSelectedId(p.id);
+    setSelectedIds(new Set([p.id]));
   }, []);
 
   const handleMovePerson = useCallback((id: string, x: number, y: number) => {
@@ -108,7 +131,7 @@ const App: React.FC = () => {
       width: 1, depth: 1, height: 0.4, rotation: 0, label: '',
     };
     setStageElements((prev) => [...prev, se]);
-    setSelectedId(se.id);
+    setSelectedIds(new Set([se.id]));
   }, []);
 
   const handleMoveStageElement = useCallback((id: string, x: number, y: number) => {
@@ -125,8 +148,9 @@ const App: React.FC = () => {
     setPersons((prev) => prev.filter((p) => p.id !== id));
     setStageElements((prev) => prev.filter((s) => s.id !== id));
     setShapes((prev) => prev.filter((s) => s.id !== id));
-    if (selectedId === id) setSelectedId(null);
-  }, [selectedId]);
+    setFixtureGroups((prev) => prev.map((g) => ({ ...g, fixtureIds: g.fixtureIds.filter((fid) => fid !== id) })).filter((g) => g.fixtureIds.length > 0));
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+  }, []);
 
   useEffect(() => {
     const handler = (e: Event) => handleDelete((e as CustomEvent).detail);
@@ -170,6 +194,59 @@ const App: React.FC = () => {
     }, stageElements);
     setFixtures((prev) => [...prev, ...newFixtures]);
   }, [persons, stageElements, defaultMountingHeight, heatMapTarget]);
+
+  // ── Group / Ungroup / Rotate ──
+  const handleGroupSelection = useCallback(() => {
+    const selFixtureIds = fixtures.filter((f) => selectedIds.has(f.id)).map((f) => f.id);
+    if (selFixtureIds.length < 2) return;
+    const group: FixtureGroup = { id: uid('grp'), label: `Gruppe ${fixtureGroups.length + 1}`, fixtureIds: selFixtureIds };
+    setFixtureGroups((prev) => [...prev, group]);
+  }, [fixtures, selectedIds, fixtureGroups.length]);
+
+  const handleUngroupSelection = useCallback(() => {
+    setFixtureGroups((prev) => prev.filter((g) => !g.fixtureIds.some((id) => selectedIds.has(id))));
+  }, [selectedIds]);
+
+  const handleRotateSelectionAroundPerson = useCallback((angleDeg: number) => {
+    // Find the first selected person as pivot, or first person in project
+    const pivotPerson = persons.find((p) => selectedIds.has(p.id)) ?? persons[0];
+    if (!pivotPerson) return;
+    const cx = pivotPerson.x, cy = pivotPerson.y;
+    const rad = (angleDeg * Math.PI) / 180;
+    const cosA = Math.cos(rad), sinA = Math.sin(rad);
+    setFixtures((prev) => prev.map((f) => {
+      if (!selectedIds.has(f.id)) return f;
+      const dx = f.x - cx, dy = f.y - cy;
+      const adx = f.aimX - cx, ady = f.aimY - cy;
+      return {
+        ...f,
+        x: Math.round((cx + dx * cosA - dy * sinA) * 10) / 10,
+        y: Math.round((cy + dx * sinA + dy * cosA) * 10) / 10,
+        aimX: Math.round((cx + adx * cosA - ady * sinA) * 10) / 10,
+        aimY: Math.round((cy + adx * sinA + ady * cosA) * 10) / 10,
+      };
+    }));
+  }, [persons, selectedIds]);
+
+  // Expand selection to include all grouped fixtures
+  const handleSelectWithGroups = useCallback((id: string | null, ctrlKey = false) => {
+    if (id === null) { setSelectedIds(new Set()); return; }
+    // Find if this fixture belongs to a group
+    const group = fixtureGroups.find((g) => g.fixtureIds.includes(id));
+    if (group && !ctrlKey) {
+      setSelectedIds(new Set(group.fixtureIds));
+    } else if (group && ctrlKey) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        const allIn = group.fixtureIds.every((fid) => next.has(fid));
+        if (allIn) { group.fixtureIds.forEach((fid) => next.delete(fid)); }
+        else { group.fixtureIds.forEach((fid) => next.add(fid)); }
+        return next;
+      });
+    } else {
+      handleSelect(id, ctrlKey);
+    }
+  }, [fixtureGroups, handleSelect]);
 
   // ── Auto-align / distribute ──
   const handleAlignH = useCallback(() => {
@@ -252,11 +329,12 @@ const App: React.FC = () => {
       persons,
       stageElements,
       customFixtures,
+      fixtureGroups,
     };
     saveProjectToStorage(projectId, meta, data);
     setProjectMeta(meta);
     setProjectDialogMode(null);
-  }, [fixtures, shapes, persons, stageElements, customFixtures, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     setFixtures(data.fixtures);
@@ -264,10 +342,11 @@ const App: React.FC = () => {
     setPersons(data.persons);
     setStageElements(data.stageElements);
     setCustomFixtures(data.customFixtures);
+    setFixtureGroups(data.fixtureGroups ?? []);
     setProjectMeta(data.meta);
     const newId = 'proj-' + Date.now();
     setProjectId(newId);
-    setSelectedId(null);
+    setSelectedIds(new Set());
     setProjectDialogMode(null);
   }, []);
 
@@ -291,11 +370,19 @@ const App: React.FC = () => {
   }, []);
 
   const handleExport = useCallback(() => {
+    const projName = projectMeta?.name || 'Lichtplan';
+    const viewLabel = viewMode === '3d' ? '3D' : '2D';
+    const num = exportCounterRef.current++;
+    const defaultName = `${projName} ${viewLabel} ${String(num).padStart(3, '0')}`;
+    const fileName = window.prompt('Screenshot-Dateiname:', defaultName);
+    if (!fileName) return;
+    const safeName = fileName.endsWith('.png') ? fileName : `${fileName}.png`;
+
     if (viewMode === '3d') {
       const dataUrl = scene3DRef.current?.screenshot();
       if (!dataUrl) return;
       const link = document.createElement('a');
-      link.download = 'lichtplan-3d.png';
+      link.download = safeName;
       link.href = dataUrl;
       link.click();
       return;
@@ -303,10 +390,10 @@ const App: React.FC = () => {
     const canvas = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
     if (!canvas) return;
     const link = document.createElement('a');
-    link.download = 'lichtplan.png';
+    link.download = safeName;
     link.href = canvas.toDataURL('image/png');
     link.click();
-  }, [viewMode]);
+  }, [viewMode, projectMeta]);
 
   const handleAddShape = useCallback((shape: Shape) => { setShapes((prev) => [...prev, shape]); }, []);
   const handleAddCustomFixture = useCallback((f: Fixture) => { setCustomFixtures((prev) => [...prev, f]); }, []);
@@ -337,7 +424,11 @@ const App: React.FC = () => {
         onLoadProject={() => setProjectDialogMode('load')}
         hasPersons={persons.length > 0}
         hasStageElements={stageElements.length > 0}
-        hasSelection={!!selectedId}
+        hasSelection={selectedIds.size > 0}
+        multiSelected={selectedIds.size > 1}
+        onGroupSelection={handleGroupSelection}
+        onUngroupSelection={handleUngroupSelection}
+        onRotateSelection={(deg: number) => handleRotateSelectionAroundPerson(deg)}
       />
       <div className="app-body">
         <Sidebar
@@ -356,13 +447,13 @@ const App: React.FC = () => {
               floorPlan={floorPlan}
               activeTool={activeTool}
               fixtureToPlace={fixtureToPlace}
-              selectedId={selectedId}
+              selectedIds={selectedIds}
               showHeatMap={showHeatMap}
               heatMapScale={heatMapScale}
               heatMapTarget={heatMapTarget}
               onPlaceFixture={handlePlaceFixture}
               onMoveFixture={handleMoveFixture}
-              onSelect={setSelectedId}
+              onSelect={handleSelectWithGroups}
               onAddShape={handleAddShape}
               onAddPerson={handleAddPerson}
               onAddStageElement={handleAddStageElement}
@@ -380,11 +471,11 @@ const App: React.FC = () => {
                 fixtures={fixtures}
                 persons={persons}
                 stageElements={stageElements}
-                selectedId={selectedId}
+                selectedIds={selectedIds}
                 showHeatMap={showHeatMap}
                 heatMapScale={heatMapScale}
                 heatMapTarget={heatMapTarget}
-                onSelect={setSelectedId}
+                onSelect={handleSelectWithGroups}
               />
             </Suspense>
           )}
@@ -401,7 +492,7 @@ const App: React.FC = () => {
           fixtures={fixtures}
           persons={persons}
           stageElements={stageElements}
-          selectedId={selectedId}
+          selectedIds={selectedIds}
           cursorLux={cursorLux}
           onUpdateFixture={handleUpdateFixture}
           onUpdatePerson={handleUpdatePerson}

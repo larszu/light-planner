@@ -26,6 +26,10 @@ interface Props {
   hasPersons: boolean;
   hasStageElements: boolean;
   hasSelection: boolean;
+  multiSelected: boolean;
+  onGroupSelection: () => void;
+  onUngroupSelection: () => void;
+  onRotateSelection: (deg: number) => void;
 }
 
 const Toolbar: React.FC<Props> = ({
@@ -53,6 +57,10 @@ const Toolbar: React.FC<Props> = ({
   hasPersons,
   hasStageElements,
   hasSelection,
+  multiSelected,
+  onGroupSelection,
+  onUngroupSelection,
+  onRotateSelection,
 }) => {
   const tools: { id: Tool; label: string; icon: string }[] = [
     { id: 'select', label: 'Auswahl', icon: '⊹' },
@@ -214,6 +222,35 @@ const Toolbar: React.FC<Props> = ({
           <span className="tool-label">V-Dist</span>
         </button>
       </div>
+
+      {/* Group / Rotate (multi-select) */}
+      {multiSelected && (
+        <>
+          <div className="toolbar-separator" />
+          <div className="toolbar-group">
+            <button className="tool-btn" onClick={onGroupSelection} title="Auswahl gruppieren">
+              <span className="tool-icon">🔗</span>
+              <span className="tool-label">Gruppe</span>
+            </button>
+            <button className="tool-btn" onClick={onUngroupSelection} title="Gruppierung aufheben">
+              <span className="tool-icon">✂</span>
+              <span className="tool-label">Lösen</span>
+            </button>
+            <button className="tool-btn" onClick={() => onRotateSelection(-45)} title="45° gegen Uhrzeigersinn um Person drehen">
+              <span className="tool-icon">↺</span>
+              <span className="tool-label">−45°</span>
+            </button>
+            <button className="tool-btn" onClick={() => onRotateSelection(45)} title="45° im Uhrzeigersinn um Person drehen">
+              <span className="tool-icon">↻</span>
+              <span className="tool-label">+45°</span>
+            </button>
+            <button className="tool-btn" onClick={() => onRotateSelection(180)} title="180° um Person drehen">
+              <span className="tool-icon">⟳</span>
+              <span className="tool-label">180°</span>
+            </button>
+          </div>
+        </>
+      )}
 
       <div className="toolbar-spacer" />
 

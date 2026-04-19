@@ -196,4 +196,11 @@ export interface ProjectData {
   persons: Person[];
   stageElements: StageElement[];
   customFixtures: Fixture[];
+  fixtureGroups?: FixtureGroup[];
+}
+
+export interface FixtureGroup {
+  id: string;
+  label: string;
+  fixtureIds: string[];
 }
