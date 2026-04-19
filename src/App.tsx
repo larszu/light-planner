@@ -7,6 +7,7 @@ import PropertyPanel from './components/PropertyPanel';
 import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import { generate3PointLighting, generateEvenDistribution } from './utils/autoLighting';
+import type { ThreePointConfig } from './utils/autoLighting';
 import './App.css';
 
 const Scene3D = lazy(() => import('./components/Scene3D'));
@@ -135,32 +136,38 @@ const App: React.FC = () => {
   const handleAutoThreePoint = useCallback(() => {
     const targetPersons = selectedId ? persons.filter((p) => p.id === selectedId) : persons;
     if (targetPersons.length === 0) return;
-    const newFixtures = targetPersons.flatMap((p) => generate3PointLighting(p, defaultMountingHeight));
+    const newFixtures = targetPersons.flatMap((p) => generate3PointLighting(p, defaultMountingHeight, {
+      targetLux: heatMapTarget,
+    }));
     setFixtures((prev) => [...prev, ...newFixtures]);
-  }, [persons, selectedId, defaultMountingHeight]);
+  }, [persons, selectedId, defaultMountingHeight, heatMapTarget]);
 
   const handleAutoThreePointForPerson = useCallback((personId: string) => {
     const person = persons.find((p) => p.id === personId);
     if (!person) return;
-    const newFixtures = generate3PointLighting(person, defaultMountingHeight);
+    const newFixtures = generate3PointLighting(person, defaultMountingHeight, {
+      targetLux: heatMapTarget,
+    });
     setFixtures((prev) => [...prev, ...newFixtures]);
-  }, [persons, defaultMountingHeight]);
+  }, [persons, defaultMountingHeight, heatMapTarget]);
 
-  const handleAutoThreePointConfigured = useCallback((keyF: Fixture, fillF: Fixture, backF: Fixture, keyDim: number, fillDim: number, backDim: number) => {
+  const handleAutoThreePointConfigured = useCallback((config: ThreePointConfig) => {
     const targetPersons = selectedId ? persons.filter((p) => p.id === selectedId) : persons;
     if (targetPersons.length === 0) return;
     const newFixtures = targetPersons.flatMap((p) =>
-      generate3PointLighting(p, defaultMountingHeight, keyF, fillF, backF, keyDim, fillDim, backDim),
+      generate3PointLighting(p, defaultMountingHeight, config),
     );
     setFixtures((prev) => [...prev, ...newFixtures]);
     setShowThreePointDialog(false);
   }, [persons, selectedId, defaultMountingHeight]);
 
   const handleAutoDistribute = useCallback(() => {
-    if (persons.length === 0) return;
-    const newFixtures = generateEvenDistribution(persons, defaultMountingHeight);
+    if (persons.length === 0 && stageElements.length === 0) return;
+    const newFixtures = generateEvenDistribution(persons, defaultMountingHeight, {
+      targetLux: heatMapTarget,
+    }, stageElements);
     setFixtures((prev) => [...prev, ...newFixtures]);
-  }, [persons, defaultMountingHeight]);
+  }, [persons, stageElements, defaultMountingHeight, heatMapTarget]);
 
   // ── Auto-align / distribute ──
   const handleAlignH = useCallback(() => {
@@ -318,6 +325,7 @@ const App: React.FC = () => {
         onSaveProject={() => setProjectDialogMode('save')}
         onLoadProject={() => setProjectDialogMode('load')}
         hasPersons={persons.length > 0}
+        hasStageElements={stageElements.length > 0}
         hasSelection={!!selectedId}
       />
       <div className="app-body">
@@ -392,6 +400,7 @@ const App: React.FC = () => {
       </div>
       {showThreePointDialog && (
         <ThreePointDialog
+          targetLux={heatMapTarget}
           onGenerate={handleAutoThreePointConfigured}
           onCancel={() => setShowThreePointDialog(false)}
         />

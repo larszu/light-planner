@@ -24,6 +24,7 @@ interface Props {
   onSaveProject: () => void;
   onLoadProject: () => void;
   hasPersons: boolean;
+  hasStageElements: boolean;
   hasSelection: boolean;
 }
 
@@ -50,6 +51,7 @@ const Toolbar: React.FC<Props> = ({
   onSaveProject,
   onLoadProject,
   hasPersons,
+  hasStageElements,
   hasSelection,
 }) => {
   const tools: { id: Tool; label: string; icon: string }[] = [
@@ -183,8 +185,8 @@ const Toolbar: React.FC<Props> = ({
         <button
           className="tool-btn auto-btn"
           onClick={onAutoDistribute}
-          disabled={!hasPersons}
-          title="Gleichmäßige Bühnenausleuchtung (Kreuzlicht)"
+          disabled={!hasPersons && !hasStageElements}
+          title="Gleichmäßige Flächenausleuchtung (Front/Back 45°)"
         >
           <span className="tool-icon">🔆</span>
           <span className="tool-label">Verteilen</span>
