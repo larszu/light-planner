@@ -1,7 +1,7 @@
 <h1 align="center">💡 LightPlanner</h1>
 
 <p align="center">
-  Photometric stage & studio lighting design for film, broadcast and live events
+  A quick lighting sketch — without paper
 </p>
 
 <p align="center">
@@ -9,144 +9,91 @@
   <img src="https://img.shields.io/badge/offline-ready-success" />
   <img src="https://img.shields.io/badge/built%20with-Electron%20%2B%20React%20%2B%20Three.js-9cf" />
   <img src="https://img.shields.io/badge/typescript-strongly%20typed-blue" />
-  <img src="https://img.shields.io/badge/status-active%20development-orange" />
+  <img src="https://img.shields.io/badge/status-early-orange" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" />
 </p>
 
-<p align="center">
-  Plan, visualize, and verify stage lighting designs with a real photometric engine.
-</p>
+---
+
+## ✨ What it is
+
+**LightPlanner** is a small desktop app for quickly sketching out a lighting setup.
+The kind of plan you'd otherwise scribble on the back of a call sheet — just on a 2D canvas with a little 3D preview on top.
+
+It is **not** a replacement for Vectorworks, WYSIWYG or Capture. It's the tool you reach for when you just want to think through where the lights go before you start rigging.
+
+✔ Runs offline on macOS & Windows
+✔ Drop in fixtures, drag the aim point, see roughly where the light lands
+✔ Save the plan as a single file and move on
 
 ---
 
-## ✨ Overview
+## 🧰 What's in it
 
-**LightPlanner** is a desktop application for designing, simulating, and documenting theatrical, studio and live-event lighting plots.
-Built with **Electron, React, TypeScript and Three.js**, it combines a 2D plan view with a true 3D venue view and a quantitative lux heatmap driven by manufacturer photometric data.
+### 🗺️ 2D plan view
+- Pan / zoom canvas with a metre grid
+- Drop fixtures, drag them around, drag the aim point
+- Multi-select, group, undo / redo
+- Stick a stage, a podium or a person on the floor for reference
 
-It is built for the people who actually rig and operate the lights — DPs, gaffers, LDs, location scouts and broadcast designers — and it works without an internet connection.
+### 🧊 3D preview
+- A simple Three.js view of the room with the cones drawn in
+- Useful to sanity-check angles and heights
+- Screenshot button for sharing
 
-✔ Fully offline desktop application
-✔ macOS & Windows support
-✔ Physically grounded lux & candela calculations
-✔ Curated library of real-world fixtures, gels and lamps
+### 🔆 Lux heatmap
+- A rough lux estimate on the floor based on the fixtures' photometric data
+- Switch on a target value to colour the floor by under / on / over
+- Not a replacement for a real photometric study — close enough for a sketch
 
----
+### 🎚️ A small fixture & gel library
+- A handful of common Source Fours, PARs, Fresnels, LED panels and a few moving heads
+- LEE & Rosco CTO / CTB / frost gels
+- Add your own custom fixture if something's missing
 
-## ✨ Core Features
+### 🎬 Auto-place helpers
+- One-click 3-point lighting around a person
+- "Fill an area evenly" generator for a stage or podium
+- Useful starting points — you'll still want to nudge things by hand
 
-### 🗺️ 2D Plan View
-- Pan, zoom, snap-to-grid canvas
-- Floor-plan image import with metre-scale calibration
-- Drag-and-drop fixture placement
-- Interactive aim point (click & drag the beam target)
-- Multi-select, group / ungroup, undo / redo (Ctrl+Z / Ctrl+Y)
-- Shapes, dimensions, walls & stage podiums
-- Persons on stage with height parameter
-
----
-
-### 🧊 3D Venue View
-- Real-time Three.js scene with venue, podiums and fixtures
-- Volumetric beam cones drawn at the 10 % field-angle so the cone edge matches the heatmap fade-out
-- Orbit / pan / zoom navigation
-- 3D heatmap projected onto the stage floor
-- Screenshot export of the full 3D view
+### 💾 Save / open
+- One JSON file per project, lives on your disk, no cloud
 
 ---
 
-### 🔆 Photometric Engine
-- Gaussian beam model with elliptical-beam support (PARs, washes, blinders)
-- Lux calculation from either:
-  - **Manufacturer photometric data** (lux at distance, beam angle)
-  - **Lumens** with proper 2-D Gaussian flux integral as a fallback
-- Zoom & frost flux-conservation compensation (peak candela scales as (refAngle / effectiveAngle)²)
-- Per-fixture dimming, attachments, gel stacks and body rotation all feed the engine
-- Live peak-lux readout at the aim point in the property panel
+## 🚀 Getting started
+
+Download the latest release from the [Releases page](https://github.com/larszu/light-planner/releases) — pick the installer or portable build for your platform.
+
+Or run from source:
+
+```bash
+npm install
+npm run dev          # web preview in the browser
+npm run electron:dev # the actual desktop app
+```
 
 ---
 
-### 🎚️ Fixture Library
-- Curated catalogue of real broadcast & theatre fixtures:
-  - ETC Source Four (fixed & zoom), Profile spots, Fresnels
-  - PAR 64 / 56 with CP60 / CP61 / CP62 lamps (elliptical beams)
-  - Aputure LS-series, ARRI Skypanel, LED panels & washes
-  - Moving heads (wash, spot, beam) and blinders
-  - Cyc / horizon lights and floodlights
-- Photometric reference data per fixture (lux × distance)
-- Mount type & weight tracking
-- **Custom fixtures** with full attribute editor
-- Fixture swap on placed instances without losing position / aim
+## 🧪 Tech
+
+Electron · React · TypeScript · Three.js · Vite · electron-builder.
 
 ---
 
-### 🎨 Gels & Color
-- LEE & Rosco gel libraries (CTO, CTB, frost / diffusion, colour)
-- Stacked-gel transmission and mired-shift colour-temp model
-- Frost / diffusion correctly widens the beam **and** preserves total flux
-- Per-fixture CCT, tunable-white range and beam-colour preview
+## ⚠️ Status
 
----
-
-### 🌡️ Heatmap & Targeting
-- Lux heatmap overlay in both 2D and 3D
-- Standard heat palette (blue → cyan → green → yellow → red)
-- **Target-lux mode** with 3-zone colouring (under-lit, on-target, over-lit)
-- Real-time readout while moving fixtures, zooming or dimming
-
----
-
-### 🎬 Auto-Lighting
-- **3-point lighting** generator (key / fill / back) with configurable contrast ratio
-- **Even-distribution** generator using front and back trusses with 45° elevation
-- Optional target-lux dimming — the engine back-solves dimmer values for you
-- Cinematographic defaults from Roger Deakins / classic film references
-
----
-
-### 💾 Project Management
-- Local JSON project files (`.lpj`)
-- New / Open / Save / Save As workflows
-- Custom fixtures, fixture groups, shapes, persons and podiums all persist
-- Project meta (name, author, notes, version, timestamps)
-
----
-
-### 🖼️ Export
-- 2D plan screenshot export
-- 3D view screenshot export
-- Named output files for production paperwork
-
----
-
-## ⚙️ Experimental / Planned
-
-- 📄 PDF cue-sheet & fixture-list export
-- 🎛️ DMX patch sheet generation
-- 🎯 Soft-Gaussian (super-Gaussian) beam model for fixtures whose 50 % and 10 % angles don't fit a single σ
-- 🌐 Multi-user / cloud-sync collaboration
-
----
-
-## 🧪 Tech Stack
-
-- **Electron** — desktop runtime (Windows + macOS)
-- **React** + **TypeScript** — UI
-- **Three.js** — 3D venue renderer
-- **Vite** — dev server & bundler
-- **electron-builder** — installer / portable / DMG builds via GitHub Actions
+Early. Things will change. Use it for sketches, not for paperwork you have to hand in.
 
 ---
 
 ## 👤 Author
 
-Built and maintained by **Lars Zumpe**
+**Lars Zumpe**
 
 ---
 
-## ❤️ Support / Donate
-
-If LightPlanner saves you time on your next show, consider buying me a coffee:
+## ❤️ Coffee?
 
 <p>
   <a href="https://paypal.me/larszumpe">
@@ -154,7 +101,7 @@ If LightPlanner saves you time on your next show, consider buying me a coffee:
   </a>
 </p>
 
-Donations are completely optional — the app will be MIT-licensed and free either way. 🙌
+Totally optional — the app will be MIT-licensed and free either way.
 
 ---
 
