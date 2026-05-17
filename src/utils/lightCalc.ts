@@ -48,13 +48,18 @@ function candelaFromPhotometric(p: PhotometricData): number {
 /**
  * Peak luminous intensity (candela) for a fixture using lumens.
  * Fallback when no photometric measurement is available.
+ *
+ * For a Gaussian beam with FWHM = beamAngleDeg, the total luminous flux is
+ *   Φ ≈ 2π · I₀ · σ_x · σ_y
+ * so I₀ = Φ / (2π · σ_x · σ_y). σ = halfAngle/√(2·ln2) for the FWHM convention.
  */
 function peakIntensityFromLumens(lumens: number, beamAngleDeg: number, ratio: number): number {
   const halfW = (beamAngleDeg / 2) * DEG2RAD;
   const halfH = halfW / Math.max(ratio, 0.1);
-  const geoMean = Math.sqrt(halfW * halfH);
-  const solidAngle = 2 * Math.PI * (1 - Math.cos(geoMean));
-  return solidAngle > 0 ? lumens / solidAngle : 0;
+  const sigmaW = halfW / Math.sqrt(2 * Math.LN2);
+  const sigmaH = halfH / Math.sqrt(2 * Math.LN2);
+  const denom = 2 * Math.PI * sigmaW * sigmaH;
+  return denom > 0 ? lumens / denom : 0;
 }
 
 /**
