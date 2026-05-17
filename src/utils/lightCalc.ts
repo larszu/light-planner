@@ -16,10 +16,16 @@ function getActiveAttachment(f: PlacedFixture): Attachment | undefined {
  *
  * `currentBeamAngle` is the zoom override expressed as FWHM (50 %) – when set,
  * the field angle (10 %) is scaled by the same factor.
+ *
+ * `refFieldAngle` is the field angle at which the photometric reference was
+ * taken, converted from the stored FWHM into the same fieldAngle convention
+ * used by σ. When no photometric is provided it defaults to the nominal
+ * (base) field angle, so zoomCompensation collapses to 1 at default zoom.
  */
 function getEffectiveBeam(f: PlacedFixture): {
   beamAngle: number;       // 50 % FWHM (metadata / labelling)
   fieldAngle: number;      // 10 % – used for the Gaussian σ
+  refFieldAngle: number;   // 10 % equivalent of photometric.beamAngle
   beamShape: typeof f.fixture.beamShape;
   beamRatioWH: number;
   lumens: number;
@@ -35,9 +41,17 @@ function getEffectiveBeam(f: PlacedFixture): {
   const fieldAngle = baseField * zoomScale;
   const beamShape = att?.beamShapeOverride ?? fix.beamShape;
   const photometric = att?.photometricOverride ?? fix.photometric;
+  // Convert photometric.beamAngle (stored as FWHM, matching fixture.beamAngle
+  // convention) into a fieldAngle so it can be compared against the σ-relevant
+  // currentAngle inside zoomCompensation.
+  const beamToFieldRatio = baseBeam > 0 ? baseField / baseBeam : 1;
+  const refFieldAngle = photometric?.beamAngle
+    ? photometric.beamAngle * beamToFieldRatio
+    : baseField;
   return {
     beamAngle,
     fieldAngle,
+    refFieldAngle,
     beamShape,
     beamRatioWH: fix.beamRatioWH,
     lumens: fix.lumens,
@@ -155,9 +169,10 @@ export function luxFromFixture(
   }
 
   // Reference field angle at which the photometric measurement was taken.
-  // Zoom and frost both shift us away from this reference and are
-  // compensated for inside peakIntensity().
-  const refAngle = eff.photometric?.beamAngle ?? f.fixture.fieldAngle;
+  // Already converted into the fieldAngle convention by getEffectiveBeam,
+  // so it matches `effectiveFieldAngle` and zoomCompensation == 1 at the
+  // photometric-measurement zoom (i.e. no zoom override, no frost).
+  const refAngle = eff.refFieldAngle;
 
   // Gel transmission factor
   const gelTransmission = (f.gelFilterIds && f.gelFilterIds.length > 0)
