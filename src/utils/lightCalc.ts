@@ -13,9 +13,13 @@ function getActiveAttachment(f: PlacedFixture): Attachment | undefined {
 
 /**
  * Get effective beam parameters, considering active attachment overrides.
+ *
+ * `currentBeamAngle` is the zoom override expressed as FWHM (50 %) – when set,
+ * the field angle (10 %) is scaled by the same factor.
  */
 function getEffectiveBeam(f: PlacedFixture): {
-  beamAngle: number;
+  beamAngle: number;       // 50 % FWHM (metadata / labelling)
+  fieldAngle: number;      // 10 % – used for the Gaussian σ
   beamShape: typeof f.fixture.beamShape;
   beamRatioWH: number;
   lumens: number;
@@ -23,13 +27,17 @@ function getEffectiveBeam(f: PlacedFixture): {
 } {
   const att = getActiveAttachment(f);
   const fix = f.fixture;
-  const beamAngle = f.currentBeamAngle
-    ?? att?.beamAngleOverride
-    ?? fix.beamAngle;
+  const baseBeam = att?.beamAngleOverride ?? fix.beamAngle;
+  const baseField = att?.fieldAngleOverride ?? fix.fieldAngle;
+  const beamAngle = f.currentBeamAngle ?? baseBeam;
+  // Zoom scales beam & field together; preserve their ratio.
+  const zoomScale = baseBeam > 0 ? beamAngle / baseBeam : 1;
+  const fieldAngle = baseField * zoomScale;
   const beamShape = att?.beamShapeOverride ?? fix.beamShape;
   const photometric = att?.photometricOverride ?? fix.photometric;
   return {
     beamAngle,
+    fieldAngle,
     beamShape,
     beamRatioWH: fix.beamRatioWH,
     lumens: fix.lumens,
@@ -46,18 +54,30 @@ function candelaFromPhotometric(p: PhotometricData): number {
 }
 
 /**
+ * Gaussian sigma (radians) from the field angle (10 % intensity).
+ *
+ * σ such that I(θ = fieldAngle/2) = 10 % · I₀, i.e.
+ *   exp(−θ²/(2σ²)) = 0.1  ⇒  σ = θ / √(2·ln10)
+ *
+ * Anchoring σ on the field angle makes the heatmap edge coincide with the
+ * visible cone (which is also drawn at the 10 % isophote in 2D / 3D).
+ */
+function beamSigma(fieldAngleDeg: number): number {
+  const halfAngle = (fieldAngleDeg / 2) * DEG2RAD;
+  return halfAngle / Math.sqrt(2 * Math.LN10);
+}
+
+/**
  * Peak luminous intensity (candela) for a fixture using lumens.
  * Fallback when no photometric measurement is available.
  *
- * For a Gaussian beam with FWHM = beamAngleDeg, the total luminous flux is
- *   Φ ≈ 2π · I₀ · σ_x · σ_y
- * so I₀ = Φ / (2π · σ_x · σ_y). σ = halfAngle/√(2·ln2) for the FWHM convention.
+ * For a 2-D Gaussian beam, total flux Φ = 2π·I₀·σ_x·σ_y ⇒ I₀ = Φ / (2π·σ_x·σ_y).
+ * σ is anchored on the same field angle used by `beamSigma()` so the σ used
+ * here matches the σ used in `luxFromFixture()`.
  */
-function peakIntensityFromLumens(lumens: number, beamAngleDeg: number, ratio: number): number {
-  const halfW = (beamAngleDeg / 2) * DEG2RAD;
-  const halfH = halfW / Math.max(ratio, 0.1);
-  const sigmaW = halfW / Math.sqrt(2 * Math.LN2);
-  const sigmaH = halfH / Math.sqrt(2 * Math.LN2);
+function peakIntensityFromLumens(lumens: number, fieldAngleDeg: number, ratio: number): number {
+  const sigmaW = beamSigma(fieldAngleDeg);
+  const sigmaH = sigmaW / Math.max(ratio, 0.1);
   const denom = 2 * Math.PI * sigmaW * sigmaH;
   return denom > 0 ? lumens / denom : 0;
 }
@@ -67,22 +87,14 @@ function peakIntensityFromLumens(lumens: number, beamAngleDeg: number, ratio: nu
  */
 function peakIntensity(
   lumens: number,
-  beamAngleDeg: number,
+  fieldAngleDeg: number,
   ratio: number,
   photometric?: PhotometricData,
 ): number {
   if (photometric && photometric.lux > 0 && photometric.distance > 0) {
     return candelaFromPhotometric(photometric);
   }
-  return peakIntensityFromLumens(lumens, beamAngleDeg, ratio);
-}
-
-/**
- * Gaussian sigma (radians) from beam angle (50% power).
- */
-function beamSigma(beamAngleDeg: number): number {
-  const halfAngle = (beamAngleDeg / 2) * DEG2RAD;
-  return halfAngle / Math.sqrt(2 * Math.LN2);
+  return peakIntensityFromLumens(lumens, fieldAngleDeg, ratio);
 }
 
 /**
@@ -107,12 +119,13 @@ export function luxFromFixture(
   if (dimFactor <= 0) return 0;
 
   const eff = getEffectiveBeam(f);
-  let beamAngle = eff.beamAngle;
+  // Anchor the Gaussian on the field angle (10 % isophote) so the heatmap
+  // edge coincides with the visible cone drawn in 2D/3D. Frost widens it.
+  let fieldAngle = eff.fieldAngle;
   const ratio = eff.beamRatioWH;
 
-  // Apply frost/diffusion gel widening
   if (f.gelFilterIds && f.gelFilterIds.length > 0) {
-    beamAngle = effectiveBeamAngleWithFrost(beamAngle, f.gelFilterIds);
+    fieldAngle = effectiveBeamAngleWithFrost(fieldAngle, f.gelFilterIds);
   }
 
   // Gel transmission factor
@@ -183,8 +196,8 @@ export function luxFromFixture(
     }
   }
 
-  const sigma = beamSigma(beamAngle);
-  const Ipeak = peakIntensity(eff.lumens, beamAngle, ratio, eff.photometric) * dimFactor * gelTransmission;
+  const sigma = beamSigma(fieldAngle);
+  const Ipeak = peakIntensity(eff.lumens, fieldAngle, ratio, eff.photometric) * dimFactor * gelTransmission;
   const I = Ipeak * Math.exp(-(effectiveTheta * effectiveTheta) / (2 * sigma * sigma));
 
   const cosIncidence = h / dist;
