@@ -54,6 +54,25 @@ function candelaFromPhotometric(p: PhotometricData): number {
 }
 
 /**
+ * Zoom- & frost-compensation scale factor for peak candela.
+ *
+ * A focusing fixture conserves luminous flux while the beam is zoomed or
+ * diffused, so the peak angular intensity scales with 1/σ². We multiply
+ * the reference peak candela by (σ_ref / σ_current)²; since both σs are
+ * derived from the same field-angle convention, the ratio simplifies to
+ * (refAngle / currentAngle)².
+ *
+ * `refAngle` is the field angle at which the photometric reference was
+ * taken: `photometric.beamAngle` if available, otherwise the fixture's
+ * nominal `fieldAngle`.
+ */
+function zoomCompensation(refAngle: number, currentAngle: number): number {
+  if (refAngle <= 0 || currentAngle <= 0) return 1;
+  const ratio = refAngle / currentAngle;
+  return ratio * ratio;
+}
+
+/**
  * Gaussian sigma (radians) from the field angle (10 % intensity).
  *
  * σ such that I(θ = fieldAngle/2) = 10 % · I₀, i.e.
@@ -84,17 +103,23 @@ function peakIntensityFromLumens(lumens: number, fieldAngleDeg: number, ratio: n
 
 /**
  * Peak luminous intensity (candela) – prefers photometric data over lumens.
+ *
+ * When the fixture is zoomed (or frosted) away from the reference field
+ * angle at which the photometric measurement was taken, we apply flux
+ * conservation. The lumen fallback already bakes σ² scaling into I₀, so
+ * no extra zoom compensation is required there.
  */
 function peakIntensity(
   lumens: number,
-  fieldAngleDeg: number,
+  refAngleDeg: number,
+  currentAngleDeg: number,
   ratio: number,
   photometric?: PhotometricData,
 ): number {
   if (photometric && photometric.lux > 0 && photometric.distance > 0) {
-    return candelaFromPhotometric(photometric);
+    return candelaFromPhotometric(photometric) * zoomCompensation(refAngleDeg, currentAngleDeg);
   }
-  return peakIntensityFromLumens(lumens, fieldAngleDeg, ratio);
+  return peakIntensityFromLumens(lumens, currentAngleDeg, ratio);
 }
 
 /**
@@ -121,12 +146,18 @@ export function luxFromFixture(
   const eff = getEffectiveBeam(f);
   // Anchor the Gaussian on the field angle (10 % isophote) so the heatmap
   // edge coincides with the visible cone drawn in 2D/3D. Frost widens it.
-  let fieldAngle = eff.fieldAngle;
+  const nominalFieldAngle = eff.fieldAngle;
   const ratio = eff.beamRatioWH;
 
+  let effectiveFieldAngle = nominalFieldAngle;
   if (f.gelFilterIds && f.gelFilterIds.length > 0) {
-    fieldAngle = effectiveBeamAngleWithFrost(fieldAngle, f.gelFilterIds);
+    effectiveFieldAngle = effectiveBeamAngleWithFrost(nominalFieldAngle, f.gelFilterIds);
   }
+
+  // Reference field angle at which the photometric measurement was taken.
+  // Zoom and frost both shift us away from this reference and are
+  // compensated for inside peakIntensity().
+  const refAngle = eff.photometric?.beamAngle ?? f.fixture.fieldAngle;
 
   // Gel transmission factor
   const gelTransmission = (f.gelFilterIds && f.gelFilterIds.length > 0)
@@ -196,8 +227,11 @@ export function luxFromFixture(
     }
   }
 
-  const sigma = beamSigma(fieldAngle);
-  const Ipeak = peakIntensity(eff.lumens, fieldAngle, ratio, eff.photometric) * dimFactor * gelTransmission;
+  const sigma = beamSigma(effectiveFieldAngle);
+  const Ipeak =
+    peakIntensity(eff.lumens, refAngle, effectiveFieldAngle, ratio, eff.photometric)
+    * dimFactor
+    * gelTransmission;
   const I = Ipeak * Math.exp(-(effectiveTheta * effectiveTheta) / (2 * sigma * sigma));
 
   const cosIncidence = h / dist;
