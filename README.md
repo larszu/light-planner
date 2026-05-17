@@ -20,7 +20,7 @@
 **LightPlanner** is a small desktop app for quickly sketching out a lighting setup.
 The kind of plan you'd otherwise scribble on the back of a call sheet — just on a 2D canvas with a little 3D preview on top.
 
-It is **not** a replacement for Vectorworks, WYSIWYG or Capture. It's the tool you reach for when you just want to think through where the lights go before you start rigging.
+It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach for when you just want to think through where the lights go before you start rigging.
 
 ✔ Runs offline on macOS & Windows
 ✔ Drop in fixtures, drag the aim point, see roughly where the light lands
