@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { PlacedFixture, Person, StageElement } from '../types';
-import { computeHeatMap, luxToColor, luxToColorTarget } from '../utils/lightCalc';
+import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
 
 export interface Scene3DHandle {
@@ -248,13 +248,14 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const angle = Math.atan2(dy, dx);
       bodyMesh.rotation.y = -angle;
 
-      // Beam cone – originates FROM fixture, spreads toward aim point
-      const beamAngle = f.currentBeamAngle ?? f.fixture.beamAngle;
+      // Beam cone – drawn at the field angle (10 % isophote) so its edge
+      // coincides with the heat-map fade-out (σ uses the same angle).
+      const fieldAngle = effectiveFieldAngleDeg(f);
       const fixturePos = new THREE.Vector3(f.x, f.mountingHeight, f.y);
       const aimPos = new THREE.Vector3(f.aimX, 0, f.aimY);
       const coneVec = aimPos.clone().sub(fixturePos);
       const coneHeight = coneVec.length();
-      const beamRadAtBase = Math.tan((beamAngle / 2) * (Math.PI / 180)) * coneHeight;
+      const beamRadAtBase = Math.tan((fieldAngle / 2) * (Math.PI / 180)) * coneHeight;
       const dimOpacity = 0.04 * (f.dimming / 100);
 
       if (coneHeight > 0.1) {

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement } from '../types';
-import { computeHeatMap, luxToColor, luxToColorTarget, totalLux } from '../utils/lightCalc';
+import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
 import { getBeamColorRgba } from '../utils/colorTemp';
 
@@ -358,8 +358,10 @@ const PlanCanvas: React.FC<Props> = ({
     for (const f of fixtures) {
       const isSel = selectedIds.has(f.id);
       const rad = 0.3;
-      const beamAngle = f.currentBeamAngle ?? f.fixture.beamAngle;
-      const beamRad = Math.tan((beamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
+      // Footprint drawn at the field angle (10 % isophote) so its edge
+      // coincides with the heat-map fade-out.
+      const fieldAngle = effectiveFieldAngleDeg(f);
+      const beamRad = Math.tan((fieldAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
       const dimAlpha = f.dimming / 100;
 
       // Beam cone visualization – emanates FROM the fixture toward aim
