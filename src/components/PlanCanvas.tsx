@@ -533,10 +533,12 @@ const PlanCanvas: React.FC<Props> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') { e.preventDefault(); spaceDownRef.current = true; }
-      if (e.code === 'Delete' && selectedId) {
+      if (e.code === 'Delete' && selectedIds.size > 0) {
         const el = document.activeElement;
         if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
-        window.dispatchEvent(new CustomEvent('lp-delete', { detail: selectedId }));
+        for (const id of selectedIds) {
+          window.dispatchEvent(new CustomEvent('lp-delete', { detail: id }));
+        }
       }
       if (e.code === 'Escape') { onSelect(null); onToolChange('select'); }
     };

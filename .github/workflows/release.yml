@@ -15,6 +15,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # Opt the bundled actions into Node 24 to silence the Node 20 deprecation
+  # notice (deadline 2026-06-02). Drop this once checkout/setup-node ship v5.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   build:
     strategy:
@@ -33,7 +38,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
