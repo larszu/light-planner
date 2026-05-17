@@ -22,6 +22,18 @@ function getActiveAttachment(f: PlacedFixture): Attachment | undefined {
  * used by σ. When no photometric is provided it defaults to the nominal
  * (base) field angle, so zoomCompensation collapses to 1 at default zoom.
  */
+/**
+ * Effective field angle (10 %) for the placed fixture, including attachment
+ * overrides, zoom (currentBeamAngle is FWHM and scales fieldAngle by the
+ * same factor) and frost widening. Use this to draw the cone footprint in
+ * 2D / 3D so its edge coincides with the heat-map fade-out (σ is anchored
+ * on the same value inside `luxFromFixture`).
+ */
+export function effectiveFieldAngleDeg(f: PlacedFixture): number {
+  const eff = getEffectiveBeam(f);
+  return effectiveBeamAngleWithFrost(eff.fieldAngle, f.gelFilterIds ?? []);
+}
+
 function getEffectiveBeam(f: PlacedFixture): {
   beamAngle: number;       // 50 % FWHM (metadata / labelling)
   fieldAngle: number;      // 10 % – used for the Gaussian σ

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { PlacedFixture, Person, StageElement, Fixture } from '../types';
-import { luxFromFixture } from '../utils/lightCalc';
+import { luxFromFixture, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { gelLibrary, effectiveColorTemp } from '../data/gelLibrary';
 import { fixtureLibrary } from '../data/fixtureLibrary';
 import { getFixtureCCT, cctToRgb } from '../utils/colorTemp';
@@ -70,6 +70,7 @@ const PropertyPanel: React.FC<Props> = ({
     const effectiveBeamAngle = f.currentBeamAngle ?? activeAtt?.beamAngleOverride ?? f.fixture.beamAngle;
     const effectiveZoomRange = activeAtt?.zoomRangeOverride ?? f.fixture.zoomRange;
     const beamRadAtFloor = Math.tan((effectiveBeamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
+    const fieldRadAtFloor = Math.tan((effectiveFieldAngleDeg(f) / 2) * (Math.PI / 180)) * f.mountingHeight;
 
     // Compute peak lux at aim point using the real engine
     const peakLux = luxFromFixture(f, f.aimX, f.aimY);
@@ -189,7 +190,8 @@ const PropertyPanel: React.FC<Props> = ({
             </label>
           )}
           <div className="prop-derived lux-readout">
-            Beam Ø: {(beamRadAtFloor * 2).toFixed(1)} m<br />
+            Beam Ø (50 %): {(beamRadAtFloor * 2).toFixed(1)} m<br />
+            Field Ø (10 %): {(fieldRadAtFloor * 2).toFixed(1)} m<br />
             Peak: ~{peakLux.toFixed(0)} lux
           </div>
         </div>
