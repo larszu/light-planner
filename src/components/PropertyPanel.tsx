@@ -1,8 +1,9 @@
 import React from 'react';
 import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape } from '../types';
 import { wallMidHandle, curveControlForMid } from '../utils/geometry';
-import { luxFromFixture, effectiveFieldAngleDeg } from '../utils/lightCalc';
-import { gelLibrary, effectiveColorTemp } from '../data/gelLibrary';
+import { luxFromFixture, effectiveFieldAngleDeg, explainLux } from '../utils/lightCalc';
+import type { FixtureCategory, BeamShape, LensType, MountType } from '../types';
+import { gelLibrary } from '../data/gelLibrary';
 import { fixtureLibrary } from '../data/fixtureLibrary';
 import { getFixtureCCT, cctToRgb } from '../utils/colorTemp';
 
@@ -71,6 +72,9 @@ const PropertyPanel: React.FC<Props> = ({
   // Multi-selection info
   const multiFixtures = fixtures.filter((f) => selectedIds.has(f.id));
   const multiCount = selectedIds.size;
+  const [beamHelp, setBeamHelp] = React.useState(false);
+  const [showCalc, setShowCalc] = React.useState(false);
+  const [showSpecs, setShowSpecs] = React.useState(true);
 
   const numField = (label: string, value: number, onChange: (v: number) => void, step = 0.1, min?: number, max?: number) => (
     <label className="prop-field">
@@ -93,11 +97,15 @@ const PropertyPanel: React.FC<Props> = ({
     const effectiveBeamAngle = f.currentBeamAngle ?? activeAtt?.beamAngleOverride ?? f.fixture.beamAngle;
     const effectiveZoomRange = activeAtt?.zoomRangeOverride ?? f.fixture.zoomRange;
     const beamRadAtFloor = Math.tan((effectiveBeamAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
-    const fieldRadAtFloor = Math.tan((effectiveFieldAngleDeg(f) / 2) * (Math.PI / 180)) * f.mountingHeight;
+    const effFieldAngle = effectiveFieldAngleDeg(f);
+    const fieldRadAtFloor = Math.tan((effFieldAngle / 2) * (Math.PI / 180)) * f.mountingHeight;
+    // Effective angles scale with the current zoom relative to the base beam.
+    const baseBeam = activeAtt?.beamAngleOverride ?? f.fixture.beamAngle;
+    const zoomScale = baseBeam > 0 ? effectiveBeamAngle / baseBeam : 1;
+    const effCutoff = f.fixture.cutoffAngle != null ? f.fixture.cutoffAngle * zoomScale : undefined;
 
     // Compute peak lux at aim point using the real engine
     const peakLux = luxFromFixture(f, f.aimX, f.aimY);
-    const totalWeight = f.fixture.weight + (activeAtt?.weightAdditional ?? 0);
 
     // Pan/tilt from aim point, allow setting directly
     const setPanTilt = (newPanDeg: number, newTiltDeg: number) => {
@@ -219,6 +227,30 @@ const PropertyPanel: React.FC<Props> = ({
           </div>
         </div>
 
+        {/* Beam details – beam vs field vs cutoff vs zoom, with explanation */}
+        <div className="prop-section">
+          <span className="prop-section-title">
+            Strahl-Details
+            <button type="button" className="beam-help-toggle" onClick={() => setBeamHelp((v) => !v)} title="Was bedeutet das?">ℹ</button>
+          </span>
+          <div className="beam-angles">
+            <div><span className="ba-dot ba-beam" /> Beam (50 %) <strong>{effectiveBeamAngle.toFixed(1)}°</strong></div>
+            <div><span className="ba-dot ba-field" /> Field (10 %) <strong>{effFieldAngle.toFixed(1)}°</strong></div>
+            {effCutoff != null && <div><span className="ba-dot ba-cut" /> Cutoff (2,5 %) <strong>{effCutoff.toFixed(1)}°</strong></div>}
+            {effectiveZoomRange
+              ? <div><span className="ba-dot ba-zoom" /> Zoom-Bereich <strong>{effectiveZoomRange[0]}–{effectiveZoomRange[1]}°</strong></div>
+              : <div><span className="ba-dot ba-zoom" /> Zoom <strong>fest</strong></div>}
+          </div>
+          {beamHelp && (
+            <div className="beam-help">
+              <p><strong>Beam-Winkel (50 %)</strong> – der helle Kern: Winkel, bei dem die Intensität auf 50 % des Maximums abfällt (Hotspot/FWHM).</p>
+              <p><strong>Field-Winkel (10 %)</strong> – der nutzbare Rand: bei 10 % des Maximums. Immer <em>größer</em> als der Beam-Winkel.</p>
+              <p><strong>Cutoff (2,5 %)</strong> – wo das Licht praktisch endet.</p>
+              <p><strong>Zoom-Bereich</strong> – bei Zoom-Geräten der <em>einstellbare</em> Beam-Winkel (eng ↔ weit). Beam &amp; Field beschreiben die Strahlform bei der aktuellen Zoom-Stellung.</p>
+            </div>
+          )}
+        </div>
+
         {/* Attachment selector */}
         {f.fixture.compatibleAttachments && f.fixture.compatibleAttachments.length > 0 && (
           <div className="prop-section">
@@ -337,37 +369,105 @@ const PropertyPanel: React.FC<Props> = ({
           </label>
         </div>
 
+        {/* Editable technical data – every value can be checked & adjusted per lamp */}
         <div className="prop-section">
-          <span className="prop-section-title">Info</span>
-          <div className="prop-info-grid">
-            <span>{f.fixture.manufacturer}</span>
-            <span>{f.fixture.wattage} W</span>
-            {f.fixture.photometric
-              ? <span>{f.fixture.photometric.lux.toLocaleString()} lux@{f.fixture.photometric.distance}m</span>
-              : <span>{f.fixture.lumens.toLocaleString()} lm</span>}
-            <span>Beam: {f.fixture.beamAngle}°</span>
-            <span>Field: {f.fixture.fieldAngle}°</span>
-            <span>{f.fixture.beamShape}</span>
-            <span>{f.fixture.lensType}</span>
-            <span>{f.fixture.colorTempRange
-              ? `${f.fixture.colorTempRange[0]}–${f.fixture.colorTempRange[1]} K`
-              : f.fixture.colorTemp > 0 ? `${f.fixture.colorTemp} K` : 'RGBW'}</span>
-            <span>{MOUNT_LABELS[f.fixture.mountType] ?? f.fixture.mountType}</span>
-            <span>{totalWeight.toFixed(1)} kg</span>
-            {f.fixture.cri && <span>CRI {f.fixture.cri}</span>}
-            {f.fixture.tlci && <span>TLCI {f.fixture.tlci}</span>}
-            {f.fixture.ipRating && <span>IP{f.fixture.ipRating}</span>}
-            {f.fixture.dmxChannels && <span>{f.fixture.dmxChannels} DMX-Ch</span>}
-            {f.gelFilterIds && f.gelFilterIds.length > 0 && (() => {
-              const baseCCT = f.currentColorTemp ?? (f.fixture.colorTempRange ? f.fixture.colorTempRange[0] : f.fixture.colorTemp);
-              if (baseCCT > 0) {
-                const effCCT = effectiveColorTemp(baseCCT, f.gelFilterIds!);
-                return <span>Eff. CCT: {effCCT} K</span>;
-              }
-              return null;
-            })()}
-          </div>
+          <span className="prop-section-title">
+            Technische Daten (anpassbar)
+            <button type="button" className="beam-help-toggle" onClick={() => setShowSpecs((v) => !v)} title="Ein-/ausklappen">{showSpecs ? '▾' : '▸'}</button>
+          </span>
+          {showSpecs && (() => {
+            const setSpec = (patch: Partial<Fixture>) => onUpdateFixture(f.id, { fixture: { ...f.fixture, ...patch } });
+            const sNum = (label: string, val: number | undefined, set: (v: number) => void, step = 1, title?: string) => (
+              <label className="prop-field" title={title}>
+                <span>{label}</span>
+                <input type="number" value={val ?? 0} step={step} onChange={(e) => set(Number(e.target.value))} />
+              </label>
+            );
+            const photo = f.fixture.photometric;
+            return (
+              <>
+                <label className="prop-field"><span>Hersteller</span>
+                  <input type="text" value={f.fixture.manufacturer} onChange={(e) => setSpec({ manufacturer: e.target.value })} /></label>
+                <label className="prop-field"><span>Typ</span>
+                  <input type="text" value={f.fixture.name} onChange={(e) => setSpec({ name: e.target.value })} /></label>
+                {sNum('Leistung (W)', f.fixture.wattage, (v) => setSpec({ wattage: v }), 1)}
+                {sNum('Lichtstrom (lm)', f.fixture.lumens, (v) => setSpec({ lumens: v }), 50, 'Gesamt-Lichtstrom (Fallback, wenn keine Lux-Referenz)')}
+                {sNum('Beam 50 % (°)', f.fixture.beamAngle, (v) => setSpec({ beamAngle: v }), 0.5, 'Heller Kern (FWHM)')}
+                {sNum('Field 10 % (°)', f.fixture.fieldAngle, (v) => setSpec({ fieldAngle: v }), 0.5, 'Nutzbarer Rand – treibt die Berechnung (σ)')}
+                {sNum('Cutoff 2,5 % (°)', f.fixture.cutoffAngle, (v) => setSpec({ cutoffAngle: v || undefined }), 0.5, 'Wo das Licht endet (optional)')}
+                <label className="prop-field"><span>Strahlform</span>
+                  <select value={f.fixture.beamShape} onChange={(e) => setSpec({ beamShape: e.target.value as BeamShape })}>
+                    <option value="circular">Kreisförmig</option><option value="elliptical">Elliptisch</option>
+                    <option value="linear">Linear</option><option value="rectangular">Rechteckig</option>
+                  </select></label>
+                {f.fixture.beamShape !== 'circular' && sNum('Beam W:H', f.fixture.beamRatioWH, (v) => setSpec({ beamRatioWH: v }), 0.1)}
+                <label className="prop-field"><span>Linsentyp</span>
+                  <select value={f.fixture.lensType} onChange={(e) => setSpec({ lensType: e.target.value as LensType })}>
+                    <option value="fixed">Fest</option><option value="zoom">Zoom</option><option value="interchangeable">Wechselbar</option>
+                    <option value="fresnel">Fresnel</option><option value="pc">PC</option><option value="reflector">Reflektor</option>
+                  </select></label>
+                <label className="prop-field"><span>Befestigung</span>
+                  <select value={f.fixture.mountType} onChange={(e) => setSpec({ mountType: e.target.value as MountType })}>
+                    {Object.entries(MOUNT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select></label>
+                {f.fixture.zoomRange && (
+                  <div className="prop-field"><span>Zoom-Bereich (°)</span>
+                    <span className="zoom-range-edit">
+                      <input type="number" step={0.5} value={f.fixture.zoomRange[0]} onChange={(e) => setSpec({ zoomRange: [Number(e.target.value), f.fixture.zoomRange![1]] })} />
+                      <input type="number" step={0.5} value={f.fixture.zoomRange[1]} onChange={(e) => setSpec({ zoomRange: [f.fixture.zoomRange![0], Number(e.target.value)] })} />
+                    </span>
+                  </div>
+                )}
+                {sNum('Farbtemp. (K, 0=RGBW)', f.fixture.colorTemp, (v) => setSpec({ colorTemp: v }), 100)}
+                {sNum('Gewicht (kg)', f.fixture.weight, (v) => setSpec({ weight: v }), 0.1)}
+                {sNum('CRI', f.fixture.cri, (v) => setSpec({ cri: v || undefined }), 1)}
+                {sNum('TLCI', f.fixture.tlci, (v) => setSpec({ tlci: v || undefined }), 1)}
+                {sNum('DMX-Kanäle', f.fixture.dmxChannels, (v) => setSpec({ dmxChannels: v || undefined }), 1)}
+                <label className="prop-field"><span>IP-Schutzart</span>
+                  <input type="text" value={f.fixture.ipRating ?? ''} onChange={(e) => setSpec({ ipRating: e.target.value || undefined })} /></label>
+                <div className="prop-field-sub">Photometrische Referenz (treibt die Lux-Berechnung):</div>
+                {sNum('Ref. Lux', photo?.lux, (v) => setSpec({ photometric: { ...(photo ?? { lux: v, distance: 1 }), lux: v } }), 100)}
+                {sNum('Ref. Abstand (m)', photo?.distance, (v) => setSpec({ photometric: { ...(photo ?? { lux: 10000, distance: v }), distance: v } }), 0.5)}
+                {sNum('Ref. bei Beam (°)', photo?.beamAngle, (v) => setSpec({ photometric: { ...(photo ?? { lux: 10000, distance: 1 }), beamAngle: v } }), 0.5, 'Beam-Winkel, bei dem die Lux-Referenz gemessen wurde')}
+              </>
+            );
+          })()}
         </div>
+
+        {/* Calculation trace – fully visible & manually verifiable */}
+        <div className="prop-section">
+          <span className="prop-section-title">
+            Rechenweg (Lux am Zielpunkt)
+            <button type="button" className="beam-help-toggle" onClick={() => setShowCalc((v) => !v)} title="Rechenweg zeigen">{showCalc ? '▾' : '▸'}</button>
+          </span>
+          {showCalc && (() => {
+            const b = explainLux(f, f.aimX, f.aimY);
+            const fmt = (n: number, d = 0) => n.toLocaleString('de-DE', { maximumFractionDigits: d });
+            return (
+              <div className="calc-trace">
+                <div className="calc-formula">E = I · cos θ / d²</div>
+                <table className="calc-table">
+                  <tbody>
+                    {b.source === 'photometric'
+                      ? <tr><td>Referenz</td><td>{fmt(b.refLux!)} lx @ {b.refDistance} m</td><td>→ I₀ = lx·d² = <b>{fmt(b.basePeakCd)} cd</b></td></tr>
+                      : <tr><td>Quelle</td><td>{fmt(f.fixture.lumens)} lm</td><td>→ I₀ = <b>{fmt(b.basePeakCd)} cd</b></td></tr>}
+                    {b.source === 'photometric' && Math.abs(b.zoomComp - 1) > 0.001 &&
+                      <tr><td>Zoom-Komp.</td><td>×{b.zoomComp.toFixed(3)}</td><td>Field {b.fieldAngleDeg.toFixed(1)}°</td></tr>}
+                    <tr><td>Peak I₀</td><td colSpan={2}><b>{fmt(b.peakCd)} cd</b></td></tr>
+                    <tr><td>Dimmer</td><td>×{(b.dimming * 100).toFixed(0)} %</td><td>{b.dimming.toFixed(2)}</td></tr>
+                    {b.gel < 1 && <tr><td>Gel</td><td>×{(b.gel * 100).toFixed(0)} %</td><td>{b.gel.toFixed(2)}</td></tr>}
+                    <tr><td>Gauss</td><td>×{b.gauss.toFixed(3)}</td><td>θ = {b.offAxisDeg.toFixed(1)}°</td></tr>
+                    <tr><td>cos θ<sub>einf.</sub></td><td>×{b.cosIncidence.toFixed(3)}</td><td>h = {f.mountingHeight} m</td></tr>
+                    <tr><td>÷ d²</td><td>d = {b.distance.toFixed(2)} m</td><td>d² = {fmt(b.distance * b.distance, 1)}</td></tr>
+                    <tr className="calc-result"><td>= E</td><td colSpan={2}><b>{fmt(b.lux)} lx</b></td></tr>
+                  </tbody>
+                </table>
+                <div className="calc-note">Alle Werte stammen aus den anpassbaren Daten oben – so lässt sich jeder Schritt nachrechnen. (Elliptische Korrektur bei nicht-runden Strahlen hier vereinfacht.)</div>
+              </div>
+            );
+          })()}
+        </div>
+
         <button className="delete-btn" onClick={() => onDelete(f.id)}>Leuchte löschen</button>
       </div>
     );

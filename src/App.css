@@ -1266,12 +1266,90 @@ kbd {
 }
 
 .prop-section-title {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text2);
   margin-bottom: 6px;
+}
+
+.beam-help-toggle {
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--accent);
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.beam-help-toggle:hover { background: var(--accent); color: #111; }
+
+/* Beam angle legend */
+.beam-angles {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.5px;
+  color: var(--text);
+}
+.beam-angles > div { display: flex; align-items: center; gap: 6px; }
+.beam-angles strong { margin-left: auto; font-family: monospace; color: var(--accent); }
+.ba-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+.ba-beam { background: #ffd24a; }
+.ba-field { background: #4fc3f7; }
+.ba-cut { background: #7d8aa0; }
+.ba-zoom { background: #ff7043; border-radius: 2px; }
+
+.beam-help {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text2);
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+}
+.beam-help p { margin: 0 0 5px; }
+.beam-help strong { color: var(--text); }
+
+/* Calculation trace */
+.calc-trace { font-size: 11px; }
+.calc-formula {
+  font-family: monospace;
+  color: var(--accent);
+  background: var(--panel-alt);
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  text-align: center;
+}
+.calc-table { width: 100%; border-collapse: collapse; }
+.calc-table td { padding: 2px 4px; border-bottom: 1px solid rgba(58,58,80,0.4); color: var(--text2); vertical-align: top; }
+.calc-table td:first-child { color: var(--text); white-space: nowrap; }
+.calc-table b { color: var(--text); }
+.calc-table .calc-result td { border-top: 1px solid var(--border); border-bottom: none; padding-top: 4px; }
+.calc-table .calc-result b { color: var(--warn); font-size: 13px; }
+.calc-note { font-size: 10px; color: var(--text2); margin-top: 6px; line-height: 1.4; }
+
+.prop-field-sub { font-size: 10.5px; color: var(--accent); margin: 6px 0 2px; }
+.zoom-range-edit { display: flex; gap: 4px; }
+.zoom-range-edit input {
+  width: 56px; padding: 3px 6px; text-align: right;
+  border: 1px solid var(--border); border-radius: 3px;
+  background: var(--panel-alt); color: var(--text); font-size: 12px; outline: none;
+}
+.editor-note {
+  grid-column: 1 / -1;
+  font-size: 10.5px;
+  color: var(--text2);
+  line-height: 1.5;
+  background: var(--panel-alt);
+  border-radius: 4px;
+  padding: 6px 8px;
 }
 
 .prop-field {

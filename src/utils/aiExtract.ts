@@ -22,6 +22,7 @@ export interface ExtractedFields {
   lumens?: number;
   beamAngle?: number;
   fieldAngle?: number;
+  cutoffAngle?: number;
   beamShape?: string;
   lensType?: string;
   hasZoom?: boolean;
@@ -71,8 +72,9 @@ const TOOL = {
       category: { type: 'string', enum: ['profile', 'fresnel', 'par', 'wash', 'spot', 'beam', 'moving-wash', 'moving-spot', 'moving-beam', 'blinder', 'cyc', 'flood', 'followspot', 'led-panel', 'custom'] },
       wattage: { type: 'number', description: 'Leistungsaufnahme in Watt' },
       lumens: { type: 'number', description: 'Lichtstrom in Lumen' },
-      beamAngle: { type: 'number', description: 'Beam-Winkel (50%) in Grad' },
-      fieldAngle: { type: 'number', description: 'Field-Winkel (10%) in Grad' },
+      beamAngle: { type: 'number', description: 'Beam-Winkel (50%, FWHM) in Grad – heller Kern' },
+      fieldAngle: { type: 'number', description: 'Field-Winkel (10%) in Grad – nutzbarer Rand, größer als Beam' },
+      cutoffAngle: { type: 'number', description: 'Cutoff-Winkel (2,5%) in Grad, falls angegeben' },
       beamShape: { type: 'string', enum: ['circular', 'elliptical', 'linear', 'rectangular'] },
       lensType: { type: 'string', enum: ['fixed', 'zoom', 'interchangeable', 'fresnel', 'pc', 'reflector'] },
       hasZoom: { type: 'boolean' },

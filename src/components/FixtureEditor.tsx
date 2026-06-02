@@ -16,6 +16,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
   const [lumens, setLumens] = useState(initial?.lumens ?? 10000);
   const [beamAngle, setBeamAngle] = useState(initial?.beamAngle ?? 26);
   const [fieldAngle, setFieldAngle] = useState(initial?.fieldAngle ?? 32);
+  const [cutoffAngle, setCutoffAngle] = useState(initial?.cutoffAngle ?? 0);
   const [beamShape, setBeamShape] = useState<BeamShape>(initial?.beamShape ?? 'circular');
   const [beamRatioWH, setBeamRatioWH] = useState(initial?.beamRatioWH ?? 1);
   const [lensType, setLensType] = useState<LensType>(initial?.lensType ?? 'pc');
@@ -54,6 +55,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
     if (f.lumens != null) setLumens(f.lumens);
     if (f.beamAngle != null) setBeamAngle(f.beamAngle);
     if (f.fieldAngle != null) setFieldAngle(f.fieldAngle);
+    if (f.cutoffAngle != null) setCutoffAngle(f.cutoffAngle);
     if (f.beamShape != null) setBeamShape(f.beamShape as BeamShape);
     if (f.lensType != null) setLensType(f.lensType as LensType);
     if (f.hasZoom != null) setHasZoom(f.hasZoom);
@@ -101,6 +103,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
       lumens,
       beamAngle,
       fieldAngle: fieldAngle || beamAngle + 6,
+      cutoffAngle: cutoffAngle || undefined,
       beamShape,
       beamRatioWH,
       lensType,
@@ -214,8 +217,10 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
           <label>Leistung (W)<input type="number" value={wattage} onChange={(e) => setWattage(Number(e.target.value))} min={1} /></label>
           <label>Lichtstrom (lm)<input type="number" value={lumens} onChange={(e) => setLumens(Number(e.target.value))} min={1} /></label>
 
-          <label>Beam Angle (°)<input type="number" value={beamAngle} step={0.5} onChange={(e) => setBeamAngle(Number(e.target.value))} min={1} max={180} /></label>
-          <label>Field Angle (°)<input type="number" value={fieldAngle} step={0.5} onChange={(e) => setFieldAngle(Number(e.target.value))} min={1} max={180} /></label>
+          <label title="Heller Kern: Winkel, bei dem die Intensität auf 50 % des Maximums fällt (FWHM).">Beam-Winkel 50 % (°)<input type="number" value={beamAngle} step={0.5} onChange={(e) => setBeamAngle(Number(e.target.value))} min={1} max={180} /></label>
+          <label title="Nutzbarer Rand: bei 10 % des Maximums. Immer größer als der Beam-Winkel.">Field-Winkel 10 % (°)<input type="number" value={fieldAngle} step={0.5} onChange={(e) => setFieldAngle(Number(e.target.value))} min={1} max={180} /></label>
+          <label title="Wo das Licht praktisch endet (2,5 %). Optional – 0 = nicht angegeben.">Cutoff 2,5 % (°)<input type="number" value={cutoffAngle} step={0.5} onChange={(e) => setCutoffAngle(Number(e.target.value))} min={0} max={180} /></label>
+          <div className="editor-note">Beam (50 %) &lt; Field (10 %) &lt; Cutoff (2,5 %). Der <b>Zoom</b> (unten) ist der einstellbare Beam-Winkel-Bereich – etwas anderes als Beam/Field.</div>
 
           <label>Strahlform
             <select value={beamShape} onChange={(e) => setBeamShape(e.target.value as BeamShape)}>

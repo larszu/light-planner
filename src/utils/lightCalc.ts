@@ -369,6 +369,70 @@ export function wallBounceAt(samples: WallSample[], px: number, py: number): num
 }
 
 /**
+ * Step-by-step breakdown of the illuminance at a floor point from one fixture,
+ * so the user can follow (and hand-check) the calculation. The factors multiply
+ * to `lux`:  lux = peakCd · dim · gel · gauss · cos(incidence) / distance²
+ * (circular-beam form; the elliptical refinement is omitted here for clarity).
+ */
+export interface LuxBreakdown {
+  source: 'photometric' | 'lumens';
+  refLux?: number; refDistance?: number; refBeamAngle?: number;
+  basePeakCd: number;      // peak candela of the reference (before zoom comp)
+  zoomComp: number;        // zoom/frost flux-conservation factor (photometric path)
+  peakCd: number;          // effective peak candela (basePeakCd × zoomComp)
+  fieldAngleDeg: number;   // effective field angle used for σ
+  dimming: number;         // 0..1
+  gel: number;             // gel transmission 0..1
+  distance: number;        // m (fixture → point, 3D)
+  offAxisDeg: number;      // θ between aim axis and the point
+  gauss: number;           // exp(−θ²/2σ²)
+  cosIncidence: number;    // h / distance
+  lux: number;
+}
+
+export function explainLux(f: PlacedFixture, px: number, py: number): LuxBreakdown {
+  const h = f.mountingHeight;
+  const dimFactor = Math.max(0, f.dimming / 100);
+  const eff = getEffectiveBeam(f);
+  let fieldAngle = eff.fieldAngle;
+  if (f.gelFilterIds && f.gelFilterIds.length > 0) fieldAngle = effectiveBeamAngleWithFrost(eff.fieldAngle, f.gelFilterIds);
+  const gel = (f.gelFilterIds && f.gelFilterIds.length > 0) ? combinedTransmission(f.gelFilterIds) : 1;
+
+  const dx = px - f.x, dy = py - f.y;
+  const dist2 = dx * dx + dy * dy + h * h;
+  const dist = Math.sqrt(dist2) || 1e-6;
+  const aDx = f.aimX - f.x, aDy = f.aimY - f.y;
+  const aimDist = Math.sqrt(aDx * aDx + aDy * aDy + h * h) || 1e-6;
+  const cosT = (aDx * dx + aDy * dy + h * h) / (aimDist * dist);
+  const theta = Math.acos(Math.min(1, Math.max(-1, cosT)));
+
+  let source: 'photometric' | 'lumens';
+  let basePeakCd: number, zoomComp: number, peakCd: number;
+  if (eff.photometric && eff.photometric.lux > 0 && eff.photometric.distance > 0) {
+    source = 'photometric';
+    basePeakCd = candelaFromPhotometric(eff.photometric);
+    zoomComp = zoomCompensation(eff.refFieldAngle, fieldAngle);
+    peakCd = basePeakCd * zoomComp;
+  } else {
+    source = 'lumens';
+    basePeakCd = peakIntensityFromLumens(eff.lumens, fieldAngle, eff.beamRatioWH);
+    zoomComp = 1;
+    peakCd = basePeakCd;
+  }
+  const sigma = beamSigma(fieldAngle);
+  const gauss = Math.exp(-(theta * theta) / (2 * sigma * sigma));
+  const cosIncidence = h / dist;
+  const lux = (peakCd * dimFactor * gel * gauss * cosIncidence) / dist2;
+
+  return {
+    source,
+    refLux: eff.photometric?.lux, refDistance: eff.photometric?.distance, refBeamAngle: eff.photometric?.beamAngle,
+    basePeakCd, zoomComp, peakCd, fieldAngleDeg: fieldAngle,
+    dimming: dimFactor, gel, distance: dist, offAxisDeg: (theta * 180) / Math.PI, gauss, cosIncidence, lux,
+  };
+}
+
+/**
  * Total illuminance at a point from all fixtures (+ optional wall bounce).
  */
 export function totalLux(

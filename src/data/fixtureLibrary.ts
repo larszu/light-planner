@@ -426,11 +426,15 @@ export const fixtureLibrary: Fixture[] = [
   // Illuminance teils auf 1 m Referenzabstand normiert / geschätzt.
   // ═══════════════════════════════════════════════════════════
   {
+    // Values from the Elation KL Fresnel 8 FC photometric test report (3/29/2021).
+    // Zoom (beam 50%): 10.4° (spot) … 50.8° (flood); field 10%: 20.6°…66.1°;
+    // cutoff 2.5%: 29.2°…88.2°. Peak 158,552 cd @ spot, 25,590 cd @ flood.
+    // Max output 16,505 lm / 560 W (flood). CRI 90.3–94.5, TLCI up to 94.
     id: 'elation-kl-fresnel-8-fc', name: 'KL Fresnel 8 FC', manufacturer: 'Elation', category: 'fresnel',
-    wattage: 514, lumens: 18000, beamAngle: 10, fieldAngle: 16,
-    beamShape: 'circular', beamRatioWH: 1, lensType: 'fresnel', zoomRange: [10, 50],
-    colorTemp: 0, colorTempRange: [2000, 10000], cri: 94, tlci: 94, weight: 10.5, mountType: 'clamp',
-    photometric: { lux: 14000, distance: 3, beamAngle: 10, colorTemp: 5600 },
+    wattage: 560, lumens: 16505, beamAngle: 10.4, fieldAngle: 20.6, cutoffAngle: 29.2,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'fresnel', zoomRange: [10.4, 50.8],
+    colorTemp: 0, colorTempRange: [2700, 6500], cri: 92, tlci: 94, weight: 10.5, mountType: 'clamp',
+    photometric: { lux: 158522, distance: 1, beamAngle: 10.4, colorTemp: 6500 },
     powerConnector: 'powerCON TRUE1', dmxChannels: 18,
   },
   {

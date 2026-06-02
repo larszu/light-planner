@@ -76,8 +76,9 @@ export interface Fixture {
   // ── Photometric reference (lux at specific distance) ──
   photometric?: PhotometricData;           // bare/with standard reflector
   // ── Beam geometry ──
-  beamAngle: number;      // 50 % peak (degrees)
-  fieldAngle: number;     // 10 % peak (degrees)
+  beamAngle: number;      // 50 % peak (degrees) – the bright core (FWHM)
+  fieldAngle: number;     // 10 % peak (degrees) – the usable beam edge
+  cutoffAngle?: number;   // 2.5 % peak (degrees) – where the light effectively ends
   beamShape: BeamShape;
   beamRatioWH: number;    // width / height ratio for elliptical (1.0 = circular)
   lensType: LensType;
