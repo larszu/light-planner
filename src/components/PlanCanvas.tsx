@@ -23,6 +23,7 @@ interface Props {
   onPlaceFixture: (fixture: Fixture, x: number, y: number) => void;
   onMoveFixture: (id: string, x: number, y: number) => void;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
+  onSelectMany: (ids: string[], additive: boolean) => void;
   onAddShape: (shape: Shape) => void;
   onAddPerson: (x: number, y: number) => void;
   onAddStageElement: (x: number, y: number) => void;
@@ -71,6 +72,7 @@ const PlanCanvas: React.FC<Props> = ({
   onPlaceFixture,
   onMoveFixture,
   onSelect,
+  onSelectMany,
   onAddShape,
   onAddPerson,
   onAddStageElement,
@@ -89,7 +91,7 @@ const PlanCanvas: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'calibrate' | 'move-plan';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'calibrate' | 'move-plan' | 'marquee';
     startScreenX: number;
     startScreenY: number;
     startWorldX: number;
@@ -99,8 +101,11 @@ const PlanCanvas: React.FC<Props> = ({
     origOffsetY?: number;
     planOrigX?: number;
     planOrigY?: number;
+    additive?: boolean;
+    pendingSelectId?: string;
   } | null>(null);
   const measureEndRef = useRef<{ x: number; y: number } | null>(null);
+  const marqueeEndRef = useRef<{ x: number; y: number } | null>(null);
   const calibEndRef = useRef<{ x: number; y: number } | null>(null);
   const heatMapCacheRef = useRef<{ imageData: ImageData | null; key: string }>({ imageData: null, key: '' });
   const animFrameRef = useRef<number>(0);
@@ -641,6 +646,20 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'start';
     }
 
+    // Marquee / box selection rectangle
+    if (dragRef.current?.type === 'marquee' && marqueeEndRef.current) {
+      const d = dragRef.current; const end = marqueeEndRef.current;
+      const rx = Math.min(d.startWorldX, end.x), ry = Math.min(d.startWorldY, end.y);
+      const rw = Math.abs(end.x - d.startWorldX), rh = Math.abs(end.y - d.startWorldY);
+      ctx.fillStyle = 'rgba(79,195,247,0.12)';
+      ctx.strokeStyle = '#4fc3f7';
+      ctx.lineWidth = 1 / v.scale;
+      ctx.setLineDash([4 / v.scale, 3 / v.scale]);
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.setLineDash([]);
+    }
+
     ctx.restore(); ctx.restore();
     drawRulers(ctx, w, h);
 
@@ -756,7 +775,11 @@ const PlanCanvas: React.FC<Props> = ({
       // Check aim-point handles first (only for selected fixture)
       const aimHitR = 0.35;
       for (const f of fixtures) {
-        if (selectedIds.has(f.id) && Math.sqrt((wx - f.aimX) ** 2 + (wy - f.aimY) ** 2) < aimHitR) {
+        // Only grab the aim handle when it is actually offset from the body
+        // (otherwise an invisible handle on a straight-down fixture would
+        // swallow clicks meant to move/drag the fixture itself).
+        const aimOffset = Math.hypot(f.aimX - f.x, f.aimY - f.y);
+        if (selectedIds.has(f.id) && aimOffset > 0.5 && Math.sqrt((wx - f.aimX) ** 2 + (wy - f.aimY) ** 2) < aimHitR) {
           dragRef.current = { type: 'move-aim', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: f.id };
           return;
         }
@@ -764,8 +787,18 @@ const PlanCanvas: React.FC<Props> = ({
       const cr = 0.5;
       for (const f of fixtures) {
         if (Math.sqrt((wx - f.x) ** 2 + (wy - f.y) ** 2) < cr) {
-          onSelect(f.id, ctrl);
-          dragRef.current = { type: 'move', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: f.id };
+          const already = selectedIds.has(f.id);
+          if (ctrl) {
+            onSelect(f.id, true);          // toggle in/out of the selection
+            if (already) return;           // toggled out → nothing to drag
+          } else if (!already) {
+            onSelect(f.id, false);         // fresh single selection
+          }
+          // If it was already part of a multi-selection, keep the whole
+          // selection so the group can be dragged together; collapse to this
+          // one only on a click without movement (handled on mouse-up).
+          dragRef.current = { type: 'move', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy,
+            targetId: f.id, pendingSelectId: already && !ctrl ? f.id : undefined };
           return;
         }
       }
@@ -790,7 +823,9 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
-      onSelect(null);
+      // Empty space → start a box / marquee selection
+      marqueeEndRef.current = { x: wx, y: wy };
+      dragRef.current = { type: 'marquee', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, additive: ctrl };
     }
   };
 
@@ -843,6 +878,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
     if (d.type === 'draw-measure') measureEndRef.current = { x: wx, y: wy };
     if (d.type === 'draw-truss') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
+    if (d.type === 'marquee') { marqueeEndRef.current = { x: wx, y: wy }; return; }
     if (d.type === 'calibrate') { calibEndRef.current = { x: wx, y: wy }; return; }
     if (d.type === 'move-plan') {
       onUpdateFloorPlan({
@@ -859,6 +895,11 @@ const PlanCanvas: React.FC<Props> = ({
       const [, , wx, wy] = (() => { const [sx2, sy2] = getCanvasPos(e); return [...screenToWorld(sx2, sy2), ...screenToWorld(sx2, sy2)]; })();
       const [sx2, sy2] = getCanvasPos(e);
       const [ewx, ewy] = screenToWorld(sx2, sy2);
+
+      // Click (no drag) on an already-selected fixture → collapse to just it.
+      if (d.type === 'move' && d.pendingSelectId && Math.hypot(ewx - d.startWorldX, ewy - d.startWorldY) < 0.1) {
+        onSelect(d.pendingSelectId, false);
+      }
 
       if (d.type === 'draw-rect') {
         const rw = Math.abs(ewx - d.startWorldX), rh = Math.abs(ewy - d.startWorldY);
@@ -893,6 +934,23 @@ const PlanCanvas: React.FC<Props> = ({
         const len = Math.hypot(ewx - d.startWorldX, ewy - d.startWorldY);
         if (len > 0.3) onAddTruss(d.startWorldX, d.startWorldY, snap(ewx), snap(ewy));
         measureEndRef.current = null;
+      }
+      if (d.type === 'marquee') {
+        const x0 = Math.min(d.startWorldX, ewx), x1 = Math.max(d.startWorldX, ewx);
+        const y0 = Math.min(d.startWorldY, ewy), y1 = Math.max(d.startWorldY, ewy);
+        if (Math.hypot(ewx - d.startWorldX, ewy - d.startWorldY) < 0.15) {
+          // No real drag → treat as a click on empty space
+          if (!d.additive) onSelect(null);
+        } else {
+          const inside = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+          const ids: string[] = [];
+          for (const f of fixtures) if (inside(f.x, f.y)) ids.push(f.id);
+          for (const p of persons) if (inside(p.x, p.y)) ids.push(p.id);
+          for (const s of stageElements) if (inside(s.x + s.width / 2, s.y + s.depth / 2)) ids.push(s.id);
+          for (const t of trusses) if (inside((t.x1 + t.x2) / 2, (t.y1 + t.y2) / 2)) ids.push(t.id);
+          onSelectMany(ids, d.additive ?? false);
+        }
+        marqueeEndRef.current = null;
       }
     }
     dragRef.current = null;

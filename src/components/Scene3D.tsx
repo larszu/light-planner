@@ -85,6 +85,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       // Only handle when no input/textarea is focused
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Space would otherwise scroll / trigger focused buttons
+      if (e.key === ' ') e.preventDefault();
       keys[e.key.toLowerCase()] = true;
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -108,8 +110,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       if (keys['s'] || keys['arrowdown'])  { dx -= _forward.x; dz -= _forward.z; }
       if (keys['a'] || keys['arrowleft'])  { dx -= _right.x;   dz -= _right.z; }
       if (keys['d'] || keys['arrowright']) { dx += _right.x;   dz += _right.z; }
-      if (keys['q'] || keys['pagedown'])   { dy -= 1; }
-      if (keys['e'] || keys['pageup'])     { dy += 1; }
+      if (keys['q'] || keys['pagedown'] || keys['shift']) { dy -= 1; } // runter
+      if (keys['e'] || keys['pageup']   || keys[' '])     { dy += 1; } // hoch (Leertaste)
 
       if (dx !== 0 || dz !== 0 || dy !== 0) {
         const move = new THREE.Vector3(dx, dy, dz).normalize().multiplyScalar(MOVE_SPEED);

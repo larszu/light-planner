@@ -395,79 +395,58 @@ const App: React.FC = () => {
   }, [fixtureGroups, handleSelect]);
 
   // ── Auto-align / distribute ──
-  const handleAlignH = useCallback(() => {
-    pushHistory();
-    const selF = fixtures.find((f) => f.id === selectedId);
-    const selSe = stageElements.find((s) => s.id === selectedId);
-    if (selF) {
-      const targetY = selF.y;
-      setFixtures((prev) => prev.map((f) => ({ ...f, y: targetY, aimY: f.aimY + (targetY - f.y) })));
-    } else if (selSe) {
-      const targetY = selSe.y;
-      setStageElements((prev) => prev.map((s) => ({ ...s, y: targetY })));
-    }
-  }, [fixtures, stageElements, selectedId]);
+  // Select a set of ids at once (box / marquee selection from the canvas).
+  const handleSelectMany = useCallback((ids: string[], additive: boolean) => {
+    setSelectedIds((prev) => {
+      if (additive) { const next = new Set(prev); ids.forEach((id) => next.add(id)); return next; }
+      return new Set(ids);
+    });
+  }, []);
 
-  const handleAlignV = useCallback(() => {
-    pushHistory();
-    const selF = fixtures.find((f) => f.id === selectedId);
-    const selSe = stageElements.find((s) => s.id === selectedId);
-    if (selF) {
-      const targetX = selF.x;
-      setFixtures((prev) => prev.map((f) => ({ ...f, x: targetX, aimX: f.aimX + (targetX - f.x) })));
-    } else if (selSe) {
-      const targetX = selSe.x;
-      setStageElements((prev) => prev.map((s) => ({ ...s, x: targetX })));
+  // ── Align selected elements on an axis (X / Y / Z=mounting height) ──
+  const handleAlign = useCallback((axis: 'x' | 'y' | 'z') => {
+    const selF = fixtures.filter((f) => selectedIds.has(f.id));
+    if (axis === 'z') {
+      if (selF.length < 2) return;
+      pushHistory();
+      const z = Math.round((selF.reduce((s, f) => s + f.mountingHeight, 0) / selF.length) * 10) / 10;
+      setFixtures((prev) => prev.map((f) => (selectedIds.has(f.id) ? { ...f, mountingHeight: z } : f)));
+      return;
     }
-  }, [fixtures, stageElements, selectedId]);
+    const selP = persons.filter((p) => selectedIds.has(p.id));
+    const selS = stageElements.filter((s) => selectedIds.has(s.id));
+    const vals = [...selF.map((f) => f[axis]), ...selP.map((p) => p[axis]), ...selS.map((s) => s[axis])];
+    if (vals.length < 2) return;
+    pushHistory();
+    const target = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+    if (selF.length) setFixtures((prev) => prev.map((f) => {
+      if (!selectedIds.has(f.id)) return f;
+      const d = target - f[axis];
+      return axis === 'x' ? { ...f, x: target, aimX: f.aimX + d } : { ...f, y: target, aimY: f.aimY + d };
+    }));
+    if (selP.length) setPersons((prev) => prev.map((p) => (selectedIds.has(p.id) ? { ...p, [axis]: target } : p)));
+    if (selS.length) setStageElements((prev) => prev.map((s) => (selectedIds.has(s.id) ? { ...s, [axis]: target } : s)));
+  }, [fixtures, persons, stageElements, selectedIds, pushHistory]);
 
-  const handleDistributeH = useCallback(() => {
-    if (fixtures.length < 2 && stageElements.length < 2) return;
+  // ── Evenly distribute the selected fixtures (or all, if none multi-picked) ──
+  const distributeFixtures = useCallback((axis: 'x' | 'y') => {
+    const sel = fixtures.filter((f) => selectedIds.has(f.id));
+    const target = sel.length >= 2 ? sel : fixtures;
+    if (target.length < 2) return;
     pushHistory();
-    if (fixtures.length >= 2) {
-      const sorted = [...fixtures].sort((a, b) => a.x - b.x);
-      const minX = sorted[0].x, maxX = sorted[sorted.length - 1].x;
-      const step = (maxX - minX) / (sorted.length - 1);
-      const idMap = new Map(sorted.map((f, i) => [f.id, minX + i * step]));
-      setFixtures((prev) => prev.map((f) => {
-        const newX = idMap.get(f.id);
-        return newX !== undefined ? { ...f, x: Math.round(newX * 10) / 10, aimX: f.aimX + (Math.round(newX * 10) / 10 - f.x) } : f;
-      }));
-    } else {
-      const sorted = [...stageElements].sort((a, b) => a.x - b.x);
-      const minX = sorted[0].x, maxX = sorted[sorted.length - 1].x;
-      const step = (maxX - minX) / (sorted.length - 1);
-      const idMap = new Map(sorted.map((s, i) => [s.id, minX + i * step]));
-      setStageElements((prev) => prev.map((s) => {
-        const newX = idMap.get(s.id);
-        return newX !== undefined ? { ...s, x: Math.round(newX * 10) / 10 } : s;
-      }));
-    }
-  }, [fixtures, stageElements]);
-
-  const handleDistributeV = useCallback(() => {
-    if (fixtures.length < 2 && stageElements.length < 2) return;
-    pushHistory();
-    if (fixtures.length >= 2) {
-      const sorted = [...fixtures].sort((a, b) => a.y - b.y);
-      const minY = sorted[0].y, maxY = sorted[sorted.length - 1].y;
-      const step = (maxY - minY) / (sorted.length - 1);
-      const idMap = new Map(sorted.map((f, i) => [f.id, minY + i * step]));
-      setFixtures((prev) => prev.map((f) => {
-        const newY = idMap.get(f.id);
-        return newY !== undefined ? { ...f, y: Math.round(newY * 10) / 10, aimY: f.aimY + (Math.round(newY * 10) / 10 - f.y) } : f;
-      }));
-    } else {
-      const sorted = [...stageElements].sort((a, b) => a.y - b.y);
-      const minY = sorted[0].y, maxY = sorted[sorted.length - 1].y;
-      const step = (maxY - minY) / (sorted.length - 1);
-      const idMap = new Map(sorted.map((s, i) => [s.id, minY + i * step]));
-      setStageElements((prev) => prev.map((s) => {
-        const newY = idMap.get(s.id);
-        return newY !== undefined ? { ...s, y: Math.round(newY * 10) / 10 } : s;
-      }));
-    }
-  }, [fixtures, stageElements]);
+    const sorted = [...target].sort((a, b) => a[axis] - b[axis]);
+    const min = sorted[0][axis], max = sorted[sorted.length - 1][axis];
+    const step = (max - min) / (sorted.length - 1);
+    const idMap = new Map(sorted.map((f, i) => [f.id, Math.round((min + i * step) * 10) / 10]));
+    setFixtures((prev) => prev.map((f) => {
+      const v = idMap.get(f.id);
+      if (v === undefined) return f;
+      const d = v - f[axis];
+      return axis === 'x' ? { ...f, x: v, aimX: f.aimX + d } : { ...f, y: v, aimY: f.aimY + d };
+    }));
+  }, [fixtures, selectedIds, pushHistory]);
+  const handleDistributeH = useCallback(() => distributeFixtures('x'), [distributeFixtures]);
+  const handleDistributeV = useCallback(() => distributeFixtures('y'), [distributeFixtures]);
 
   // ── Project save/load ──
   const handleSaveProject = useCallback((meta: ProjectMeta) => {
@@ -756,8 +735,9 @@ const App: React.FC = () => {
         onAutoThreePoint={handleAutoThreePoint}
         onAutoThreePointConfig={() => setShowThreePointDialog(true)}
         onAutoDistribute={handleAutoDistribute}
-        onAlignH={handleAlignH}
-        onAlignV={handleAlignV}
+        onAlignX={() => handleAlign('x')}
+        onAlignY={() => handleAlign('y')}
+        onAlignZ={() => handleAlign('z')}
         onDistributeH={handleDistributeH}
         onDistributeV={handleDistributeV}
         onSaveProject={() => setProjectDialogMode('save')}
@@ -799,6 +779,7 @@ const App: React.FC = () => {
               onPlaceFixture={handlePlaceFixture}
               onMoveFixture={handleMoveFixture}
               onSelect={handleSelectWithGroups}
+              onSelectMany={handleSelectMany}
               onAddShape={handleAddShape}
               onAddPerson={handleAddPerson}
               onAddStageElement={handleAddStageElement}
