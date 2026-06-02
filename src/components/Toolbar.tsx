@@ -23,6 +23,9 @@ interface Props {
   onDistributeV: () => void;
   onSaveProject: () => void;
   onLoadProject: () => void;
+  onOpenSchedule: () => void;
+  snapEnabled: boolean;
+  onToggleSnap: () => void;
   hasPersons: boolean;
   hasStageElements: boolean;
   hasSelection: boolean;
@@ -54,6 +57,9 @@ const Toolbar: React.FC<Props> = ({
   onDistributeV,
   onSaveProject,
   onLoadProject,
+  onOpenSchedule,
+  snapEnabled,
+  onToggleSnap,
   hasPersons,
   hasStageElements,
   hasSelection,
@@ -70,6 +76,7 @@ const Toolbar: React.FC<Props> = ({
     { id: 'measure', label: 'Messen', icon: '📏' },
     { id: 'person', label: 'Person', icon: '🧑' },
     { id: 'stage', label: 'Podest', icon: '⬜' },
+    { id: 'truss', label: 'Traverse', icon: '▤' },
   ];
 
   return (
@@ -125,6 +132,14 @@ const Toolbar: React.FC<Props> = ({
             }}
           />
         </label>
+        <button
+          className={`tool-btn ${snapEnabled ? 'active' : ''}`}
+          onClick={onToggleSnap}
+          title="Am Raster einrasten (0,5 m) ein/aus"
+        >
+          <span className="tool-icon">⊞</span>
+          <span className="tool-label">Raster</span>
+        </button>
       </div>
 
       <div className="toolbar-separator" />
@@ -255,6 +270,10 @@ const Toolbar: React.FC<Props> = ({
       <div className="toolbar-spacer" />
 
       <div className="toolbar-group">
+        <button className="tool-btn" onClick={onOpenSchedule} title="Geräteliste, DMX-Patch & Stromberechnung">
+          <span className="tool-icon">📋</span>
+          <span className="tool-label">Geräteliste</span>
+        </button>
         <button className="tool-btn" onClick={onSaveProject} title="Projekt speichern">
           <span className="tool-icon">💾</span>
           <span className="tool-label">Speichern</span>

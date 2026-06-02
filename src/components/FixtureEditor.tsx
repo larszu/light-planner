@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Fixture, FixtureCategory, BeamShape, LensType, MountType } from '../types';
+import { extractFixtureSpecs, AI_MODELS, API_KEY_STORAGE, type ExtractedFields, type VerificationItem } from '../utils/aiExtract';
 
 interface Props {
   onSave: (fixture: Fixture) => void;
@@ -36,6 +37,59 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
   const [photoDistance, setPhotoDistance] = useState(initial?.photometric?.distance ?? 1);
   const [tlci, setTlci] = useState(initial?.tlci ?? 0);
 
+  // ── KI-Datenblatt-Extraktion ──
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiText, setAiText] = useState('');
+  const [aiKey, setAiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) ?? '');
+  const [aiModel, setAiModel] = useState<string>(AI_MODELS[0].id);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiVerification, setAiVerification] = useState<VerificationItem[] | null>(null);
+
+  const applyExtracted = (f: ExtractedFields) => {
+    if (f.name != null) setName(f.name);
+    if (f.manufacturer != null) setManufacturer(f.manufacturer);
+    if (f.category != null) setCategory(f.category as FixtureCategory);
+    if (f.wattage != null) setWattage(f.wattage);
+    if (f.lumens != null) setLumens(f.lumens);
+    if (f.beamAngle != null) setBeamAngle(f.beamAngle);
+    if (f.fieldAngle != null) setFieldAngle(f.fieldAngle);
+    if (f.beamShape != null) setBeamShape(f.beamShape as BeamShape);
+    if (f.lensType != null) setLensType(f.lensType as LensType);
+    if (f.hasZoom != null) setHasZoom(f.hasZoom);
+    if (f.zoomMin != null) setZoomMin(f.zoomMin);
+    if (f.zoomMax != null) setZoomMax(f.zoomMax);
+    if (f.hasColorTempRange != null) setHasColorTempRange(f.hasColorTempRange);
+    if (f.colorTemp != null) setColorTemp(f.colorTemp);
+    if (f.colorTempMin != null) setColorTempMin(f.colorTempMin);
+    if (f.colorTempMax != null) setColorTempMax(f.colorTempMax);
+    if (f.cri != null) setCri(f.cri);
+    if (f.tlci != null) setTlci(f.tlci);
+    if (f.weight != null) setWeight(f.weight);
+    if (f.mountType != null) setMountType(f.mountType as MountType);
+    if (f.ipRating != null) setIpRating(f.ipRating);
+    if (f.dmxChannels != null) setDmxChannels(f.dmxChannels);
+    if (f.hasPhotometric != null) setHasPhotometric(f.hasPhotometric);
+    if (f.photoLux != null) setPhotoLux(f.photoLux);
+    if (f.photoDistance != null) setPhotoDistance(f.photoDistance);
+  };
+
+  const handleExtract = async () => {
+    if (!aiText.trim()) { setAiError('Bitte Datenblatt-Text oder Modellname einfügen.'); return; }
+    if (!aiKey.trim()) { setAiError('Bitte Anthropic API-Schlüssel eingeben.'); return; }
+    setAiLoading(true); setAiError(null);
+    localStorage.setItem(API_KEY_STORAGE, aiKey.trim());
+    try {
+      const { fields, verification } = await extractFixtureSpecs(aiText, { apiKey: aiKey.trim(), model: aiModel });
+      applyExtracted(fields);
+      setAiVerification(verification);
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSave = () => {
     if (!name.trim()) return;
     const fixture: Fixture = {
@@ -68,6 +122,58 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal fixture-editor-modal" onClick={(e) => e.stopPropagation()}>
         <h3>{initial ? 'Leuchte bearbeiten' : 'Eigene Leuchte anlegen'}</h3>
+
+        <div className="ai-assist">
+          <button type="button" className={`ai-toggle ${aiOpen ? 'open' : ''}`} onClick={() => setAiOpen((o) => !o)}>
+            ✨ KI-Assistent – Daten aus Datenblatt ziehen {aiOpen ? '▾' : '▸'}
+          </button>
+          {aiOpen && (
+            <div className="ai-body">
+              <textarea
+                className="ai-textarea"
+                rows={5}
+                value={aiText}
+                onChange={(e) => setAiText(e.target.value)}
+                placeholder={'Datenblatt-Text hier einfügen – oder einfach das Modell nennen, z. B. Elation KL Profile FC …'}
+              />
+              <div className="ai-controls">
+                <input
+                  className="ai-key"
+                  type="password"
+                  value={aiKey}
+                  onChange={(e) => setAiKey(e.target.value)}
+                  placeholder="Anthropic API-Schlüssel (sk-ant-…)"
+                />
+                <select value={aiModel} onChange={(e) => setAiModel(e.target.value)}>
+                  {AI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+                <button type="button" className="primary" disabled={aiLoading} onClick={handleExtract}>
+                  {aiLoading ? 'Extrahiere…' : 'Daten extrahieren'}
+                </button>
+              </div>
+              <div className="ai-note">
+                Der Schlüssel bleibt lokal im Browser und geht direkt an api.anthropic.com.
+                Bitte alle übernommenen Werte unten prüfen, bevor du speicherst.
+              </div>
+              {aiError && <div className="ai-error">⚠ {aiError}</div>}
+              {aiVerification && (
+                <div className="ai-verify">
+                  <div className="ai-verify-head">✓ Übernommen – bitte prüfen ({aiVerification.length} Felder):</div>
+                  <table className="ai-verify-table">
+                    <thead><tr><th>Feld</th><th>Wert</th><th>Quelle / Begründung</th></tr></thead>
+                    <tbody>
+                      {aiVerification.map((v, i) => (
+                        <tr key={i} className={/gesch/i.test(v.source) ? 'ai-est' : ''}>
+                          <td>{v.field}</td><td>{v.value}</td><td>{v.source}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="editor-grid">
           <label>Name*<input value={name} onChange={(e) => setName(e.target.value)} placeholder="z.B. PAR 64 CP62" /></label>

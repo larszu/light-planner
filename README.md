@@ -52,18 +52,25 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 - Switch on a target value to colour the floor by under / on / over
 - Not a replacement for a real photometric study — close enough for a sketch
 
-### 🎚️ A small fixture & gel library
-- A handful of common Source Fours, PARs, Fresnels, LED panels and a few moving heads
+### 🎚️ A fixture & gel library
+- Source Fours, PARs, Fresnels, LED panels and a few moving heads
+- Current Elation LED range built in — KL Fresnel 8 FC, KL Panel, KL Profile FC, KL PAR FC, Fuze, …
 - LEE & Rosco CTO / CTB / frost gels
-- Add your own custom fixture if something's missing
+- Add your own custom fixture — or **let the AI pull the specs from a datasheet** (paste the text, it fills the photometric/beam/power fields and shows where each value came from so you can check it)
+
+### 📋 Patch & paperwork
+- Auto-number the rig and auto-patch DMX (universe / address, footprint-aware, with clash detection)
+- Equipment list, instrument schedule and an electrical-load summary (kW, A per phase, 16 A circuits) — export to CSV
+- Trusses / hanging positions you can draw and label
 
 ### 🎬 Auto-place helpers
 - One-click 3-point lighting around a person
 - "Fill an area evenly" generator for a stage or podium
 - Useful starting points — you'll still want to nudge things by hand
 
-### 💾 Save / open
-- One JSON file per project, lives on your disk, no cloud
+### 💾 Save / open · export
+- One project file with everything in it — fixtures, trusses, and the calibrated building plan — in local storage, no cloud
+- File menu with undo / redo, and export of the current view as PNG, JPG or PDF
 
 ---
 

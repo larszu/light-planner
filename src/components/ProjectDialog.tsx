@@ -33,7 +33,11 @@ export function saveProjectToStorage(id: string, meta: ProjectMeta, data: Projec
   const entry: StoredProject = { id, meta, data };
   if (idx >= 0) list[idx] = entry;
   else list.push(entry);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    throw new Error('Lokaler Speicher voll – evtl. ist das Grundriss-Bild zu groß. Tipp: Grundriss vor dem Speichern entfernen oder verkleinern.');
+  }
 }
 
 export function deleteProjectFromStorage(id: string) {

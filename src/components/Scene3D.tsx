@@ -1,18 +1,21 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { PlacedFixture, Person, StageElement } from '../types';
+import type { PlacedFixture, Person, StageElement, Truss, FloorPlan } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
 
 export interface Scene3DHandle {
   screenshot: () => string | null;
+  getCanvas: () => HTMLCanvasElement | null;
 }
 
 interface Props {
   fixtures: PlacedFixture[];
   persons: Person[];
   stageElements: StageElement[];
+  trusses: Truss[];
+  floorPlan: FloorPlan | null;
   selectedIds: Set<string>;
   showHeatMap: boolean;
   heatMapScale: number;
@@ -20,7 +23,7 @@ interface Props {
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -176,8 +179,27 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     const toRemove = scene.children.filter((c) => c.userData?.dynamic);
     toRemove.forEach((c) => {
       scene.remove(c);
-      if (c instanceof THREE.Mesh) { c.geometry.dispose(); }
+      if (c instanceof THREE.Mesh) {
+        c.geometry.dispose();
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach((m) => { (m as THREE.MeshBasicMaterial).map?.dispose(); m.dispose(); });
+      }
     });
+
+    // Imported building plan textured onto the floor (matches 2D placement)
+    if (floorPlan) {
+      const { offsetX, offsetY, widthMeters, heightMeters } = floorPlan;
+      const tex = new THREE.Texture(floorPlan.image);
+      tex.needsUpdate = true;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const geo = new THREE.PlaneGeometry(widthMeters, heightMeters);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: floorPlan.opacity, depthWrite: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(offsetX + widthMeters / 2, 0.006, offsetY + heightMeters / 2);
+      mesh.userData = { dynamic: true };
+      scene.add(mesh);
+    }
 
     // Stage elements (podeste)
     for (const se of stageElements) {
@@ -192,6 +214,22 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData = { dynamic: true, selectId: se.id };
+      scene.add(mesh);
+    }
+
+    // Trusses (rigging / hanging positions)
+    for (const t of trusses) {
+      const len = Math.hypot(t.x2 - t.x1, t.y2 - t.y1);
+      if (len < 0.05) continue;
+      const isSel = selectedIds.has(t.id);
+      const angle = Math.atan2(t.y2 - t.y1, t.x2 - t.x1);
+      const geo = new THREE.BoxGeometry(len, 0.3, 0.3);
+      const mat = new THREE.MeshStandardMaterial({ color: isSel ? '#ffcc33' : '#9aa4b2', roughness: 0.6, metalness: 0.4 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set((t.x1 + t.x2) / 2, t.height, (t.y1 + t.y2) / 2);
+      mesh.rotation.y = -angle;
+      mesh.castShadow = true;
+      mesh.userData = { dynamic: true, selectId: t.id };
       scene.add(mesh);
     }
 
@@ -360,7 +398,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       sprite.userData = { dynamic: true };
       scene.add(sprite);
     }
-  }, [fixtures, persons, stageElements, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
+  }, [fixtures, persons, stageElements, trusses, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {
@@ -368,6 +406,12 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       if (!s) return null;
       s.renderer.render(s.scene, s.camera);
       return s.renderer.domElement.toDataURL('image/png');
+    },
+    getCanvas: () => {
+      const s = sceneRef.current;
+      if (!s) return null;
+      s.renderer.render(s.scene, s.camera); // ensure the buffer is fresh
+      return s.renderer.domElement;
     },
   }));
 

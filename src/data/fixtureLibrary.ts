@@ -419,4 +419,66 @@ export const fixtureLibrary: Fixture[] = [
       attachmentLibrary.find((a) => a.id === 'generic-snoot-bowens')!,
     ],
   },
+
+  // ═══════════════════════════════════════════════════════════
+  // ELATION – aktuelle LED-Serie (KL / Fuze)
+  // Werte aus den Hersteller-Datenblättern (Stand 2024/25);
+  // Illuminance teils auf 1 m Referenzabstand normiert / geschätzt.
+  // ═══════════════════════════════════════════════════════════
+  {
+    id: 'elation-kl-fresnel-8-fc', name: 'KL Fresnel 8 FC', manufacturer: 'Elation', category: 'fresnel',
+    wattage: 514, lumens: 18000, beamAngle: 10, fieldAngle: 16,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'fresnel', zoomRange: [10, 50],
+    colorTemp: 0, colorTempRange: [2000, 10000], cri: 94, tlci: 94, weight: 10.5, mountType: 'clamp',
+    photometric: { lux: 14000, distance: 3, beamAngle: 10, colorTemp: 5600 },
+    powerConnector: 'powerCON TRUE1', dmxChannels: 18,
+  },
+  {
+    id: 'elation-kl-fresnel-6-fc', name: 'KL Fresnel 6 FC', manufacturer: 'Elation', category: 'fresnel',
+    wattage: 220, lumens: 9000, beamAngle: 12, fieldAngle: 18,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'fresnel', zoomRange: [12, 60],
+    colorTemp: 0, colorTempRange: [2000, 10000], cri: 95, tlci: 94, weight: 7.0, mountType: 'clamp',
+    photometric: { lux: 7000, distance: 3, beamAngle: 12, colorTemp: 5600 },
+    powerConnector: 'powerCON TRUE1', dmxChannels: 18,
+  },
+  {
+    id: 'elation-kl-panel-fc', name: 'KL Panel FC', manufacturer: 'Elation', category: 'led-panel',
+    wattage: 295, lumens: 16000, beamAngle: 64, fieldAngle: 90,
+    beamShape: 'rectangular', beamRatioWH: 1, lensType: 'fixed',
+    colorTemp: 0, colorTempRange: [2000, 10000], cri: 95, tlci: 92, weight: 13.0, mountType: 'clamp',
+    photometric: { lux: 13000, distance: 1, beamAngle: 64, colorTemp: 5600 },
+    powerConnector: 'powerCON TRUE1', dmxChannels: 16,
+  },
+  {
+    id: 'elation-kl-profile-fc', name: 'KL Profile FC', manufacturer: 'Elation', category: 'profile',
+    wattage: 305, lumens: 10600, beamAngle: 6, fieldAngle: 10,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [6, 50],
+    colorTemp: 0, colorTempRange: [2400, 8500], cri: 94, tlci: 92, weight: 9.5, mountType: 'clamp',
+    photometric: { lux: 15517, distance: 1, beamAngle: 50, colorTemp: 6500 },
+    powerConnector: 'powerCON TRUE1', dmxChannels: 24,
+  },
+  {
+    id: 'elation-kl-par-fc', name: 'KL PAR FC', manufacturer: 'Elation', category: 'par',
+    wattage: 280, lumens: 11000, beamAngle: 11, fieldAngle: 16,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
+    colorTemp: 0, colorTempRange: [1750, 10000], cri: 93, tlci: 95, weight: 7.7, mountType: 'clamp',
+    photometric: { lux: 11520, distance: 5, beamAngle: 11, colorTemp: 6000 },
+    powerConnector: 'powerCON TRUE1', dmxChannels: 16,
+  },
+  {
+    id: 'elation-fuze-wash-z350', name: 'Fuze Wash Z350', manufacturer: 'Elation', category: 'moving-wash',
+    wattage: 399, lumens: 13000, beamAngle: 6, fieldAngle: 10,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [6, 46],
+    colorTemp: 0, colorTempRange: [2700, 8000], cri: 80, weight: 20.4, mountType: 'yoke',
+    photometric: { lux: 60280, distance: 2, beamAngle: 6, colorTemp: 7000 },
+    powerConnector: 'powerCON TRUE1', ipRating: '30', dmxChannels: 28,
+  },
+  {
+    id: 'elation-fuze-par-z120', name: 'Fuze Par Z120 IP', manufacturer: 'Elation', category: 'moving-wash',
+    wattage: 157, lumens: 4500, beamAngle: 7, fieldAngle: 12,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 55],
+    colorTemp: 0, colorTempRange: [2700, 8000], cri: 80, weight: 10.0, mountType: 'yoke',
+    photometric: { lux: 10640, distance: 3, beamAngle: 7, colorTemp: 7000 },
+    powerConnector: 'powerCON TRUE1', ipRating: '65', dmxChannels: 20,
+  },
 ];

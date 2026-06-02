@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PlacedFixture, Person, StageElement, Fixture } from '../types';
+import type { PlacedFixture, Person, StageElement, Fixture, Truss } from '../types';
 import { luxFromFixture, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { gelLibrary, effectiveColorTemp } from '../data/gelLibrary';
 import { fixtureLibrary } from '../data/fixtureLibrary';
@@ -9,11 +9,14 @@ interface Props {
   fixtures: PlacedFixture[];
   persons: Person[];
   stageElements: StageElement[];
+  trusses: Truss[];
   selectedIds: Set<string>;
   cursorLux: number | null;
+  patchConflicts: Set<string>;
   onUpdateFixture: (id: string, updates: Partial<PlacedFixture>) => void;
   onUpdatePerson: (id: string, updates: Partial<Person>) => void;
   onUpdateStageElement: (id: string, updates: Partial<StageElement>) => void;
+  onUpdateTruss: (id: string, updates: Partial<Truss>) => void;
   onDelete: (id: string) => void;
   onAutoThreePointForPerson: (personId: string) => void;
 }
@@ -32,11 +35,14 @@ const PropertyPanel: React.FC<Props> = ({
   fixtures,
   persons,
   stageElements,
+  trusses,
   selectedIds,
   cursorLux,
+  patchConflicts,
   onUpdateFixture,
   onUpdatePerson,
   onUpdateStageElement,
+  onUpdateTruss,
   onDelete,
   onAutoThreePointForPerson,
 }) => {
@@ -44,6 +50,7 @@ const PropertyPanel: React.FC<Props> = ({
   const selFixture = fixtures.find((f) => f.id === selectedId);
   const selPerson = persons.find((p) => p.id === selectedId);
   const selStage = stageElements.find((s) => s.id === selectedId);
+  const selTruss = trusses.find((t) => t.id === selectedId);
 
   // Multi-selection info
   const multiFixtures = fixtures.filter((f) => selectedIds.has(f.id));
@@ -282,6 +289,39 @@ const PropertyPanel: React.FC<Props> = ({
         </div>
 
         <div className="prop-section">
+          <span className="prop-section-title">Patch / Paperwork</span>
+          {patchConflicts.has(f.id) && <div className="patch-conflict">⚠ DMX-Adresse überschneidet sich</div>}
+          <label className="prop-field">
+            <span>Kanal</span>
+            <input type="number" min={0} value={f.channel ?? ''}
+              onChange={(e) => onUpdateFixture(f.id, { channel: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </label>
+          <label className="prop-field">
+            <span>Unit-Nr.</span>
+            <input type="text" value={f.unitNumber ?? ''}
+              onChange={(e) => onUpdateFixture(f.id, { unitNumber: e.target.value || undefined })} />
+          </label>
+          <label className="prop-field">
+            <span>Universe</span>
+            <input type="number" min={1} value={f.universe ?? ''}
+              onChange={(e) => onUpdateFixture(f.id, { universe: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </label>
+          <label className="prop-field">
+            <span>DMX-Adr.</span>
+            <input type="number" min={1} max={512} value={f.dmxAddress ?? ''}
+              onChange={(e) => onUpdateFixture(f.id, { dmxAddress: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </label>
+          <div className="prop-derived">
+            Footprint: {f.fixture.dmxChannels && f.fixture.dmxChannels > 0 ? `${f.fixture.dmxChannels} DMX-Ch` : 'Dimmer (1 Ch)'}
+          </div>
+          <label className="prop-field">
+            <span>Zweck</span>
+            <input type="text" value={f.purpose ?? ''} placeholder="z. B. Frontlicht"
+              onChange={(e) => onUpdateFixture(f.id, { purpose: e.target.value || undefined })} />
+          </label>
+        </div>
+
+        <div className="prop-section">
           <span className="prop-section-title">Info</span>
           <div className="prop-info-grid">
             <span>{f.fixture.manufacturer}</span>
@@ -357,6 +397,29 @@ const PropertyPanel: React.FC<Props> = ({
           </label>
         </div>
         <button className="delete-btn" onClick={() => onDelete(se.id)}>Element löschen</button>
+      </div>
+    );
+  }
+
+  if (selTruss) {
+    const t = selTruss;
+    const len = Math.hypot(t.x2 - t.x1, t.y2 - t.y1);
+    return (
+      <div className="property-panel">
+        <h3>Traverse</h3>
+        <div className="prop-section">
+          <div className="prop-derived lux-readout">Länge: {len.toFixed(2)} m</div>
+          {numField('Start X (m)', t.x1, (v) => onUpdateTruss(t.id, { x1: v }))}
+          {numField('Start Y (m)', t.y1, (v) => onUpdateTruss(t.id, { y1: v }))}
+          {numField('Ende X (m)', t.x2, (v) => onUpdateTruss(t.id, { x2: v }))}
+          {numField('Ende Y (m)', t.y2, (v) => onUpdateTruss(t.id, { y2: v }))}
+          {numField('Trimm-Höhe (m)', t.height, (v) => onUpdateTruss(t.id, { height: v }), 0.5, 0, 30)}
+          <label className="prop-field">
+            <span>Bezeichnung</span>
+            <input type="text" value={t.label || ''} onChange={(e) => onUpdateTruss(t.id, { label: e.target.value })} />
+          </label>
+        </div>
+        <button className="delete-btn" onClick={() => onDelete(t.id)}>Traverse löschen</button>
       </div>
     );
   }
