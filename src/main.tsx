@@ -1,14 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
-import { HostProvider } from './integration/hostContext';
+import LightPlanner from './LightPlanner';
 
-// Standalone build → browser HostAdapter. When embedded in a host app, wrap
-// <App/> with <HostProvider adapter={hostAdapter}> instead.
+// Standalone build → LightPlanner with the default browser HostAdapter.
+// A host app instead does: <LightPlanner adapter={hostAdapter} onEquipmentChange={…} />
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <HostProvider>
-      <App />
-    </HostProvider>
+    <LightPlanner />
   </React.StrictMode>,
 );
