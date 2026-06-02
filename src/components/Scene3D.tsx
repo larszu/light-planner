@@ -7,6 +7,7 @@ import { getBeamColorHex } from '../utils/colorTemp';
 
 export interface Scene3DHandle {
   screenshot: () => string | null;
+  getCanvas: () => HTMLCanvasElement | null;
 }
 
 interface Props {
@@ -405,6 +406,12 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       if (!s) return null;
       s.renderer.render(s.scene, s.camera);
       return s.renderer.domElement.toDataURL('image/png');
+    },
+    getCanvas: () => {
+      const s = sceneRef.current;
+      if (!s) return null;
+      s.renderer.render(s.scene, s.camera); // ensure the buffer is fresh
+      return s.renderer.domElement;
     },
   }));
 

@@ -58,6 +58,10 @@ const Sidebar: React.FC<Props> = ({
     fixtures: filtered.filter((f) => f.category === cat),
   })).filter((g) => g.fixtures.length > 0);
 
+  // While searching, expand every group that has a match so results aren't
+  // hidden inside collapsed categories.
+  const searching = search.trim() !== '';
+
   const handleDragStart = (e: React.DragEvent, fixture: Fixture) => {
     e.dataTransfer.setData('application/fixture', JSON.stringify(fixture));
     e.dataTransfer.effectAllowed = 'copy';
@@ -80,17 +84,19 @@ const Sidebar: React.FC<Props> = ({
       </div>
 
       <div className="sidebar-list">
-        {grouped.map((g) => (
+        {grouped.map((g) => {
+          const expanded = searching || expandedCat === g.category;
+          return (
           <div key={g.category} className="fixture-group">
             <button
               className="group-header"
               onClick={() => setExpandedCat(expandedCat === g.category ? null : g.category)}
             >
-              <span className="group-arrow">{expandedCat === g.category ? '▾' : '▸'}</span>
+              <span className="group-arrow">{expanded ? '▾' : '▸'}</span>
               <span>{CATEGORY_LABELS[g.category]}</span>
               <span className="group-count">{g.fixtures.length}</span>
             </button>
-            {expandedCat === g.category && (
+            {expanded && (
               <div className="group-items">
                 {g.fixtures.map((f) => (
                   <button
@@ -127,7 +133,8 @@ const Sidebar: React.FC<Props> = ({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="sidebar-footer">

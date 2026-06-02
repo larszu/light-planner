@@ -14,6 +14,8 @@ import { generate3PointLighting, generateEvenDistribution } from './utils/autoLi
 import type { ThreePointConfig } from './utils/autoLighting';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
+import { jpegToPdfBlob, dataUrlToBytes, downloadBlob, downloadDataUrl } from './utils/pdfExport';
+import MenuBar from './components/MenuBar';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 
@@ -678,7 +680,8 @@ const App: React.FC = () => {
       const el = document.activeElement;
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
       const mod = e.ctrlKey || e.metaKey;
-      if (mod && (e.key === 'c' || e.key === 'C')) { handleCopy(); }
+      if (mod && (e.key === 's' || e.key === 'S')) { e.preventDefault(); setProjectDialogMode('save'); }
+      else if (mod && (e.key === 'c' || e.key === 'C')) { handleCopy(); }
       else if (mod && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); handlePaste(); }
       else if (mod && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); handleDuplicate(); }
       else if (viewMode === '2d' && selectedIds.size > 0 && e.key.startsWith('Arrow')) {
@@ -694,30 +697,25 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [handleCopy, handlePaste, handleDuplicate, handleNudge, selectedIds, snapStep, viewMode]);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback((format: 'png' | 'jpg' | 'pdf' = 'png') => {
     const projName = projectMeta?.name || 'Lichtplan';
     const viewLabel = viewMode === '3d' ? '3D' : '2D';
     const num = exportCounterRef.current++;
-    const defaultName = `${projName} ${viewLabel} ${String(num).padStart(3, '0')}`;
-    const fileName = window.prompt('Screenshot-Dateiname:', defaultName);
-    if (!fileName) return;
-    const safeName = fileName.endsWith('.png') ? fileName : `${fileName}.png`;
+    const base = `${projName} ${viewLabel} ${String(num).padStart(3, '0')}`;
 
-    if (viewMode === '3d') {
-      const dataUrl = scene3DRef.current?.screenshot();
-      if (!dataUrl) return;
-      const link = document.createElement('a');
-      link.download = safeName;
-      link.href = dataUrl;
-      link.click();
-      return;
-    }
-    const canvas = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
+    const canvas = viewMode === '3d'
+      ? scene3DRef.current?.getCanvas() ?? null
+      : (document.querySelector('.plan-canvas') as HTMLCanvasElement | null);
     if (!canvas) return;
-    const link = document.createElement('a');
-    link.download = safeName;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+
+    if (format === 'pdf') {
+      const bytes = dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
+      downloadBlob(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`);
+    } else if (format === 'jpg') {
+      downloadDataUrl(canvas.toDataURL('image/jpeg', 0.92), `${base}.jpg`);
+    } else {
+      downloadDataUrl(canvas.toDataURL('image/png'), `${base}.png`);
+    }
   }, [viewMode, projectMeta]);
 
   const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
@@ -725,6 +723,23 @@ const App: React.FC = () => {
 
   return (
     <div className="app">
+      <MenuBar
+        viewMode={viewMode}
+        showHeatMap={showHeatMap}
+        snapEnabled={snapStep > 0}
+        onSave={() => setProjectDialogMode('save')}
+        onLoad={() => setProjectDialogMode('load')}
+        onExport={handleExport}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        onCopy={handleCopy}
+        onPaste={handlePaste}
+        onDuplicate={handleDuplicate}
+        onOpenSchedule={() => setScheduleOpen(true)}
+        onViewModeChange={setViewMode}
+        onToggleHeatMap={() => setShowHeatMap((v) => !v)}
+        onToggleSnap={() => setSnapStep((s) => (s > 0 ? 0 : 0.5))}
+      />
       <Toolbar
         activeTool={activeTool}
         viewMode={viewMode}
