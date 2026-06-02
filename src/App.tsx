@@ -23,6 +23,8 @@ import MenuBar from './components/MenuBar';
 import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
+import { useUiStore } from './store/uiStore';
+import { useProjectStore } from './store/projectStore';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 
@@ -88,15 +90,23 @@ const App: React.FC = () => {
   const [stageElements, setStageElements] = useState<StageElement[]>([]);
   const [customFixtures, setCustomFixtures] = useState<Fixture[]>([]);
   const [activeTool, setActiveTool] = useState<Tool>('select');
-  const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [fixtureToPlace, setFixtureToPlace] = useState<Fixture | null>(null);
-  const [showHeatMap, setShowHeatMap] = useState(false);
-  const [heatMapScale, setHeatMapScale] = useState(1000);
-  const [heatMapTarget, setHeatMapTarget] = useState(0);
-  const [photoMode, setPhotoMode] = useState(false);
-  const [exposure, setExposure] = useState(1.0);
-  const [haze, setHaze] = useState(0.15);
+  // ── View / display settings live in the zustand uiStore ──
+  const viewMode = useUiStore((s) => s.viewMode);
+  const setViewMode = useUiStore((s) => s.setViewMode);
+  const showHeatMap = useUiStore((s) => s.showHeatMap);
+  const toggleHeatMap = useUiStore((s) => s.toggleHeatMap);
+  const heatMapScale = useUiStore((s) => s.heatMapScale);
+  const setHeatMapScale = useUiStore((s) => s.setHeatMapScale);
+  const heatMapTarget = useUiStore((s) => s.heatMapTarget);
+  const setHeatMapTarget = useUiStore((s) => s.setHeatMapTarget);
+  const photoMode = useUiStore((s) => s.photoMode);
+  const togglePhotoMode = useUiStore((s) => s.togglePhotoMode);
+  const exposure = useUiStore((s) => s.exposure);
+  const setExposure = useUiStore((s) => s.setExposure);
+  const haze = useUiStore((s) => s.haze);
+  const setHaze = useUiStore((s) => s.setHaze);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [cameras, setCameras] = useState<CameraView[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
@@ -111,7 +121,8 @@ const App: React.FC = () => {
   const [ceilings, setCeilings] = useState<Ceiling[]>([]);
   const [planMode, setPlanMode] = useState<PlanMode>('none');
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
-  const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
+  const snapStep = useUiStore((s) => s.snapStep);
+  const toggleSnap = useUiStore((s) => s.toggleSnap);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -1014,6 +1025,17 @@ const App: React.FC = () => {
     walls: walls.length, floorPlan: floorPlan ? 1 : 0,
   };
 
+  // Publish the live lighting document to the zustand projectStore so a host
+  // (Cable-Planner) can read/subscribe to the current plan (e.g. pull fixtures
+  // as equipment, or embed it in its own project file).
+  useEffect(() => {
+    useProjectStore.getState().setDocument({
+      fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
+      trusses, walls, ceilings, scenes, cameras, layers,
+      floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+    }, projectMeta ?? null);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, projectMeta]);
+
   return (
     <div className="app">
       <MenuBar
@@ -1032,8 +1054,8 @@ const App: React.FC = () => {
         onDuplicate={handleDuplicate}
         onOpenSchedule={() => setScheduleOpen(true)}
         onViewModeChange={setViewMode}
-        onToggleHeatMap={() => setShowHeatMap((v) => !v)}
-        onToggleSnap={() => setSnapStep((s) => (s > 0 ? 0 : 0.5))}
+        onToggleHeatMap={toggleHeatMap}
+        onToggleSnap={toggleSnap}
         onAbout={() => setAboutOpen(true)}
       />
       <Toolbar
@@ -1043,14 +1065,14 @@ const App: React.FC = () => {
         heatMapScale={heatMapScale}
         onToolChange={handleToolChange}
         onViewModeChange={setViewMode}
-        onToggleHeatMap={() => setShowHeatMap((v) => !v)}
+        onToggleHeatMap={toggleHeatMap}
         heatMapTarget={heatMapTarget}
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
         photoMode={photoMode}
         exposure={exposure}
         haze={haze}
-        onTogglePhotoMode={() => setPhotoMode((v) => !v)}
+        onTogglePhotoMode={togglePhotoMode}
         onExposureChange={setExposure}
         onHazeChange={setHaze}
         onUploadFloorPlan={handleUploadFloorPlan}
@@ -1070,7 +1092,7 @@ const App: React.FC = () => {
         onLoadProject={() => setProjectDialogMode('load')}
         onOpenSchedule={() => setScheduleOpen(true)}
         snapEnabled={snapStep > 0}
-        onToggleSnap={() => setSnapStep((s) => (s > 0 ? 0 : 0.5))}
+        onToggleSnap={toggleSnap}
         hasPersons={persons.length > 0}
         hasStageElements={stageElements.length > 0}
         hasSelection={selectedIds.size > 0}
