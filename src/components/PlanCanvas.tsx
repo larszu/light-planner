@@ -405,15 +405,25 @@ const PlanCanvas: React.FC<Props> = ({
     // Heat map
     if (showHeatMap && fixtures.length > 0) {
       const hmResX = 150, hmResY = 150;
-      const planLeft = floorPlan ? floorPlan.offsetX : 0;
-      const planTop = floorPlan ? floorPlan.offsetY : 0;
-      const planRight = floorPlan ? floorPlan.offsetX + floorPlan.widthMeters : 50;
-      const planBottom = floorPlan ? floorPlan.offsetY + floorPlan.heightMeters : 30;
+      // Region = bounding box of the rig (fixtures + their aim) ∪ floor plan,
+      // padded — so the heat-map always covers the lit area and matches 3D.
+      let planLeft = Infinity, planTop = Infinity, planRight = -Infinity, planBottom = -Infinity;
+      for (const f of fixtures) {
+        planLeft = Math.min(planLeft, f.x, f.aimX); planRight = Math.max(planRight, f.x, f.aimX);
+        planTop = Math.min(planTop, f.y, f.aimY); planBottom = Math.max(planBottom, f.y, f.aimY);
+      }
+      const pad = 4;
+      planLeft -= pad; planTop -= pad; planRight += pad; planBottom += pad;
+      if (floorPlan) {
+        planLeft = Math.min(planLeft, floorPlan.offsetX); planTop = Math.min(planTop, floorPlan.offsetY);
+        planRight = Math.max(planRight, floorPlan.offsetX + floorPlan.widthMeters);
+        planBottom = Math.max(planBottom, floorPlan.offsetY + floorPlan.heightMeters);
+      }
       const hmLeft = Math.max(left, planLeft), hmTop = Math.max(top, planTop);
       const hmWidth = Math.min(right, planRight) - hmLeft;
       const hmHeight = Math.min(bottom, planBottom) - hmTop;
       if (hmWidth > 0 && hmHeight > 0) {
-        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
+        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
         let imgData = heatMapCacheRef.current.imageData;
         if (heatMapCacheRef.current.key !== cacheKey || !imgData) {
           const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY);
