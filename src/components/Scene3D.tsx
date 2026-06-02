@@ -7,7 +7,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers } from '../types';
+import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers, CameraView } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
 import { sampleWall, isCurved } from '../utils/geometry';
@@ -46,6 +46,7 @@ function loadPersonModel(): Promise<PersonModel> {
 export interface Scene3DHandle {
   screenshot: () => string | null;
   getCanvas: () => HTMLCanvasElement | null;
+  lookThroughCamera: (cam: { x: number; y: number; height: number; aimX: number; aimY: number; fov: number }) => void;
 }
 
 interface Props {
@@ -57,6 +58,7 @@ interface Props {
   ceilings: Ceiling[];
   floorPlan: FloorPlan | null;
   layers: Layers;
+  cameras: CameraView[];
   selectedIds: Set<string>;
   showHeatMap: boolean;
   heatMapScale: number;
@@ -66,7 +68,7 @@ interface Props {
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -662,6 +664,20 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       scene.add(group);
     }
 
+    // Placeable cameras – a marker + sight line (so you can see the viewpoints).
+    for (const cam of cameras) {
+      const isSel = selectedIds.has(cam.id);
+      const g = new THREE.Group();
+      g.userData = { dynamic: true, selectId: cam.id };
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.28, 0.5), new THREE.MeshStandardMaterial({ color: isSel ? '#ffcc33' : '#26c6da' }));
+      body.position.set(cam.x, cam.height, cam.y);
+      body.rotation.y = -Math.atan2(cam.aimY - cam.y, cam.aimX - cam.x);
+      g.add(body);
+      const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(cam.x, cam.height, cam.y), new THREE.Vector3(cam.aimX, 0.9, cam.aimY)]);
+      g.add(new THREE.Line(lg, new THREE.LineBasicMaterial({ color: '#26c6da', transparent: true, opacity: 0.6 })));
+      scene.add(g);
+    }
+
     // ── 3D Heatmap on the ground, sized to cover the actual rig ──
     if (showHeatMap && fixtures.length > 0 && hasContent) {
       const pad = 4;
@@ -738,7 +754,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, personModel]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, personModel]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {
@@ -755,6 +771,16 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       if (photoModeRef.current) { s.renderer.toneMappingExposure = exposureRef.current; s.composer.render(); }
       else s.renderer.render(s.scene, s.camera);
       return s.renderer.domElement;
+    },
+    lookThroughCamera: (cam) => {
+      const s = sceneRef.current;
+      if (!s) return;
+      s.camera.fov = cam.fov;
+      s.camera.updateProjectionMatrix();
+      s.camera.position.set(cam.x, cam.height, cam.y);
+      s.controls.target.set(cam.aimX, 0.9, cam.aimY); // look slightly above the floor
+      s.controls.update();
+      framedRef.current = true; // keep this view; don't auto-frame over it
     },
   }));
 

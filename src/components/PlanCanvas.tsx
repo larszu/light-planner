@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
-import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling, Layers } from '../types';
+import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling, Layers, CameraView } from '../types';
 import type { PlanMode } from '../App';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../utils/lightCalc';
 import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall, pointInPolygon } from '../utils/geometry';
@@ -36,6 +36,10 @@ interface Props {
   onMoveStageElement: (id: string, x: number, y: number) => void;
   onUpdateStageElement: (id: string, updates: Partial<StageElement>) => void;
   onAddStagePolygon: (points: { x: number; y: number }[]) => void;
+  cameras: CameraView[];
+  onAddCamera: (x: number, y: number) => void;
+  onMoveCamera: (id: string, x: number, y: number) => void;
+  onMoveCameraAim: (id: string, aimX: number, aimY: number) => void;
   onAddTruss: (x1: number, y1: number, x2: number, y2: number) => void;
   onMoveTruss: (id: string, dx: number, dy: number) => void;
   onAddWall: (x1: number, y1: number, x2: number, y2: number) => void;
@@ -94,6 +98,10 @@ const PlanCanvas: React.FC<Props> = ({
   onMoveStageElement,
   onUpdateStageElement,
   onAddStagePolygon,
+  cameras,
+  onAddCamera,
+  onMoveCamera,
+  onMoveCameraAim,
   onAddTruss,
   onMoveTruss,
   onAddWall,
@@ -110,7 +118,7 @@ const PlanCanvas: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'resize-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'draw-stage' | 'calibrate' | 'move-plan' | 'marquee';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'resize-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'move-camera' | 'move-camera-aim' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'draw-stage' | 'calibrate' | 'move-plan' | 'marquee';
     corner?: 0 | 1 | 2 | 3;
     startScreenX: number;
     startScreenY: number;
@@ -793,6 +801,45 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'start';
     }
 
+    // Placeable cameras (viewpoints) with their FOV frustum
+    for (const cam of cameras) {
+      const isSel = selectedIds.has(cam.id);
+      const ang = Math.atan2(cam.aimY - cam.y, cam.aimX - cam.x);
+      const hFov = 2 * Math.atan(Math.tan((cam.fov / 2) * (Math.PI / 180)) * (16 / 9));
+      const throwLen = Math.max(2, Math.hypot(cam.aimX - cam.x, cam.aimY - cam.y));
+      const a1 = ang - hFov / 2, a2 = ang + hFov / 2;
+      ctx.beginPath();
+      ctx.moveTo(cam.x, cam.y);
+      ctx.lineTo(cam.x + throwLen * Math.cos(a1), cam.y + throwLen * Math.sin(a1));
+      ctx.lineTo(cam.x + throwLen * Math.cos(a2), cam.y + throwLen * Math.sin(a2));
+      ctx.closePath();
+      ctx.fillStyle = isSel ? 'rgba(38,198,218,0.18)' : 'rgba(38,198,218,0.09)';
+      ctx.fill();
+      ctx.strokeStyle = isSel ? '#26c6da' : 'rgba(38,198,218,0.6)';
+      ctx.lineWidth = 1 / v.scale;
+      ctx.stroke();
+      // body (triangle pointing at the aim)
+      ctx.save();
+      ctx.translate(cam.x, cam.y);
+      ctx.rotate(ang);
+      ctx.fillStyle = isSel ? '#ffcc33' : '#26c6da';
+      ctx.beginPath(); ctx.moveTo(0.28, 0); ctx.lineTo(-0.18, 0.18); ctx.lineTo(-0.18, -0.18); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = isSel ? '#ffcc33' : '#9fe7f0';
+      ctx.font = `${10 / v.scale}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`🎥 ${cam.label || 'Kamera'} · ${cam.fov}°`, cam.x, cam.y - 0.45);
+      ctx.textAlign = 'start';
+      if (isSel) {
+        ctx.setLineDash([4 / v.scale, 4 / v.scale]);
+        ctx.beginPath(); ctx.moveTo(cam.x, cam.y); ctx.lineTo(cam.aimX, cam.aimY); ctx.strokeStyle = '#26c6da'; ctx.lineWidth = 1 / v.scale; ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(cam.aimX, cam.aimY, 0.2, 0, Math.PI * 2); ctx.stroke();
+        const cs = 0.13;
+        ctx.beginPath(); ctx.moveTo(cam.aimX - cs, cam.aimY); ctx.lineTo(cam.aimX + cs, cam.aimY); ctx.moveTo(cam.aimX, cam.aimY - cs); ctx.lineTo(cam.aimX, cam.aimY + cs); ctx.stroke();
+      }
+    }
+
     // Active measure line
     if (dragRef.current?.type === 'draw-measure' && measureEndRef.current) {
       const d = dragRef.current;
@@ -939,7 +986,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, activeTool, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, activeTool, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1069,6 +1116,7 @@ const PlanCanvas: React.FC<Props> = ({
 
     if (fixtureToPlace) { onPlaceFixture(fixtureToPlace, snap(wx), snap(wy)); return; }
     if (activeTool === 'person') { onAddPerson(snap(wx), snap(wy)); return; }
+    if (activeTool === 'camera') { onAddCamera(snap(wx), snap(wy)); return; }
     if (activeTool === 'stage') {
       // Drag to size a podest/stage frame (a tiny click falls back to 1×1).
       measureEndRef.current = { x: snap(wx), y: snap(wy) };
@@ -1144,6 +1192,22 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
+      // Camera aim handle (selected) → drag the look-at point
+      for (const cam of cameras) {
+        if (selectedIds.has(cam.id) && Math.hypot(wx - cam.aimX, wy - cam.aimY) < 0.35) {
+          dragRef.current = { type: 'move-camera-aim', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: cam.id };
+          return;
+        }
+      }
+      // Camera body → select / move
+      for (const cam of cameras) {
+        if (Math.hypot(wx - cam.x, wy - cam.y) < 0.4) {
+          onSelect(cam.id, ctrl);
+          dragRef.current = { type: 'move-camera', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: cam.id };
+          return;
+        }
+      }
+
       const cr = 0.5;
       // All fixtures under the cursor, nearest first — so overlapping lamps
       // can be told apart and cycled through.
@@ -1367,6 +1431,15 @@ const PlanCanvas: React.FC<Props> = ({
     if (d.type === 'move-truss' && d.targetId) {
       onMoveTruss(d.targetId, wx - d.startWorldX, wy - d.startWorldY);
       d.startWorldX = wx; d.startWorldY = wy;
+      return;
+    }
+    if (d.type === 'move-camera' && d.targetId) {
+      const cam = cameras.find((c) => c.id === d.targetId);
+      if (cam) { onMoveCamera(d.targetId, snap(cam.x + wx - d.startWorldX), snap(cam.y + wy - d.startWorldY)); d.startWorldX = wx; d.startWorldY = wy; }
+      return;
+    }
+    if (d.type === 'move-camera-aim' && d.targetId) {
+      onMoveCameraAim(d.targetId, Math.round(wx * 10) / 10, Math.round(wy * 10) / 10);
       return;
     }
     if (d.type === 'move-wall' && d.targetId) {

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView } from './types';
 import { convexHull } from './utils/geometry';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
@@ -97,6 +97,7 @@ const App: React.FC = () => {
   const [photoMode, setPhotoMode] = useState(false);
   const [exposure, setExposure] = useState(1.0);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
+  const [cameras, setCameras] = useState<CameraView[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
   const [cursorLux, setCursorLux] = useState<number | null>(null);
   const [showThreePointDialog, setShowThreePointDialog] = useState(false);
@@ -305,6 +306,37 @@ const App: React.FC = () => {
     }));
   }, [pushHistoryThrottled]);
 
+  // ── Placeable cameras ──
+  const handleAddCamera = useCallback((x: number, y: number) => {
+    pushHistory();
+    const cam: CameraView = { id: uid('cam'), x, y, height: 1.6, aimX: x, aimY: Math.round((y + 6) * 10) / 10, fov: 50, label: '' };
+    setCameras((prev) => [...prev, cam]);
+    setSelectedIds(new Set([cam.id]));
+  }, [pushHistory]);
+  const handleMoveCamera = useCallback((id: string, x: number, y: number) => {
+    pushHistoryThrottled();
+    setCameras((prev) => prev.map((c) => (c.id === id ? { ...c, x, y } : c)));
+  }, [pushHistoryThrottled]);
+  const handleMoveCameraAim = useCallback((id: string, aimX: number, aimY: number) => {
+    pushHistoryThrottled();
+    setCameras((prev) => prev.map((c) => (c.id === id ? { ...c, aimX, aimY } : c)));
+  }, [pushHistoryThrottled]);
+  const handleUpdateCamera = useCallback((id: string, updates: Partial<CameraView>) => {
+    pushHistoryThrottled();
+    setCameras((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+  }, [pushHistoryThrottled]);
+  const handleLookThroughCamera = useCallback((id: string) => {
+    const cam = cameras.find((c) => c.id === id);
+    if (!cam) return;
+    setViewMode('3d');
+    // Scene3D loads lazily; retry until its imperative handle is ready.
+    const tryLook = (n = 0) => {
+      if (scene3DRef.current) scene3DRef.current.lookThroughCamera(cam);
+      else if (n < 60) setTimeout(() => tryLook(n + 1), 50);
+    };
+    tryLook();
+  }, [cameras]);
+
   const handleAddStagePolygon = useCallback((points: { x: number; y: number }[]) => {
     if (points.length < 3) return;
     pushHistory();
@@ -400,6 +432,7 @@ const App: React.FC = () => {
     setTrusses((prev) => prev.filter((t) => t.id !== id));
     setWalls((prev) => prev.filter((w) => w.id !== id));
     setCeilings((prev) => prev.filter((c) => c.id !== id));
+    setCameras((prev) => prev.filter((c) => c.id !== id));
     setFixtureGroups((prev) => prev.map((g) => ({ ...g, fixtureIds: g.fixtureIds.filter((fid) => fid !== id) })).filter((g) => g.fixtureIds.length > 0));
     setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
   }, []);
@@ -599,6 +632,7 @@ const App: React.FC = () => {
       walls,
       ceilings,
       scenes,
+      cameras,
       layers,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
@@ -609,7 +643,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, layers, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -626,6 +660,7 @@ const App: React.FC = () => {
     setScenes(data.scenes ?? []);
     setActiveSceneId(null);
     preSceneRef.current = null;
+    setCameras(data.cameras ?? []);
     setLayers(data.layers ?? DEFAULT_LAYERS);
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
@@ -1079,6 +1114,10 @@ const App: React.FC = () => {
               onMoveStageElement={handleMoveStageElement}
               onUpdateStageElement={handleUpdateStageElement}
               onAddStagePolygon={handleAddStagePolygon}
+              cameras={cameras}
+              onAddCamera={handleAddCamera}
+              onMoveCamera={handleMoveCamera}
+              onMoveCameraAim={handleMoveCameraAim}
               onAddTruss={handleAddTruss}
               onMoveTruss={handleMoveTruss}
               onAddWall={handleAddWall}
@@ -1104,6 +1143,7 @@ const App: React.FC = () => {
                 ceilings={ceilings}
                 floorPlan={floorPlan}
                 layers={layers}
+                cameras={cameras}
                 selectedIds={selectedIds}
                 showHeatMap={showHeatMap}
                 heatMapScale={heatMapScale}
@@ -1130,6 +1170,11 @@ const App: React.FC = () => {
           {activeTool === 'stagepoly' && viewMode === '2d' && (
             <div className="placing-hint">
               ⬠ <strong>Bühne (Polygon)</strong>: Eckpunkte klicken · Startpunkt klicken oder Doppelklick/<kbd>Enter</kbd> schließt die Fläche · <kbd>ESC</kbd> bricht ab
+            </div>
+          )}
+          {activeTool === 'camera' && viewMode === '2d' && (
+            <div className="placing-hint">
+              🎥 <strong>Kamera</strong>: Klicke, um eine Kamera zu setzen · dann Blickziel &amp; Bildwinkel einstellen und „Durch Kamera schauen"
             </div>
           )}
           {planMode === 'calibrate' && viewMode === '2d' && (
@@ -1180,6 +1225,7 @@ const App: React.FC = () => {
           walls={walls}
           ceilings={ceilings}
           shapes={shapes}
+          cameras={cameras}
           selectedIds={selectedIds}
           cursorLux={cursorLux}
           patchConflicts={patchConflicts}
@@ -1189,6 +1235,8 @@ const App: React.FC = () => {
           onUpdateTruss={handleUpdateTruss}
           onUpdateWall={handleUpdateWall}
           onUpdateCeiling={handleUpdateCeiling}
+          onUpdateCamera={handleUpdateCamera}
+          onLookThroughCamera={handleLookThroughCamera}
           onDelete={handleDelete}
           onAutoThreePointForPerson={handleAutoThreePointForPerson}
           onAreaLight={() => setAreaLightOpen(true)}

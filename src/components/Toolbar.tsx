@@ -95,6 +95,7 @@ const Toolbar: React.FC<Props> = ({
     { id: 'stagepoly', label: 'Bühne (Polygon)', icon: '⬠' },
     { id: 'truss', label: 'Traverse', icon: '▤' },
     { id: 'wall', label: 'Wand', icon: '▬' },
+    { id: 'camera', label: 'Kamera', icon: '🎥' },
   ];
 
   return (

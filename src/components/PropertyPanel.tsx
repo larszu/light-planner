@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape } from '../types';
+import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape, CameraView } from '../types';
 import { wallMidHandle, curveControlForMid } from '../utils/geometry';
 import { luxFromFixture, effectiveFieldAngleDeg, explainLux } from '../utils/lightCalc';
 import type { FixtureCategory, BeamShape, LensType, MountType } from '../types';
@@ -15,6 +15,7 @@ interface Props {
   walls: Wall[];
   ceilings: Ceiling[];
   shapes: Shape[];
+  cameras: CameraView[];
   selectedIds: Set<string>;
   cursorLux: number | null;
   patchConflicts: Set<string>;
@@ -24,6 +25,8 @@ interface Props {
   onUpdateTruss: (id: string, updates: Partial<Truss>) => void;
   onUpdateWall: (id: string, updates: Partial<Wall>) => void;
   onUpdateCeiling: (id: string, updates: Partial<Ceiling>) => void;
+  onUpdateCamera: (id: string, updates: Partial<CameraView>) => void;
+  onLookThroughCamera: (id: string) => void;
   onDelete: (id: string) => void;
   onAutoThreePointForPerson: (personId: string) => void;
   onAreaLight: () => void;
@@ -47,6 +50,7 @@ const PropertyPanel: React.FC<Props> = ({
   walls,
   ceilings,
   shapes,
+  cameras,
   selectedIds,
   cursorLux,
   patchConflicts,
@@ -56,6 +60,8 @@ const PropertyPanel: React.FC<Props> = ({
   onUpdateTruss,
   onUpdateWall,
   onUpdateCeiling,
+  onUpdateCamera,
+  onLookThroughCamera,
   onDelete,
   onAutoThreePointForPerson,
   onAreaLight,
@@ -68,6 +74,7 @@ const PropertyPanel: React.FC<Props> = ({
   const selWall = walls.find((w) => w.id === selectedId);
   const selCeiling = ceilings.find((c) => c.id === selectedId);
   const selShape = shapes.find((s) => s.id === selectedId);
+  const selCamera = cameras.find((c) => c.id === selectedId);
 
   // Multi-selection info
   const multiFixtures = fixtures.filter((f) => selectedIds.has(f.id));
@@ -630,6 +637,48 @@ const PropertyPanel: React.FC<Props> = ({
           </label>
         </div>
         <button className="delete-btn" onClick={() => onDelete(t.id)}>Traverse löschen</button>
+      </div>
+    );
+  }
+
+  if (selCamera) {
+    const c = selCamera;
+    const hDist = Math.hypot(c.aimX - c.x, c.aimY - c.y);
+    const tilt = (Math.atan2(c.height, Math.max(0.01, hDist)) * 180) / Math.PI;
+    return (
+      <div className="property-panel">
+        <h3>🎥 Kamera</h3>
+        <button className="auto-btn wide" onClick={() => onLookThroughCamera(c.id)}>
+          🎬 Durch diese Kamera schauen
+        </button>
+        <div className="prop-section">
+          <span className="prop-section-title">Position & Blick</span>
+          {numField('X (m)', c.x, (v) => onUpdateCamera(c.id, { x: v }))}
+          {numField('Y (m)', c.y, (v) => onUpdateCamera(c.id, { y: v }))}
+          {numField('Augenhöhe (m)', c.height, (v) => onUpdateCamera(c.id, { height: v }), 0.1, 0.1, 30)}
+          {numField('Ziel X (m)', c.aimX, (v) => onUpdateCamera(c.id, { aimX: v }))}
+          {numField('Ziel Y (m)', c.aimY, (v) => onUpdateCamera(c.id, { aimY: v }))}
+          <div className="prop-derived">Blick {hDist.toFixed(1)} m weit · ca. {tilt.toFixed(0)}° nach unten</div>
+        </div>
+        <div className="prop-section">
+          <span className="prop-section-title">Objektiv</span>
+          <label className="prop-field">
+            <span>Bildwinkel ({c.fov}°)</span>
+            <input type="range" min={10} max={110} step={1} value={c.fov}
+              onChange={(e) => onUpdateCamera(c.id, { fov: Number(e.target.value) })} />
+          </label>
+          <div className="reflectance-presets">
+            {[['Tele 35°', 35], ['Normal 50°', 50], ['Weit 75°', 75], ['Ultra 95°', 95]].map(([lbl, v]) => (
+              <button key={lbl as string} className="refl-btn" onClick={() => onUpdateCamera(c.id, { fov: v as number })}>{lbl}</button>
+            ))}
+          </div>
+          <label className="prop-field">
+            <span>Bezeichnung</span>
+            <input type="text" value={c.label || ''} onChange={(e) => onUpdateCamera(c.id, { label: e.target.value })} />
+          </label>
+          <div className="prop-derived">Kleinerer Bildwinkel = mehr „Tele" (engerer Ausschnitt), größerer = Weitwinkel.</div>
+        </div>
+        <button className="delete-btn" onClick={() => onDelete(c.id)}>Kamera löschen</button>
       </div>
     );
   }
