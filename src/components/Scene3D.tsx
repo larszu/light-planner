@@ -480,22 +480,26 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         }
       }
 
-      // Photo view: a real human figure that casts & receives real shadows.
-      // The model's camo textures are swapped for a clean, neutral mannequin
-      // material – the kind of scale-reference figure previz tools use.
+      // Photo view: a real, photo-scanned casual human (its own PBR textures)
+      // that casts & receives real shadows. Scaled to the person's height.
       if (photoMode && personModel) {
         const m = cloneSkeleton(personModel.scene) as THREE.Group;
         const s = p.height / personModel.height;
         m.scale.setScalar(s);
         m.position.set(p.x, floorH - personModel.minY * s, p.y);
         m.rotation.y = Math.PI; // face toward −Z (typical "downstage")
-        const skin = new THREE.MeshStandardMaterial({
-          color: isSel ? '#ffcc33' : '#c2ad9a', roughness: 0.78, metalness: 0,
-          emissive: new THREE.Color('#ffcc33'), emissiveIntensity: isSel ? 0.18 : 0,
-        });
+        const highlight = (mm: THREE.Material) => {
+          const c = (mm as THREE.MeshStandardMaterial).clone();
+          c.emissive = new THREE.Color('#ffcc33');
+          c.emissiveIntensity = 0.22;
+          return c;
+        };
         m.traverse((o) => {
           const mesh = o as THREE.Mesh;
-          if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; mesh.material = skin; }
+          if (!mesh.isMesh) return;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          if (isSel) mesh.material = Array.isArray(mesh.material) ? mesh.material.map(highlight) : highlight(mesh.material);
         });
         m.userData = { dynamic: true, selectId: p.id };
         scene.add(m);
