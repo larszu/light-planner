@@ -1,112 +1,124 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Fixture ↔ Equipment mapping
+// Fixture → Cable-Planner Equipment mapping
 //
-// The bridge that lets a host like Cable-Planner treat a placed light as a
-// normal piece of equipment with DMX + power ports, so it can be cabled and
-// fed into the cable BOM. Pure data transform — no UI, no store.
-//
-// The shapes below mirror a typical equipment/port model (EquipmentItem,
-// EquipmentPort). When wiring into Cable-Planner, map these onto its own
-// `types/equipment.ts` (EquipmentItem / Template / Port) — the field names are
-// chosen to line up.
+// Produces equipment in Cable-Planner's exact shape (mirrors
+// cable-planner/src/renderer/types/equipment.ts: EquipmentItem, Port,
+// ConnectorType) so a placed light drops straight into the cable plan as a
+// device with DMX (in + thru) and power ports — cable it, tally the load, BOM
+// it. Pure data transform — no UI, no store.
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { PlacedFixture } from '../core';
 
-export type PortKind = 'dmx' | 'power' | 'data' | 'network' | 'video' | 'audio' | 'other';
-export type PortDirection = 'in' | 'out' | 'bi';
+// Subset of Cable-Planner's ConnectorType that lighting fixtures use. The host
+// union is a superset, so these string literals are assignable to it.
+export type CpConnectorType =
+  | 'DMX 5-pol (XLR)' | 'DMX 3-pol (XLR)'
+  | 'PowerCON' | 'IEC 230V' | 'Schuko 230V' | 'CEE16' | 'CEE32' | 'Kleeblatt';
 
-export interface EquipmentPort {
+// Mirrors Cable-Planner Port (only the fields we populate).
+export interface CpPort {
   id: string;
   name: string;
-  kind: PortKind;
-  direction: PortDirection;
-  connector?: string;                                    // e.g. "XLR-5 (DMX)", "powerCON TRUE1"
-  dmx?: { universe?: number; address?: number; channels?: number };
-  power?: { watts?: number };
+  type: string;                 // signal type, e.g. 'DMX', 'Power'
+  connectorType: CpConnectorType;
+  side?: 'left' | 'right';
+  contentLabel?: string;        // shown as the canvas label when set
 }
 
-export interface EquipmentItem {
+// Mirrors Cable-Planner EquipmentItem (the fields a fixture fills in).
+export interface CpEquipmentItem {
   id: string;
-  templateId?: string;                                   // fixture-library id
   name: string;
-  manufacturer?: string;
-  category: string;                                      // host category (here: 'lighting')
-  x: number;
-  y: number;
-  z?: number;                                            // mounting height (m)
-  rotation?: number;                                     // body rotation (deg)
+  subtitle?: string;
+  category: string;             // host category — 'Licht'
+  icon?: string;
+  inputs: CpPort[];
+  outputs: CpPort[];
+  x: number; y: number; width: number; height: number;   // canvas px
+  powerConsumptionWatts?: number;
+  powerWatts?: number;
   weightKg?: number;
-  powerW?: number;
-  ports: EquipmentPort[];
-  domain: 'lighting';
-  // Keep the lighting specifics intact so nothing is lost in the round-trip.
-  lighting?: {
-    fixtureId: string;
-    mountingHeight: number;
-    aimX: number;
-    aimY: number;
-    dimming: number;
-    channel?: number;
-    unitNumber?: string;
-    purpose?: string;
-  };
+  notes?: string;
+  // Category-specific data — surfaces in Properties + travels with the file.
+  categoryProps?: Record<string, string | number | boolean>;
 }
 
-const DMX_CONNECTOR = 'XLR-5 (DMX)';
+const PX_PER_M = 40;
+
+/** Map a fixture's power connector string to a Cable-Planner ConnectorType. */
+export function powerConnectorToCp(connector?: string): CpConnectorType {
+  const c = (connector ?? '').toLowerCase();
+  if (c.includes('powercon')) return 'PowerCON';
+  if (c.includes('schuko')) return 'Schuko 230V';
+  if (c.includes('cee32')) return 'CEE32';
+  if (c.includes('cee')) return 'CEE16';
+  if (c.includes('iec') || c.includes('c13') || c.includes('c14')) return 'IEC 230V';
+  if (c.includes('klee') || c.includes('c7')) return 'Kleeblatt';
+  return 'PowerCON';
+}
 
 /**
- * Convert a placed fixture into an equipment item with DMX (in + thru) and a
- * power port. DMX patch (universe / address / channels) and power draw carry
- * over so the host can route cables and tally load.
+ * Convert a placed fixture into a Cable-Planner equipment item. DMX patch
+ * (universe.address / footprint) and power draw carry over so the host can
+ * route DMX + power cables and tally the load.
  */
-export function fixtureToEquipment(pf: PlacedFixture): EquipmentItem {
+export function fixtureToEquipment(pf: PlacedFixture): CpEquipmentItem {
   const f = pf.fixture;
   const channels = f.dmxChannels && f.dmxChannels > 0 ? f.dmxChannels : 1;
-  const ports: EquipmentPort[] = [
+  const patch = pf.universe != null && pf.dmxAddress != null ? `U${pf.universe}.${pf.dmxAddress}` : undefined;
+  const inputs: CpPort[] = [
     {
-      id: `${pf.id}:dmx-in`, name: 'DMX In', kind: 'dmx', direction: 'in', connector: DMX_CONNECTOR,
-      dmx: { universe: pf.universe, address: pf.dmxAddress, channels },
+      id: `${pf.id}:dmx-in`, name: patch ? `DMX In (${patch})` : 'DMX In', type: 'DMX',
+      connectorType: 'DMX 5-pol (XLR)', side: 'left', contentLabel: patch,
     },
-    { id: `${pf.id}:dmx-thru`, name: 'DMX Thru', kind: 'dmx', direction: 'out', connector: DMX_CONNECTOR },
     {
-      id: `${pf.id}:power`, name: 'Power', kind: 'power', direction: 'in',
-      connector: f.powerConnector ?? 'powerCON', power: { watts: f.wattage },
+      id: `${pf.id}:power`, name: 'Power', type: 'Power',
+      connectorType: powerConnectorToCp(f.powerConnector), side: 'left',
     },
   ];
+  const outputs: CpPort[] = [
+    { id: `${pf.id}:dmx-thru`, name: 'DMX Thru', type: 'DMX', connectorType: 'DMX 5-pol (XLR)', side: 'right' },
+  ];
+  const categoryProps: Record<string, string | number | boolean> = {
+    'Lichtstrom (lm)': f.lumens,
+    'Beam (°)': f.beamAngle,
+    'Field (°)': f.fieldAngle,
+    'DMX-Footprint': channels,
+    'Dimmer (%)': pf.dimming,
+    'Höhe (m)': pf.mountingHeight,
+  };
+  if (pf.universe != null) categoryProps['DMX-Universe'] = pf.universe;
+  if (pf.dmxAddress != null) categoryProps['DMX-Adresse'] = pf.dmxAddress;
+  if (pf.channel != null) categoryProps['Kanal'] = pf.channel;
+  if (f.colorTemp) categoryProps['CCT (K)'] = f.colorTemp;
+
   return {
     id: pf.id,
-    templateId: f.id,
     name: pf.unitNumber ? `${pf.unitNumber} · ${f.name}` : f.name,
-    manufacturer: f.manufacturer,
-    category: 'lighting',
-    x: pf.x,
-    y: pf.y,
-    z: pf.mountingHeight,
-    rotation: pf.bodyRotation,
+    subtitle: f.manufacturer,
+    category: 'Licht',
+    icon: '💡',
+    inputs,
+    outputs,
+    x: Math.round(pf.x * PX_PER_M),
+    y: Math.round(pf.y * PX_PER_M),
+    width: 200,
+    height: 96,
+    powerConsumptionWatts: f.wattage,
+    powerWatts: f.wattage,
     weightKg: f.weight,
-    powerW: f.wattage,
-    ports,
-    domain: 'lighting',
-    lighting: {
-      fixtureId: f.id,
-      mountingHeight: pf.mountingHeight,
-      aimX: pf.aimX,
-      aimY: pf.aimY,
-      dimming: pf.dimming,
-      channel: pf.channel,
-      unitNumber: pf.unitNumber,
-      purpose: pf.purpose,
-    },
+    notes: pf.purpose,
+    categoryProps,
   };
 }
 
-/** All placed fixtures as equipment items (e.g. to hand the cable planner). */
-export function fixturesToEquipment(fixtures: PlacedFixture[]): EquipmentItem[] {
+/** All placed fixtures as Cable-Planner equipment items. */
+export function fixturesToEquipment(fixtures: PlacedFixture[]): CpEquipmentItem[] {
   return fixtures.map(fixtureToEquipment);
 }
 
-/** Total connected load in watts (dimming-independent rated draw). */
+/** Total connected load in watts (rated draw, dimming-independent). */
 export function totalRatedPowerW(fixtures: PlacedFixture[]): number {
   return fixtures.reduce((sum, pf) => sum + (pf.fixture.wattage || 0), 0);
 }

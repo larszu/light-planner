@@ -3,6 +3,39 @@
 This document describes how the lighting planner is structured for embedding in
 a host app (Cable-Planner) and exactly what is done vs. what remains.
 
+## Verified against cable-planner (larszu/cable-planner @ v8.0.10)
+
+Checked against the real source, not the diagram:
+
+- **three `^0.184.0`** — identical to light-planner (no dedupe conflict). r3f
+  `@react-three/fiber ^9.6.1`; light-planner's `Scene3D` is raw three and works
+  side-by-side, port to r3f later if desired.
+- **zustand `^5`** — matches.
+- **React `^19`** — light-planner is now bumped to React 19 to match (runs clean).
+- **Canvas** is `reactflow ^11` (schematic) — keep the spatial `PlanCanvas`/`Scene3D`
+  as a separate view, don't force it into ReactFlow.
+- **i18n**: same `t(key, 'Deutsche Form')` model, `Language = 'de'|'en'` in the
+  uiStore. NB cable-planner defaults to `language: 'en'`; point the planner's
+  `useTranslation` at the host uiStore on mount (the `t` signature is identical).
+- Cable-planner is **already lighting-aware**: `ProjectMetadata.defaultLightingControl:
+  'dmx512'|'artnet'|'sacn'`, connector types include `DMX 5-pol (XLR)` / `PowerCON`,
+  and equipment carries `categoryProps`, `powerConsumptionWatts`, `weightKg`.
+
+### Real types used by the mapping (`src/integration/equipment.ts`)
+`CpEquipmentItem`/`CpPort`/`CpConnectorType` mirror cable-planner's
+`types/equipment.ts` (`EquipmentItem` with `inputs: Port[]` / `outputs: Port[]`,
+px `x/y/width/height`, `categoryProps`, `powerConsumptionWatts`, `weightKg`).
+`fixtureToEquipment` yields e.g. `inputs: [DMX In (U1.13), Power[PowerCON]]`,
+`outputs: [DMX Thru]`, `category: 'Licht'` — drop straight into
+`projectStore.addEquipment(...)`.
+
+### Real bridge API (`src/integration/cablePlannerHost.ts`)
+`window.bridge.project.{ saveProject(project, path?), openProject(), saveProjectAs() }`
+and `window.bridge.fs.{ readFile, writeFile }`. The lighting document is embedded
+in the host `CablePlannerProject` (host owns Save/Open), so `createCablePlannerHost`
+takes `onSaveDocument` / `onLoadDocument` hooks; only image/PDF export touches
+`bridge.fs` directly.
+
 ## Architecture seams (already in place)
 
 ```

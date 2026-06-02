@@ -3,4 +3,6 @@
 export * from './equipment';
 export * from './hostAdapter';
 export { browserHost } from './browserHost';
+export { createCablePlannerHost } from './cablePlannerHost';
+export type { CablePlannerHostDeps } from './cablePlannerHost';
 export { HostProvider, useHost } from './hostContext';
