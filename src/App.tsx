@@ -1098,6 +1098,11 @@ const App: React.FC = () => {
               Klicke auf den Plan um <strong>{fixtureToPlace.name}</strong> zu platzieren · ESC zum Abbrechen
             </div>
           )}
+          {activeTool === 'wall' && viewMode === '2d' && (
+            <div className="placing-hint">
+              🧱 <strong>Wand-Pfad</strong>: Punkte nacheinander klicken · Startpunkt klicken schließt den Raum · <kbd>Shift</kbd> = 15°-Winkel · Doppelklick/<kbd>ESC</kbd> beendet
+            </div>
+          )}
           {planMode === 'calibrate' && viewMode === '2d' && (
             <div className="placing-hint plan-calibrate-hint">
               📏 Ziehe eine Linie entlang einer <strong>bekannten Strecke</strong> (z.&nbsp;B. eine Wand) · ESC zum Abbrechen

@@ -122,6 +122,9 @@ const PlanCanvas: React.FC<Props> = ({
   const measureEndRef = useRef<{ x: number; y: number } | null>(null);
   const marqueeEndRef = useRef<{ x: number; y: number } | null>(null);
   const calibEndRef = useRef<{ x: number; y: number } | null>(null);
+  // Wall path tool: committed vertices of the current chain + the live cursor.
+  const wallPathRef = useRef<{ x: number; y: number }[]>([]);
+  const wallCursorRef = useRef<{ x: number; y: number } | null>(null);
   const heatMapCacheRef = useRef<{ imageData: ImageData | null; key: string }>({ imageData: null, key: '' });
   const animFrameRef = useRef<number>(0);
   const spaceDownRef = useRef(false);
@@ -773,22 +776,52 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'start';
     }
 
-    // Active truss / wall being drawn
-    if ((dragRef.current?.type === 'draw-truss' || dragRef.current?.type === 'draw-wall') && measureEndRef.current) {
+    // Active truss being drawn (drag)
+    if (dragRef.current?.type === 'draw-truss' && measureEndRef.current) {
       const d = dragRef.current;
       const end = measureEndRef.current;
       const len = Math.hypot(end.x - d.startWorldX, end.y - d.startWorldY);
-      const isWall = d.type === 'draw-wall';
-      ctx.strokeStyle = isWall ? '#c9c4b8' : '#9aa4b2';
-      ctx.lineCap = isWall ? 'round' : 'butt';
-      ctx.lineWidth = isWall ? 0.22 : 3 / v.scale;
+      ctx.strokeStyle = '#9aa4b2';
+      ctx.lineWidth = 3 / v.scale;
       ctx.beginPath(); ctx.moveTo(d.startWorldX, d.startWorldY); ctx.lineTo(end.x, end.y); ctx.stroke();
-      ctx.lineCap = 'butt';
       const mx = (d.startWorldX + end.x) / 2, my = (d.startWorldY + end.y) / 2;
       ctx.fillStyle = '#c8d0da';
       ctx.font = `bold ${12 / v.scale}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(`${len.toFixed(1)} m`, mx, my - 8 / v.scale);
+      ctx.textAlign = 'start';
+    }
+
+    // Wall path tool: rubber-band from the last vertex + length & angle readout.
+    if (activeTool === 'wall' && wallPathRef.current.length > 0 && wallCursorRef.current) {
+      const path = wallPathRef.current;
+      const cur = wallCursorRef.current;
+      const last = path[path.length - 1];
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#c9c4b8';
+      ctx.lineWidth = 0.22;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(cur.x, cur.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineCap = 'butt';
+      // vertices placed so far
+      for (const p of path) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 0.1, 0, Math.PI * 2);
+        ctx.fillStyle = '#4fc3f7'; ctx.fill();
+      }
+      // start ring (click to close the loop)
+      if (path.length >= 2) {
+        ctx.beginPath(); ctx.arc(path[0].x, path[0].y, 0.2, 0, Math.PI * 2);
+        ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 1.5 / v.scale; ctx.stroke();
+      }
+      const len = Math.hypot(cur.x - last.x, cur.y - last.y);
+      let ang = (Math.atan2(cur.y - last.y, cur.x - last.x) * 180) / Math.PI;
+      if (ang < 0) ang += 360;
+      const mx = (last.x + cur.x) / 2, my = (last.y + cur.y) / 2;
+      ctx.fillStyle = '#ffcc33';
+      ctx.font = `bold ${12 / v.scale}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${len.toFixed(2)} m · ${ang.toFixed(0)}°`, mx, my - 10 / v.scale);
       ctx.textAlign = 'start';
     }
 
@@ -812,7 +845,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, activeTool, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -844,13 +877,26 @@ const PlanCanvas: React.FC<Props> = ({
           window.dispatchEvent(new CustomEvent('lp-delete', { detail: id }));
         }
       }
-      if (e.code === 'Escape') { onSelect(null); onToolChange('select'); }
+      if (e.code === 'Escape') {
+        // First Escape ends an in-progress wall chain (keeping the wall tool).
+        if (wallPathRef.current.length > 0) { wallPathRef.current = []; wallCursorRef.current = null; return; }
+        onSelect(null); onToolChange('select');
+      }
+      if (e.code === 'Enter' && wallPathRef.current.length > 0) { wallPathRef.current = []; wallCursorRef.current = null; }
     };
     const handleKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') spaceDownRef.current = false; };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
   }, [selectedIds, onSelect, onToolChange]);
+
+  // Leaving the wall tool ends any chain in progress.
+  useEffect(() => {
+    if (activeTool !== 'wall') { wallPathRef.current = []; wallCursorRef.current = null; }
+  }, [activeTool]);
+
+  // Double-click finishes the current wall chain (without closing the loop).
+  const handleDoubleClick = () => { wallPathRef.current = []; wallCursorRef.current = null; };
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; };
   const handleDrop = (e: React.DragEvent) => {
@@ -868,6 +914,31 @@ const PlanCanvas: React.FC<Props> = ({
   const getCanvasPos = (e: React.MouseEvent): [number, number] => {
     const rect = canvasRef.current!.getBoundingClientRect();
     return [e.clientX - rect.left, e.clientY - rect.top];
+  };
+
+  // Precise point for the wall path tool. Priority:
+  //  1. exact snap to a nearby existing wall endpoint (so walls connect cleanly)
+  //  2. Shift → constrain to 15° from the previous vertex
+  //  3. grid snap (respects the snap step)
+  const snapWallPoint = (wx: number, wy: number, shift: boolean): { x: number; y: number } => {
+    let best: { x: number; y: number } | null = null;
+    let bestD = 0.4;
+    for (const w of walls) {
+      for (const e of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) {
+        const d = Math.hypot(wx - e.x, wy - e.y);
+        if (d < bestD) { bestD = d; best = e; }
+      }
+    }
+    if (best) return best;
+    const path = wallPathRef.current;
+    if (shift && path.length > 0) {
+      const prev = path[path.length - 1];
+      const len = Math.hypot(wx - prev.x, wy - prev.y);
+      const step = Math.PI / 12; // 15°
+      const a = Math.round(Math.atan2(wy - prev.y, wx - prev.x) / step) * step;
+      return { x: Math.round((prev.x + Math.cos(a) * len) * 10) / 10, y: Math.round((prev.y + Math.sin(a) * len) * 10) / 10 };
+    }
+    return { x: snap(wx), y: snap(wy) };
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -903,9 +974,21 @@ const PlanCanvas: React.FC<Props> = ({
       return;
     }
     if (activeTool === 'wall') {
-      const s = { x: snap(wx), y: snap(wy) };
-      measureEndRef.current = s;
-      dragRef.current = { type: 'draw-wall', startScreenX: sx, startScreenY: sy, startWorldX: s.x, startWorldY: s.y };
+      // Click-to-add path: each click extends the chain with a new wall segment;
+      // click the start point (blue ring) to close the loop, Esc / double-click ends it.
+      const p = snapWallPoint(wx, wy, e.shiftKey);
+      const path = wallPathRef.current;
+      if (path.length === 0) {
+        wallPathRef.current = [p];
+      } else {
+        const prev = path[path.length - 1];
+        const closing = path.length >= 2 && Math.hypot(p.x - path[0].x, p.y - path[0].y) < 0.3;
+        const end = closing ? path[0] : p;
+        if (Math.hypot(end.x - prev.x, end.y - prev.y) > 0.05) onAddWall(prev.x, prev.y, end.x, end.y);
+        wallPathRef.current = closing ? [] : [...path, p];
+      }
+      wallCursorRef.current = p;
+      draw();
       return;
     }
     if (activeTool === 'measure') {
@@ -1066,6 +1149,12 @@ const PlanCanvas: React.FC<Props> = ({
     if (fixtures.length > 0) onCursorLux(totalLux(fixtures, wx, wy, wallSamples));
     else onCursorLux(null);
 
+    // Live rubber-band for the wall path tool (no drag involved).
+    if (activeTool === 'wall' && wallPathRef.current.length > 0) {
+      wallCursorRef.current = snapWallPoint(wx, wy, e.shiftKey);
+      draw();
+    }
+
     if (!dragRef.current) return;
     const d = dragRef.current;
 
@@ -1126,7 +1215,7 @@ const PlanCanvas: React.FC<Props> = ({
       return;
     }
     if (d.type === 'draw-measure') measureEndRef.current = { x: wx, y: wy };
-    if (d.type === 'draw-truss' || d.type === 'draw-wall') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
+    if (d.type === 'draw-truss') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
     if (d.type === 'marquee') { marqueeEndRef.current = { x: wx, y: wy }; return; }
     if (d.type === 'calibrate') { calibEndRef.current = { x: wx, y: wy }; return; }
     if (d.type === 'move-plan') {
@@ -1184,11 +1273,6 @@ const PlanCanvas: React.FC<Props> = ({
         if (len > 0.3) onAddTruss(d.startWorldX, d.startWorldY, snap(ewx), snap(ewy));
         measureEndRef.current = null;
       }
-      if (d.type === 'draw-wall') {
-        const len = Math.hypot(ewx - d.startWorldX, ewy - d.startWorldY);
-        if (len > 0.3) onAddWall(d.startWorldX, d.startWorldY, snap(ewx), snap(ewy));
-        measureEndRef.current = null;
-      }
       if (d.type === 'marquee') {
         const x0 = Math.min(d.startWorldX, ewx), x1 = Math.max(d.startWorldX, ewx);
         const y0 = Math.min(d.startWorldY, ewy), y1 = Math.max(d.startWorldY, ewy);
@@ -1231,6 +1315,7 @@ const PlanCanvas: React.FC<Props> = ({
     <div ref={containerRef} className="plan-canvas-container">
       <canvas ref={canvasRef} className="plan-canvas"
         onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
         onWheel={handleWheel} onDragOver={handleDragOver} onDrop={handleDrop}
         onContextMenu={(e) => e.preventDefault()} style={{ cursor }} />
     </div>
