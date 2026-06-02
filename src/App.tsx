@@ -19,6 +19,7 @@ import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
 import { jpegToPdfBlob, dataUrlToBytes, downloadBlob, downloadDataUrl } from './utils/pdfExport';
 import MenuBar from './components/MenuBar';
+import { drawHeatMapLegend } from './utils/heatmapLegend';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 
@@ -788,10 +789,30 @@ const App: React.FC = () => {
     const num = exportCounterRef.current++;
     const base = `${projName} ${viewLabel} ${String(num).padStart(3, '0')}`;
 
-    const canvas = viewMode === '3d'
+    const srcCanvas = viewMode === '3d'
       ? scene3DRef.current?.getCanvas() ?? null
       : (document.querySelector('.plan-canvas') as HTMLCanvasElement | null);
-    if (!canvas) return;
+    if (!srcCanvas) return;
+
+    // When the heat-map is on, composite a matching legend into the export so
+    // the colours are readable on the saved image.
+    let canvas = srcCanvas;
+    if (showHeatMap) {
+      const composite = document.createElement('canvas');
+      composite.width = srcCanvas.width;
+      composite.height = srcCanvas.height;
+      const cctx = composite.getContext('2d');
+      if (cctx) {
+        cctx.drawImage(srcCanvas, 0, 0);
+        drawHeatMapLegend(cctx, {
+          canvasWidth: composite.width,
+          canvasHeight: composite.height,
+          heatMapScale,
+          heatMapTarget,
+        });
+        canvas = composite;
+      }
+    }
 
     if (format === 'pdf') {
       const bytes = dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
@@ -801,7 +822,7 @@ const App: React.FC = () => {
     } else {
       downloadDataUrl(canvas.toDataURL('image/png'), `${base}.png`);
     }
-  }, [viewMode, projectMeta]);
+  }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget]);
 
   const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
   const handleMoveShape = useCallback((id: string, dx: number, dy: number) => {
