@@ -1,4 +1,4 @@
-import { luxToColor, luxToColorTarget } from './lightCalc';
+import { luxToColor, luxToColorTarget } from '../core/lightCalc';
 
 // Draws a heat-map legend onto a 2D canvas context (used when exporting an
 // image while the heat-map is on). It samples the very same palette functions

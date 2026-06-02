@@ -1,7 +1,7 @@
 import React from 'react';
 import type { PlacedFixture } from '../types';
-import { computePower, fixtureCounts, footprint } from '../utils/patch';
-import { gelLibrary } from '../data/gelLibrary';
+import { computePower, fixtureCounts, footprint } from '../core/patch';
+import { gelLibrary } from '../core/gelLibrary';
 
 interface Props {
   fixtures: PlacedFixture[];

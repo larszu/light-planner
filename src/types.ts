@@ -162,12 +162,16 @@ export interface Scene {
 }
 
 // ── Person on stage ──
+export type PersonPose = 'standing' | 'sitting';
+
 export interface Person {
   id: string;
   x: number;            // meters
   y: number;            // meters
   height: number;       // meters (default 1.75)
   label: string;
+  pose?: PersonPose;    // standing (default) or sitting (3D photo figure)
+  facing?: number;      // direction the person looks, degrees in plan (0 = +X). Default 270 (−Y / downstage)
 }
 
 // ── Stage elements (Podeste) ──
@@ -183,6 +187,9 @@ export interface StageElement {
   height: number;       // meters – podest height (front edge for a ramp)
   height2?: number;     // meters – height at the far (back) edge; ≠ height ⇒ ramp/slope
   rotation: number;     // degrees
+  // Free polygon stage: world-space outline. When present the element is drawn
+  // as this polygon (x/y/width/depth are kept as its bounding box for picking).
+  points?: { x: number; y: number }[];
   label: string;
 }
 
@@ -217,6 +224,18 @@ export interface Ceiling {
   label: string;
 }
 
+// ── Placeable camera (a viewpoint you can "look through" in 3D) ──
+export interface CameraView {
+  id: string;
+  x: number;            // position on the floor plan (meters)
+  y: number;
+  height: number;       // eye height above floor (meters)
+  aimX: number;         // look-at point on the floor (meters)
+  aimY: number;
+  fov: number;          // vertical field of view (degrees) – the "focal length"
+  label: string;
+}
+
 // ── Truss / hanging position (rigging) ──
 export interface Truss {
   id: string;
@@ -228,7 +247,7 @@ export interface Truss {
   label: string;
 }
 
-export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'truss' | 'wall';
+export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'stagepoly' | 'truss' | 'wall' | 'camera';
 export type ViewMode = '2d' | '3d';
 
 export interface ViewTransform {
@@ -291,6 +310,7 @@ export interface ProjectData {
   walls?: Wall[];
   ceilings?: Ceiling[];
   scenes?: Scene[];
+  cameras?: CameraView[];
   layers?: Layers;
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.

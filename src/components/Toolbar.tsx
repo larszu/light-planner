@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Tool, ViewMode } from '../types';
+import { useTranslation } from '../i18n';
 
 interface Props {
   activeTool: Tool;
@@ -14,8 +15,10 @@ interface Props {
   onHeatMapTargetChange: (v: number) => void;
   photoMode: boolean;
   exposure: number;
+  haze: number;
   onTogglePhotoMode: () => void;
   onExposureChange: (v: number) => void;
+  onHazeChange: (v: number) => void;
   onUploadFloorPlan: (file: File) => void;
   onExport: () => void;
   onAutoThreePoint: () => void;
@@ -56,8 +59,10 @@ const Toolbar: React.FC<Props> = ({
   onHeatMapTargetChange,
   photoMode,
   exposure,
+  haze,
   onTogglePhotoMode,
   onExposureChange,
+  onHazeChange,
   onUploadFloorPlan,
   onExport,
   onAutoThreePoint,
@@ -84,16 +89,19 @@ const Toolbar: React.FC<Props> = ({
   onUngroupSelection,
   onRotateSelection,
 }) => {
+  const { t } = useTranslation();
   const tools: { id: Tool; label: string; icon: string }[] = [
-    { id: 'select', label: 'Auswahl', icon: '⊹' },
-    { id: 'pan', label: 'Verschieben', icon: '✋' },
-    { id: 'rect', label: 'Rechteck', icon: '▭' },
-    { id: 'line', label: 'Linie', icon: '╱' },
-    { id: 'measure', label: 'Messen', icon: '📏' },
-    { id: 'person', label: 'Person', icon: '🧑' },
-    { id: 'stage', label: 'Podest', icon: '⬜' },
-    { id: 'truss', label: 'Traverse', icon: '▤' },
-    { id: 'wall', label: 'Wand', icon: '▬' },
+    { id: 'select', label: t('tool.select', 'Auswahl'), icon: '⊹' },
+    { id: 'pan', label: t('tool.pan', 'Verschieben'), icon: '✋' },
+    { id: 'rect', label: t('tool.rect', 'Rechteck'), icon: '▭' },
+    { id: 'line', label: t('tool.line', 'Linie'), icon: '╱' },
+    { id: 'measure', label: t('tool.measure', 'Messen'), icon: '📏' },
+    { id: 'person', label: t('tool.person', 'Person'), icon: '🧑' },
+    { id: 'stage', label: t('tool.stage', 'Podest'), icon: '⬜' },
+    { id: 'stagepoly', label: t('tool.stagepoly', 'Bühne (Polygon)'), icon: '⬠' },
+    { id: 'truss', label: t('tool.truss', 'Traverse'), icon: '▤' },
+    { id: 'wall', label: t('tool.wall', 'Wand'), icon: '▬' },
+    { id: 'camera', label: t('tool.camera', 'Kamera'), icon: '🎥' },
   ];
 
   return (
@@ -225,6 +233,20 @@ const Toolbar: React.FC<Props> = ({
                   onChange={(e) => onExposureChange(Number(e.target.value))}
                 />
                 <span>{exposure.toFixed(2)}</span>
+              </label>
+            )}
+            {photoMode && (
+              <label className="heat-scale-label" title="Dunst / Haze – Lichtkegel sind nur im Dunst sichtbar (wie in echt)">
+                <span>🌫</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.02}
+                  value={haze}
+                  onChange={(e) => onHazeChange(Number(e.target.value))}
+                />
+                <span>{Math.round(haze * 100)}%</span>
               </label>
             )}
           </div>

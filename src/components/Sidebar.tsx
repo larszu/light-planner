@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Fixture, FixtureCategory } from '../types';
-import { fixtureLibrary } from '../data/fixtureLibrary';
+import { fixtureLibrary } from '../core/fixtureLibrary';
 import FixtureEditor from './FixtureEditor';
 
 interface Props {

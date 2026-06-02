@@ -7,14 +7,32 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers } from '../types';
-import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../utils/lightCalc';
-import { getBeamColorHex } from '../utils/colorTemp';
-import { sampleWall, isCurved } from '../utils/geometry';
+import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers, CameraView } from '../types';
+import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../core/lightCalc';
+import { getBeamColorHex } from '../core/colorTemp';
+import { sampleWall, isCurved } from '../core/geometry';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
 const LIGHT_K = 0.0016;
+
+// Bend the standard (Mixamo/RPM) skeleton into a seated pose: thighs forward,
+// knees bent, slight forward lean + arms resting. Tuned for the bundled avatar.
+function applySitPose(root: THREE.Object3D) {
+  const rot = (name: string, x: number, z = 0) => {
+    const b = root.getObjectByName(name);
+    if (b) { b.rotation.x += x; if (z) b.rotation.z += z; }
+  };
+  rot('LeftUpLeg', -1.5, 0.12);
+  rot('RightUpLeg', -1.5, -0.12);
+  rot('LeftLeg', 1.55);
+  rot('RightLeg', 1.55);
+  rot('LeftFoot', 0.35);
+  rot('RightFoot', 0.35);
+  rot('Spine', 0.12);
+  rot('LeftArm', 0.25);
+  rot('RightArm', 0.25);
+}
 
 // A real (textured) human model, loaded once and reused for the photo view so
 // people cast and receive real shadows. Falls back to the simple cylinder when
@@ -26,6 +44,15 @@ function loadPersonModel(): Promise<PersonModel> {
     const url = `${import.meta.env.BASE_URL}models/person.glb`;
     personModelPromise = new GLTFLoader().loadAsync(url).then((g) => {
       const scene = g.scene;
+      // The bind pose is a T-pose; sample the idle clip so the figure stands
+      // naturally (arms down). One mixer.update bakes the pose into the bones,
+      // which the per-person clones then capture.
+      const idle = g.animations.find((a) => /idle|stand|rest/i.test(a.name)) ?? g.animations[0];
+      if (idle) {
+        const mixer = new THREE.AnimationMixer(scene);
+        mixer.clipAction(idle).play();
+        mixer.update(0.4);
+      }
       scene.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(scene);
       return { scene, height: Math.max(0.1, box.max.y - box.min.y), minY: box.min.y };
@@ -37,6 +64,7 @@ function loadPersonModel(): Promise<PersonModel> {
 export interface Scene3DHandle {
   screenshot: () => string | null;
   getCanvas: () => HTMLCanvasElement | null;
+  lookThroughCamera: (cam: { x: number; y: number; height: number; aimX: number; aimY: number; fov: number }) => void;
 }
 
 interface Props {
@@ -48,16 +76,18 @@ interface Props {
   ceilings: Ceiling[];
   floorPlan: FloorPlan | null;
   layers: Layers;
+  cameras: CameraView[];
   selectedIds: Set<string>;
   showHeatMap: boolean;
   heatMapScale: number;
   heatMapTarget: number;
   photoMode: boolean;
   exposure: number;
+  haze: number;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -68,8 +98,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     composer: EffectComposer;
     bloom: UnrealBloomPass;
     ambient: THREE.AmbientLight;
+    hemi: THREE.HemisphereLight;
     dir: THREE.DirectionalLight;
     grid: THREE.GridHelper;
+    ground: THREE.Mesh;
   } | null>(null);
   // Whether the camera has been framed to the content yet (once per mount).
   const framedRef = useRef(false);
@@ -108,23 +140,26 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     controls.dampingFactor = 0.08;
     controls.target.set(10, 0, 10);
 
-    // Ground grid
+    // Ground grid (hidden in the photo view)
     const grid = new THREE.GridHelper(60, 60, '#3a3a50', '#2a2a3c');
     scene.add(grid);
 
-    // Ground plane (for shadows)
-    const groundGeo = new THREE.PlaneGeometry(60, 60);
-    const groundMat = new THREE.MeshStandardMaterial({ color: '#222238', roughness: 0.9 });
+    // Ground plane – large so it always reads as a real floor; receives shadows.
+    const groundGeo = new THREE.PlaneGeometry(400, 400);
+    const groundMat = new THREE.MeshStandardMaterial({ color: photoModeRef.current ? '#313139' : '#222238', roughness: 0.9, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Ambient + key light. In photo mode these are dimmed right down so the
-    // fixtures themselves light the scene (and cast the real shadows).
-    const ambient = new THREE.AmbientLight('#666680', photoModeRef.current ? 0.12 : 0.5);
+    // Lighting. Photo mode keeps a gentle sky/ground hemisphere fill so the
+    // floor and shadows stay readable, while the fixtures dominate and cast the
+    // real shadows; the flat ambient/key are dimmed right down.
+    const ambient = new THREE.AmbientLight('#666680', photoModeRef.current ? 0.06 : 0.5);
     scene.add(ambient);
-    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.04 : 0.3);
+    const hemi = new THREE.HemisphereLight('#44506e', '#11111a', photoModeRef.current ? 0.6 : 0.0);
+    scene.add(hemi);
+    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.05 : 0.3);
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
@@ -135,9 +170,9 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     composer.addPass(new RenderPass(scene, camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(container.clientWidth, container.clientHeight),
-      0.7,  // strength
-      0.6,  // radius
-      0.75, // threshold (only the bright bits bloom)
+      0.5,  // strength (subtle – just a halo on the brightest bits)
+      0.5,  // radius
+      0.8,  // threshold (only the bright bits bloom)
     );
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
@@ -146,7 +181,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     renderer.toneMappingExposure = exposureRef.current;
 
     const animId = 0;
-    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, dir: dirLight, grid };
+    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, grid, ground };
 
     // ── WASD keyboard movement ──
     const keys: Record<string, boolean> = {};
@@ -257,10 +292,14 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     if (!s) return;
     s.renderer.toneMapping = photoMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     s.renderer.toneMappingExposure = exposure;
-    s.ambient.intensity = photoMode ? 0.12 : 0.5;
+    s.ambient.intensity = photoMode ? 0.06 : 0.5;
+    s.hemi.intensity = photoMode ? 0.6 : 0.0;
     s.dir.intensity = photoMode ? 0.05 : 0.3;
     s.grid.visible = !photoMode;
-    s.scene.background = new THREE.Color(photoMode ? '#08080d' : '#1a1a2e');
+    (s.ground.material as THREE.MeshStandardMaterial).color.set(photoMode ? '#313139' : '#222238');
+    const bg = photoMode ? '#0e0e16' : '#1a1a2e';
+    s.scene.background = new THREE.Color(bg);
+    if (s.scene.fog) (s.scene.fog as THREE.Fog).color.set(bg);
     // Tone-mapping change requires existing materials to recompile.
     s.scene.traverse((o) => {
       const m = (o as THREE.Mesh).material;
@@ -318,10 +357,35 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       scene.add(mesh);
     }
 
-    // Stage elements (podeste) – flat box, or a wedge when it's a ramp.
+    // Stage elements (podeste) – flat box, a wedge when it's a ramp, or an
+    // extruded prism for a free polygon stage.
     if (layers.stage.visible) for (const se of stageElements) {
       const isSel = selectedIds.has(se.id);
       const mat = new THREE.MeshStandardMaterial({ color: isSel ? '#cc8833' : '#8B4513', roughness: 0.7 });
+
+      if (se.points && se.points.length >= 3) {
+        const pts = se.points, h = Math.max(0.01, se.height);
+        const pos: number[] = [];
+        for (let i = 1; i < pts.length - 1; i++) {
+          const a = pts[0], b = pts[i], c = pts[i + 1];
+          pos.push(a.x, 0, a.y, b.x, 0, b.y, c.x, 0, c.y);   // bottom
+          pos.push(a.x, h, a.y, c.x, h, c.y, b.x, h, b.y);   // top
+        }
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          pos.push(a.x, 0, a.y, b.x, 0, b.y, b.x, h, b.y);   // side
+          pos.push(a.x, 0, a.y, b.x, h, b.y, a.x, h, a.y);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.userData = { dynamic: true, selectId: se.id };
+        scene.add(mesh);
+        continue;
+      }
+
       const w = se.width, d = se.depth;
       const isRamp = se.height2 != null && Math.abs(se.height2 - se.height) > 0.01;
       let geo: THREE.BufferGeometry;
@@ -434,25 +498,31 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         }
       }
 
-      // Photo view: a real, textured human that casts & receives real shadows.
+      // Photo view: a real, photo-scanned casual human (its own PBR textures)
+      // that casts & receives real shadows. Scaled to the person's height.
       if (photoMode && personModel) {
         const m = cloneSkeleton(personModel.scene) as THREE.Group;
         const s = p.height / personModel.height;
         m.scale.setScalar(s);
-        m.position.set(p.x, floorH - personModel.minY * s, p.y);
-        m.rotation.y = Math.PI; // face toward −Z (typical "downstage")
+        // Facing: plan angle (0 = +X) → rotation about Y (model forward = +Z = plan +Y).
+        m.rotation.y = ((90 - (p.facing ?? 270)) * Math.PI) / 180;
+        const sitting = p.pose === 'sitting';
+        m.position.set(p.x, floorH - personModel.minY * s - (sitting ? 0.5 * s : 0), p.y);
+        if (sitting) applySitPose(m);
+        const highlight = (mm: THREE.Material) => {
+          const c = (mm as THREE.MeshStandardMaterial).clone();
+          c.emissive = new THREE.Color('#ffcc33');
+          c.emissiveIntensity = 0.22;
+          return c;
+        };
         m.traverse((o) => {
           const mesh = o as THREE.Mesh;
-          if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+          if (!mesh.isMesh) return;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          if (isSel) mesh.material = Array.isArray(mesh.material) ? mesh.material.map(highlight) : highlight(mesh.material);
         });
         m.userData = { dynamic: true, selectId: p.id };
-        if (isSel) m.traverse((o) => {
-          const mesh = o as THREE.Mesh;
-          if (mesh.isMesh && mesh.material) {
-            const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
-            mat.emissive = new THREE.Color('#ffcc33'); mat.emissiveIntensity = 0.25;
-          }
-        });
         scene.add(m);
         continue;
       }
@@ -524,19 +594,21 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const beamRadAtBase = Math.tan((fieldAngle / 2) * (Math.PI / 180)) * coneHeight;
       const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
-      if (!hidden && coneHeight > 0.1) {
+      // In the photo view a beam is only visible where there's haze in the air
+      // (just like reality) – the shaft fades out as haze → 0.
+      if (!hidden && coneHeight > 0.1 && (!photoMode || haze > 0.01)) {
         const coneGeo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
         // Shift geometry so tip is at local origin (tip at y=+h/2, base at y=-h/2)
         coneGeo.translate(0, -coneHeight / 2, 0);
 
-        // Photo mode: additively-blended haze so the beam reads as a volumetric
-        // shaft (bloom then turns the bright core into a glow). Only the back
-        // faces are drawn so the shaft doesn't wash out subjects in front of it.
-        const volA = 0.04 + 0.08 * (f.dimming / 100);
+        // Photo mode: additive haze shaft scaled by the haze amount; bloom then
+        // turns the bright core into a glow. Back faces only so the shaft
+        // doesn't wash out subjects in front of it.
+        const volA = (0.05 + 0.10 * (f.dimming / 100)) * Math.min(1.2, haze * 4);
         const coneMat = new THREE.MeshBasicMaterial({
           color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
           transparent: true,
-          opacity: photoMode ? (isSel ? Math.max(volA, 0.04) : volA) : (isSel ? Math.max(dimOpacity, 0.02) : dimOpacity),
+          opacity: photoMode ? volA : (isSel ? Math.max(dimOpacity, 0.02) : dimOpacity),
           side: photoMode ? THREE.BackSide : THREE.DoubleSide,
           depthWrite: false,
           blending: photoMode ? THREE.AdditiveBlending : THREE.NormalBlending,
@@ -574,6 +646,44 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
           spot.shadow.camera.near = 0.5;
           spot.shadow.camera.far = Math.max(20, coneHeight * 2 + 10);
           spot.shadow.focus = 1;
+
+          // Flügeltore: invisible shadow-casting flaps 1 m in front of the lens
+          // cut the beam for real, at the same angle the heat-map uses
+          // ((1−closure)·fieldHalf), oriented in the fixture's own frame.
+          if (f.barnDoors) {
+            const bd = f.barnDoors;
+            const aN = aimPos.clone().sub(fixturePos).normalize();
+            let right = new THREE.Vector3().crossVectors(aN, new THREE.Vector3(0, 1, 0));
+            if (right.lengthSq() < 1e-6) right.set(1, 0, 0); else right.normalize();
+            const up = new THREE.Vector3().crossVectors(right, aN).normalize();
+            const br = (f.bodyRotation || 0) * Math.PI / 180;
+            const cb = Math.cos(br), sb = Math.sin(br);
+            const R = right.clone().multiplyScalar(cb).add(up.clone().multiplyScalar(sb));
+            const U = right.clone().multiplyScalar(-sb).add(up.clone().multiplyScalar(cb));
+            const L = 1.0;
+            const fieldHalf = (fieldAngle / 2) * Math.PI / 180;
+            const apR = Math.tan(fieldHalf) * L;
+            const base = fixturePos.clone().add(aN.clone().multiplyScalar(L));
+            const zAxis = new THREE.Vector3().crossVectors(R, U).normalize();
+            const flapQuat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(R, U, zAxis));
+            const flapMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
+            const addFlap = (closure: number, dir: THREE.Vector3, wide: boolean) => {
+              if (closure <= 0) return;
+              const cut = Math.tan((1 - closure) * fieldHalf) * L;
+              const ext = apR * 2.5, width = apR * 6;
+              const center = base.clone().add(dir.clone().multiplyScalar(cut + ext / 2));
+              const m = new THREE.Mesh(new THREE.PlaneGeometry(wide ? width : ext, wide ? ext : width), flapMat);
+              m.castShadow = true;
+              m.quaternion.copy(flapQuat);
+              m.position.copy(center);
+              m.userData = { dynamic: true };
+              group.add(m);
+            };
+            addFlap(bd.top || 0, U, true);
+            addFlap(bd.bottom || 0, U.clone().negate(), true);
+            addFlap(bd.right || 0, R, false);
+            addFlap(bd.left || 0, R.clone().negate(), false);
+          }
         }
         group.add(spot);
         group.add(spot.target);
@@ -588,6 +698,20 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       group.add(new THREE.Line(lineGeo, lineMat));
 
       scene.add(group);
+    }
+
+    // Placeable cameras – a marker + sight line (so you can see the viewpoints).
+    for (const cam of cameras) {
+      const isSel = selectedIds.has(cam.id);
+      const g = new THREE.Group();
+      g.userData = { dynamic: true, selectId: cam.id };
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.28, 0.5), new THREE.MeshStandardMaterial({ color: isSel ? '#ffcc33' : '#26c6da' }));
+      body.position.set(cam.x, cam.height, cam.y);
+      body.rotation.y = -Math.atan2(cam.aimY - cam.y, cam.aimX - cam.x);
+      g.add(body);
+      const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(cam.x, cam.height, cam.y), new THREE.Vector3(cam.aimX, 0.9, cam.aimY)]);
+      g.add(new THREE.Line(lg, new THREE.LineBasicMaterial({ color: '#26c6da', transparent: true, opacity: 0.6 })));
+      scene.add(g);
     }
 
     // ── 3D Heatmap on the ground, sized to cover the actual rig ──
@@ -666,7 +790,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, personModel]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, personModel]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {
@@ -683,6 +807,16 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       if (photoModeRef.current) { s.renderer.toneMappingExposure = exposureRef.current; s.composer.render(); }
       else s.renderer.render(s.scene, s.camera);
       return s.renderer.domElement;
+    },
+    lookThroughCamera: (cam) => {
+      const s = sceneRef.current;
+      if (!s) return;
+      s.camera.fov = cam.fov;
+      s.camera.updateProjectionMatrix();
+      s.camera.position.set(cam.x, cam.height, cam.y);
+      s.controls.target.set(cam.aimX, 0.9, cam.aimY); // look slightly above the floor
+      s.controls.update();
+      framedRef.current = true; // keep this view; don't auto-frame over it
     },
   }));
 

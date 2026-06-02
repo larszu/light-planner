@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey } from './types';
-import { convexHull } from './utils/geometry';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView } from './types';
+import { convexHull } from './core/geometry';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import PlanCanvas from './components/PlanCanvas';
@@ -12,9 +12,9 @@ import ScenePanel from './components/ScenePanel';
 import LayersPanel from './components/LayersPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
-import { autoPatch, findPatchConflicts } from './utils/patch';
-import { generate3PointLighting, generateAreaLighting } from './utils/autoLighting';
-import type { ThreePointConfig, AreaLightConfig, LightArea } from './utils/autoLighting';
+import { autoPatch, findPatchConflicts } from './core/patch';
+import { generate3PointLighting, generateAreaLighting } from './core/autoLighting';
+import type { ThreePointConfig, AreaLightConfig, LightArea } from './core/autoLighting';
 import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
@@ -22,7 +22,9 @@ import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
 import MenuBar from './components/MenuBar';
 import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
-import { saveBlobToFile, openTextFile } from './utils/fileSave';
+import { useHost } from './integration/hostContext';
+import { useUiStore } from './store/uiStore';
+import { useProjectStore } from './store/projectStore';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 
@@ -88,15 +90,25 @@ const App: React.FC = () => {
   const [stageElements, setStageElements] = useState<StageElement[]>([]);
   const [customFixtures, setCustomFixtures] = useState<Fixture[]>([]);
   const [activeTool, setActiveTool] = useState<Tool>('select');
-  const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [fixtureToPlace, setFixtureToPlace] = useState<Fixture | null>(null);
-  const [showHeatMap, setShowHeatMap] = useState(false);
-  const [heatMapScale, setHeatMapScale] = useState(1000);
-  const [heatMapTarget, setHeatMapTarget] = useState(0);
-  const [photoMode, setPhotoMode] = useState(false);
-  const [exposure, setExposure] = useState(1.0);
+  // ── View / display settings live in the zustand uiStore ──
+  const viewMode = useUiStore((s) => s.viewMode);
+  const setViewMode = useUiStore((s) => s.setViewMode);
+  const showHeatMap = useUiStore((s) => s.showHeatMap);
+  const toggleHeatMap = useUiStore((s) => s.toggleHeatMap);
+  const heatMapScale = useUiStore((s) => s.heatMapScale);
+  const setHeatMapScale = useUiStore((s) => s.setHeatMapScale);
+  const heatMapTarget = useUiStore((s) => s.heatMapTarget);
+  const setHeatMapTarget = useUiStore((s) => s.setHeatMapTarget);
+  const photoMode = useUiStore((s) => s.photoMode);
+  const togglePhotoMode = useUiStore((s) => s.togglePhotoMode);
+  const exposure = useUiStore((s) => s.exposure);
+  const setExposure = useUiStore((s) => s.setExposure);
+  const haze = useUiStore((s) => s.haze);
+  const setHaze = useUiStore((s) => s.setHaze);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
+  const [cameras, setCameras] = useState<CameraView[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
   const [cursorLux, setCursorLux] = useState<number | null>(null);
   const [showThreePointDialog, setShowThreePointDialog] = useState(false);
@@ -109,7 +121,8 @@ const App: React.FC = () => {
   const [ceilings, setCeilings] = useState<Ceiling[]>([]);
   const [planMode, setPlanMode] = useState<PlanMode>('none');
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
-  const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
+  const snapStep = useUiStore((s) => s.snapStep);
+  const toggleSnap = useUiStore((s) => s.toggleSnap);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -122,6 +135,7 @@ const App: React.FC = () => {
   const scene3DRef = useRef<Scene3DHandle>(null);
   const exportCounterRef = useRef(1);
   const defaultMountingHeight = 6;
+  const host = useHost(); // platform seam: files / export / AI
 
   // ── Undo / Redo ──
   interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[]; trusses: Truss[]; walls: Wall[]; ceilings: Ceiling[] }
@@ -266,7 +280,7 @@ const App: React.FC = () => {
   // ── Person handlers ──
   const handleAddPerson = useCallback((x: number, y: number) => {
     pushHistory();
-    const p: Person = { id: uid('per'), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, height: 1.75, label: '' };
+    const p: Person = { id: uid('per'), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, height: 1.75, label: '', pose: 'standing', facing: 270 };
     setPersons((prev) => [...prev, p]);
     setSelectedIds(new Set([p.id]));
   }, []);
@@ -297,8 +311,59 @@ const App: React.FC = () => {
 
   const handleMoveStageElement = useCallback((id: string, x: number, y: number) => {
     pushHistoryThrottled();
-    setStageElements((prev) => prev.map((s) => (s.id === id ? { ...s, x, y } : s)));
+    setStageElements((prev) => prev.map((s) => {
+      if (s.id !== id) return s;
+      // A polygon stage shifts all its outline points with the bounding box.
+      if (s.points) { const dx = x - s.x, dy = y - s.y; return { ...s, x, y, points: s.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) }; }
+      return { ...s, x, y };
+    }));
   }, [pushHistoryThrottled]);
+
+  // ── Placeable cameras ──
+  const handleAddCamera = useCallback((x: number, y: number) => {
+    pushHistory();
+    const cam: CameraView = { id: uid('cam'), x, y, height: 1.6, aimX: x, aimY: Math.round((y + 6) * 10) / 10, fov: 50, label: '' };
+    setCameras((prev) => [...prev, cam]);
+    setSelectedIds(new Set([cam.id]));
+  }, [pushHistory]);
+  const handleMoveCamera = useCallback((id: string, x: number, y: number) => {
+    pushHistoryThrottled();
+    setCameras((prev) => prev.map((c) => (c.id === id ? { ...c, x, y } : c)));
+  }, [pushHistoryThrottled]);
+  const handleMoveCameraAim = useCallback((id: string, aimX: number, aimY: number) => {
+    pushHistoryThrottled();
+    setCameras((prev) => prev.map((c) => (c.id === id ? { ...c, aimX, aimY } : c)));
+  }, [pushHistoryThrottled]);
+  const handleUpdateCamera = useCallback((id: string, updates: Partial<CameraView>) => {
+    pushHistoryThrottled();
+    setCameras((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+  }, [pushHistoryThrottled]);
+  const handleLookThroughCamera = useCallback((id: string) => {
+    const cam = cameras.find((c) => c.id === id);
+    if (!cam) return;
+    setViewMode('3d');
+    // Scene3D loads lazily; retry until its imperative handle is ready.
+    const tryLook = (n = 0) => {
+      if (scene3DRef.current) scene3DRef.current.lookThroughCamera(cam);
+      else if (n < 60) setTimeout(() => tryLook(n + 1), 50);
+    };
+    tryLook();
+  }, [cameras]);
+
+  const handleAddStagePolygon = useCallback((points: { x: number; y: number }[]) => {
+    if (points.length < 3) return;
+    pushHistory();
+    const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const r = (v: number) => Math.round(v * 10) / 10;
+    const se: StageElement = {
+      id: uid('stg'), type: 'custom',
+      x: r(minX), y: r(minY), width: Math.max(0.1, r(maxX - minX)), depth: Math.max(0.1, r(maxY - minY)),
+      height: 0.4, rotation: 0, points: points.map((p) => ({ x: r(p.x), y: r(p.y) })), label: '',
+    };
+    setStageElements((prev) => [...prev, se]);
+    setSelectedIds(new Set([se.id]));
+  }, [pushHistory]);
 
   const handleUpdateStageElement = useCallback((id: string, updates: Partial<StageElement>) => {
     pushHistoryThrottled();
@@ -380,6 +445,7 @@ const App: React.FC = () => {
     setTrusses((prev) => prev.filter((t) => t.id !== id));
     setWalls((prev) => prev.filter((w) => w.id !== id));
     setCeilings((prev) => prev.filter((c) => c.id !== id));
+    setCameras((prev) => prev.filter((c) => c.id !== id));
     setFixtureGroups((prev) => prev.map((g) => ({ ...g, fixtureIds: g.fixtureIds.filter((fid) => fid !== id) })).filter((g) => g.fixtureIds.length > 0));
     setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
   }, []);
@@ -579,6 +645,7 @@ const App: React.FC = () => {
       walls,
       ceilings,
       scenes,
+      cameras,
       layers,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
@@ -589,7 +656,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, layers, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -606,6 +673,7 @@ const App: React.FC = () => {
     setScenes(data.scenes ?? []);
     setActiveSceneId(null);
     preSceneRef.current = null;
+    setCameras(data.cameras ?? []);
     setLayers(data.layers ?? DEFAULT_LAYERS);
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
@@ -839,34 +907,33 @@ const App: React.FC = () => {
     // download fallback when the File System Access API isn't available).
     if (format === 'pdf') {
       const bytes = dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
-      await saveBlobToFile(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
+      await host.exportFile(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
     } else {
       const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
       const blob = await new Promise<Blob | null>((res) => canvas.toBlob((b) => res(b), mime, 0.92));
       if (blob) {
         const accept: Record<string, string[]> = format === 'jpg' ? { 'image/jpeg': ['.jpg', '.jpeg'] } : { 'image/png': ['.png'] };
-        await saveBlobToFile(blob, `${base}.${format}`, accept);
+        await host.exportFile(blob, `${base}.${format}`, accept);
       }
     }
-  }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget]);
+  }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget, host]);
 
-  // ── Project save/load to a real file (user picks the location) ──
+  // ── Project save/load to a real file (the host decides where) ──
   const handleSaveToFile = useCallback(async () => {
     const now = new Date().toISOString();
     const meta: ProjectMeta = projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now };
     const data: ProjectData = {
       meta: { ...meta, updatedAt: now },
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
-      trusses, walls, ceilings, scenes, layers,
+      trusses, walls, ceilings, scenes, cameras, layers,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
-    await saveBlobToFile(blob, `${safe}.lightplan.json`, { 'application/json': ['.json'] });
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, layers, floorPlan]);
+    await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, host]);
 
   const handleLoadFromFile = useCallback(async () => {
-    const res = await openTextFile({ 'application/json': ['.json'] });
+    const res = await host.openProjectFile();
     if (!res) return;
     try {
       const raw = JSON.parse(res.text);
@@ -879,7 +946,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projektdatei konnte nicht geladen werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [handleLoadProject]);
+  }, [handleLoadProject, host]);
 
   const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
   const handleMoveShape = useCallback((id: string, dx: number, dy: number) => {
@@ -961,6 +1028,17 @@ const App: React.FC = () => {
     walls: walls.length, floorPlan: floorPlan ? 1 : 0,
   };
 
+  // Publish the live lighting document to the zustand projectStore so a host
+  // (Cable-Planner) can read/subscribe to the current plan (e.g. pull fixtures
+  // as equipment, or embed it in its own project file).
+  useEffect(() => {
+    useProjectStore.getState().setDocument({
+      fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
+      trusses, walls, ceilings, scenes, cameras, layers,
+      floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+    }, projectMeta ?? null);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, projectMeta]);
+
   return (
     <div className="app">
       <MenuBar
@@ -979,8 +1057,8 @@ const App: React.FC = () => {
         onDuplicate={handleDuplicate}
         onOpenSchedule={() => setScheduleOpen(true)}
         onViewModeChange={setViewMode}
-        onToggleHeatMap={() => setShowHeatMap((v) => !v)}
-        onToggleSnap={() => setSnapStep((s) => (s > 0 ? 0 : 0.5))}
+        onToggleHeatMap={toggleHeatMap}
+        onToggleSnap={toggleSnap}
         onAbout={() => setAboutOpen(true)}
       />
       <Toolbar
@@ -990,14 +1068,16 @@ const App: React.FC = () => {
         heatMapScale={heatMapScale}
         onToolChange={handleToolChange}
         onViewModeChange={setViewMode}
-        onToggleHeatMap={() => setShowHeatMap((v) => !v)}
+        onToggleHeatMap={toggleHeatMap}
         heatMapTarget={heatMapTarget}
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
         photoMode={photoMode}
         exposure={exposure}
-        onTogglePhotoMode={() => setPhotoMode((v) => !v)}
+        haze={haze}
+        onTogglePhotoMode={togglePhotoMode}
         onExposureChange={setExposure}
+        onHazeChange={setHaze}
         onUploadFloorPlan={handleUploadFloorPlan}
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
@@ -1015,7 +1095,7 @@ const App: React.FC = () => {
         onLoadProject={() => setProjectDialogMode('load')}
         onOpenSchedule={() => setScheduleOpen(true)}
         snapEnabled={snapStep > 0}
-        onToggleSnap={() => setSnapStep((s) => (s > 0 ? 0 : 0.5))}
+        onToggleSnap={toggleSnap}
         hasPersons={persons.length > 0}
         hasStageElements={stageElements.length > 0}
         hasSelection={selectedIds.size > 0}
@@ -1061,6 +1141,11 @@ const App: React.FC = () => {
               onMovePerson={handleMovePerson}
               onMoveStageElement={handleMoveStageElement}
               onUpdateStageElement={handleUpdateStageElement}
+              onAddStagePolygon={handleAddStagePolygon}
+              cameras={cameras}
+              onAddCamera={handleAddCamera}
+              onMoveCamera={handleMoveCamera}
+              onMoveCameraAim={handleMoveCameraAim}
               onAddTruss={handleAddTruss}
               onMoveTruss={handleMoveTruss}
               onAddWall={handleAddWall}
@@ -1086,12 +1171,14 @@ const App: React.FC = () => {
                 ceilings={ceilings}
                 floorPlan={floorPlan}
                 layers={layers}
+                cameras={cameras}
                 selectedIds={selectedIds}
                 showHeatMap={showHeatMap}
                 heatMapScale={heatMapScale}
                 heatMapTarget={heatMapTarget}
                 photoMode={photoMode}
                 exposure={exposure}
+                haze={haze}
                 onSelect={handleSelectWithGroups}
               />
             </Suspense>
@@ -1107,6 +1194,16 @@ const App: React.FC = () => {
           {activeTool === 'wall' && viewMode === '2d' && (
             <div className="placing-hint">
               🧱 <strong>Wand-Pfad</strong>: Punkte nacheinander klicken · Startpunkt klicken schließt den Raum · <kbd>Shift</kbd> = 15°-Winkel · Doppelklick/<kbd>ESC</kbd> beendet
+            </div>
+          )}
+          {activeTool === 'stagepoly' && viewMode === '2d' && (
+            <div className="placing-hint">
+              ⬠ <strong>Bühne (Polygon)</strong>: Eckpunkte klicken · Startpunkt klicken oder Doppelklick/<kbd>Enter</kbd> schließt die Fläche · <kbd>ESC</kbd> bricht ab
+            </div>
+          )}
+          {activeTool === 'camera' && viewMode === '2d' && (
+            <div className="placing-hint">
+              🎥 <strong>Kamera</strong>: Klicke, um eine Kamera zu setzen · dann Blickziel &amp; Bildwinkel einstellen und „Durch Kamera schauen"
             </div>
           )}
           {planMode === 'calibrate' && viewMode === '2d' && (
@@ -1157,6 +1254,7 @@ const App: React.FC = () => {
           walls={walls}
           ceilings={ceilings}
           shapes={shapes}
+          cameras={cameras}
           selectedIds={selectedIds}
           cursorLux={cursorLux}
           patchConflicts={patchConflicts}
@@ -1166,6 +1264,8 @@ const App: React.FC = () => {
           onUpdateTruss={handleUpdateTruss}
           onUpdateWall={handleUpdateWall}
           onUpdateCeiling={handleUpdateCeiling}
+          onUpdateCamera={handleUpdateCamera}
+          onLookThroughCamera={handleLookThroughCamera}
           onDelete={handleDelete}
           onAutoThreePointForPerson={handleAutoThreePointForPerson}
           onAreaLight={() => setAreaLightOpen(true)}
@@ -1174,6 +1274,7 @@ const App: React.FC = () => {
       {showThreePointDialog && (
         <ThreePointDialog
           targetLux={heatMapTarget}
+          trusses={trusses}
           onGenerate={handleAutoThreePointConfigured}
           onCancel={() => setShowThreePointDialog(false)}
         />
@@ -1189,6 +1290,7 @@ const App: React.FC = () => {
         <AreaLightDialog
           area={lightArea}
           defaultTargetLux={heatMapTarget}
+          trusses={trusses}
           onGenerate={handleAreaLight}
           onCancel={() => setAreaLightOpen(false)}
         />
