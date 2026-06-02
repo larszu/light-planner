@@ -5,6 +5,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
@@ -13,6 +15,24 @@ import { sampleWall, isCurved } from '../utils/geometry';
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
 const LIGHT_K = 0.0016;
+
+// A real (textured) human model, loaded once and reused for the photo view so
+// people cast and receive real shadows. Falls back to the simple cylinder when
+// it isn't loaded (or in the non-photo view).
+interface PersonModel { scene: THREE.Group; height: number; minY: number }
+let personModelPromise: Promise<PersonModel> | null = null;
+function loadPersonModel(): Promise<PersonModel> {
+  if (!personModelPromise) {
+    const url = `${import.meta.env.BASE_URL}models/person.glb`;
+    personModelPromise = new GLTFLoader().loadAsync(url).then((g) => {
+      const scene = g.scene;
+      scene.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(scene);
+      return { scene, height: Math.max(0.1, box.max.y - box.min.y), minY: box.min.y };
+    });
+  }
+  return personModelPromise;
+}
 
 export interface Scene3DHandle {
   screenshot: () => string | null;
@@ -56,6 +76,11 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
   // Photo-realism flags read by the animation loop without re-creating it.
   const photoModeRef = useRef(photoMode);
   const exposureRef = useRef(exposure);
+  // Real human model for the photo view (lazy-loaded on first use).
+  const [personModel, setPersonModel] = React.useState<PersonModel | null>(null);
+  useEffect(() => {
+    if (photoMode && !personModel) loadPersonModel().then(setPersonModel).catch(() => { /* keep fallback */ });
+  }, [photoMode, personModel]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -409,6 +434,29 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         }
       }
 
+      // Photo view: a real, textured human that casts & receives real shadows.
+      if (photoMode && personModel) {
+        const m = cloneSkeleton(personModel.scene) as THREE.Group;
+        const s = p.height / personModel.height;
+        m.scale.setScalar(s);
+        m.position.set(p.x, floorH - personModel.minY * s, p.y);
+        m.rotation.y = Math.PI; // face toward −Z (typical "downstage")
+        m.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+        });
+        m.userData = { dynamic: true, selectId: p.id };
+        if (isSel) m.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (mesh.isMesh && mesh.material) {
+            const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
+            mat.emissive = new THREE.Color('#ffcc33'); mat.emissiveIntensity = 0.25;
+          }
+        });
+        scene.add(m);
+        continue;
+      }
+
       const bodyH = p.height * 0.75;
       const headR = p.height * 0.1;
       const bodyGeo = new THREE.CylinderGeometry(0.18, 0.18, bodyH, 12);
@@ -617,7 +665,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, personModel]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {
