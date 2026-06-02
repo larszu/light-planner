@@ -112,6 +112,9 @@ const PlanCanvas: React.FC<Props> = ({
   const heatMapCacheRef = useRef<{ imageData: ImageData | null; key: string }>({ imageData: null, key: '' });
   const animFrameRef = useRef<number>(0);
   const spaceDownRef = useRef(false);
+  // Screen pos of the last fixture pick, to detect repeated clicks on the same
+  // spot for cycling through overlapping fixtures.
+  const lastPickRef = useRef<{ x: number; y: number } | null>(null);
 
   const screenToWorld = useCallback((sx: number, sy: number): [number, number] => {
     const v = viewRef.current;
@@ -572,6 +575,18 @@ const PlanCanvas: React.FC<Props> = ({
       drawFixtureSymbol(ctx, f.fixture.category, rad, isSel, v.scale);
       ctx.restore();
 
+      // Stack badge: when this (selected) fixture overlaps others, show how
+      // many sit here and hint that clicking again cycles through them.
+      if (isSel) {
+        const stack = fixtures.reduce((n, o) => n + (Math.hypot(o.x - f.x, o.y - f.y) < 0.5 ? 1 : 0), 0);
+        if (stack > 1) {
+          ctx.fillStyle = '#4fc3f7';
+          ctx.font = `bold ${10 / v.scale}px sans-serif`;
+          ctx.textAlign = 'left';
+          ctx.fillText(`⇅${stack}`, f.x + rad + 3 / v.scale, f.y - rad);
+        }
+      }
+
       // Labels
       ctx.fillStyle = '#ddd';
       ctx.font = `${10 / v.scale}px sans-serif`;
@@ -800,22 +815,44 @@ const PlanCanvas: React.FC<Props> = ({
         }
       }
       const cr = 0.5;
-      for (const f of fixtures) {
-        if (Math.sqrt((wx - f.x) ** 2 + (wy - f.y) ** 2) < cr) {
-          const already = selectedIds.has(f.id);
-          if (ctrl) {
-            onSelect(f.id, true);          // toggle in/out of the selection
-            if (already) return;           // toggled out → nothing to drag
-          } else if (!already) {
-            onSelect(f.id, false);         // fresh single selection
-          }
-          // If it was already part of a multi-selection, keep the whole
-          // selection so the group can be dragged together; collapse to this
-          // one only on a click without movement (handled on mouse-up).
-          dragRef.current = { type: 'move', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy,
-            targetId: f.id, pendingSelectId: already && !ctrl ? f.id : undefined };
+      // All fixtures under the cursor, nearest first — so overlapping lamps
+      // can be told apart and cycled through.
+      const candidates = fixtures
+        .map((f) => ({ f, d: Math.hypot(wx - f.x, wy - f.y) }))
+        .filter((c) => c.d < cr)
+        .sort((a, b) => a.d - b.d)
+        .map((c) => c.f);
+
+      if (candidates.length > 0) {
+        const samePlace = !!lastPickRef.current
+          && Math.hypot(sx - lastPickRef.current.x, sy - lastPickRef.current.y) < 8;
+        lastPickRef.current = { x: sx, y: sy };
+
+        // Repeated click on the same spot with a single fixture selected →
+        // step to the next lamp in the stack (so you can reach the one beneath).
+        const cycling = samePlace && candidates.length > 1 && selectedIds.size === 1
+          && candidates.some((f) => selectedIds.has(f.id));
+        if (cycling) {
+          const curIdx = candidates.findIndex((f) => selectedIds.has(f.id));
+          const next = candidates[(curIdx + 1) % candidates.length];
+          onSelect(next.id, false);
+          dragRef.current = { type: 'move', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: next.id };
           return;
         }
+
+        const target = candidates[0]; // nearest to the cursor
+        const already = selectedIds.has(target.id);
+        if (ctrl) {
+          onSelect(target.id, true);     // toggle in/out of the selection
+          if (already) return;           // toggled out → nothing to drag
+        } else if (!already) {
+          onSelect(target.id, false);    // fresh single selection
+        }
+        // If already part of a multi-selection, keep the whole selection so it
+        // can be dragged together; collapse to this one on a click w/o movement.
+        dragRef.current = { type: 'move', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy,
+          targetId: target.id, pendingSelectId: already && !ctrl ? target.id : undefined };
+        return;
       }
       for (const p of persons) {
         if (Math.sqrt((wx - p.x) ** 2 + (wy - p.y) ** 2) < 0.4) {
