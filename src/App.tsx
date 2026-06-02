@@ -6,10 +6,16 @@ import PlanCanvas from './components/PlanCanvas';
 import PropertyPanel from './components/PropertyPanel';
 import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
+import FloorPlanPanel from './components/FloorPlanPanel';
+import ScaleDialog from './components/ScaleDialog';
 import { generate3PointLighting, generateEvenDistribution } from './utils/autoLighting';
 import type { ThreePointConfig } from './utils/autoLighting';
 import type { Scene3DHandle } from './components/Scene3D';
+import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
+import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
+
+export type PlanMode = 'none' | 'calibrate' | 'move';
 
 const Scene3D = lazy(() => import('./components/Scene3D'));
 
@@ -36,6 +42,9 @@ const App: React.FC = () => {
   const [projectMeta, setProjectMeta] = useState<ProjectMeta | undefined>(undefined);
   const [projectId, setProjectId] = useState<string>('proj-' + Date.now());
   const [fixtureGroups, setFixtureGroups] = useState<FixtureGroup[]>([]);
+  const [planMode, setPlanMode] = useState<PlanMode>('none');
+  const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
+  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const scene3DRef = useRef<Scene3DHandle>(null);
   const exportCounterRef = useRef(1);
   const defaultMountingHeight = 6;
@@ -88,6 +97,14 @@ const App: React.FC = () => {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [handleUndo, handleRedo]);
+
+  // Leave plan-edit modes on Escape, and whenever we drop into the 3D view.
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setPlanMode('none'); };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, []);
+  useEffect(() => { if (viewMode === '3d') setPlanMode('none'); }, [viewMode]);
 
   // ── Selection helpers ──
   const selectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
@@ -427,20 +444,103 @@ const App: React.FC = () => {
     deleteProjectFromStorage(id);
   }, []);
 
-  // ── Floor plan ──
+  // ── Floor plan (JPG / PNG / PDF building plans) ──
   const handleUploadFloorPlan = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
+    loadFloorPlanFile(file)
+      .then((loaded) => {
+        pdfDocRef.current = loaded.pdf ?? null;
         const widthMeters = 20;
-        const heightMeters = (img.height / img.width) * widthMeters;
-        setFloorPlan({ image: img, widthMeters, heightMeters });
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
+        const heightMeters = (loaded.naturalHeight / loaded.naturalWidth) * widthMeters;
+        setFloorPlan({
+          image: loaded.image,
+          src: loaded.src,
+          name: file.name,
+          widthMeters,
+          heightMeters,
+          naturalWidth: loaded.naturalWidth,
+          naturalHeight: loaded.naturalHeight,
+          offsetX: 0,
+          offsetY: 0,
+          opacity: 0.7,
+          locked: false,
+          kind: loaded.kind,
+          pageCount: loaded.pageCount,
+          pageIndex: loaded.pageIndex,
+        });
+        setPlanMode('none');
+      })
+      .catch((err) => {
+        console.error(err);
+        window.alert(`Grundriss konnte nicht geladen werden:\n${err?.message ?? err}`);
+      });
   }, []);
+
+  const handleUpdateFloorPlan = useCallback((updates: Partial<FloorPlan>) => {
+    setFloorPlan((prev) => (prev ? { ...prev, ...updates } : prev));
+  }, []);
+
+  const handleRemoveFloorPlan = useCallback(() => {
+    pdfDocRef.current = null;
+    setFloorPlan(null);
+    setPlanMode('none');
+    setPendingCalibration(null);
+  }, []);
+
+  // Switch the visible page of a multi-page PDF, keeping scale & position.
+  const handleSetFloorPlanPage = useCallback((pageIndex: number) => {
+    const pdf = pdfDocRef.current;
+    if (!pdf) return;
+    renderPdfPage(pdf, pageIndex)
+      .then((rendered) => {
+        setFloorPlan((prev) => prev && {
+          ...prev,
+          image: rendered.image,
+          src: rendered.src,
+          naturalWidth: rendered.naturalWidth,
+          naturalHeight: rendered.naturalHeight,
+          heightMeters: (rendered.naturalHeight / rendered.naturalWidth) * prev.widthMeters,
+          pageIndex,
+        });
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
+  // Set the plan width directly; height follows the bitmap aspect ratio.
+  const handleSetFloorPlanWidth = useCallback((widthMeters: number) => {
+    if (!(widthMeters > 0)) return;
+    setFloorPlan((prev) => prev && {
+      ...prev,
+      widthMeters: Math.round(widthMeters * 100) / 100,
+      heightMeters: Math.round((prev.naturalHeight / prev.naturalWidth) * widthMeters * 100) / 100,
+    });
+  }, []);
+
+  // Called by the canvas after the user drags a reference segment in
+  // calibrate mode. We remember the measured length + an anchor point and let
+  // the user type the real-world distance.
+  const handleCalibrateSegment = useCallback((x1: number, y1: number, x2: number, y2: number) => {
+    const meters = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    if (meters < 0.05) return;
+    setPendingCalibration({ meters, pivotX: x1, pivotY: y1 });
+    setPlanMode('none');
+  }, []);
+
+  // Apply a calibration: scale the plan so the measured segment equals the
+  // entered real length, anchored at the segment's start so it stays put.
+  const handleApplyScale = useCallback((realMeters: number) => {
+    const pending = pendingCalibration;
+    if (pending && realMeters > 0) {
+      const s = realMeters / pending.meters;
+      setFloorPlan((prev) => prev && {
+        ...prev,
+        widthMeters: Math.round(prev.widthMeters * s * 100) / 100,
+        heightMeters: Math.round(prev.heightMeters * s * 100) / 100,
+        offsetX: Math.round((pending.pivotX + (prev.offsetX - pending.pivotX) * s) * 100) / 100,
+        offsetY: Math.round((pending.pivotY + (prev.offsetY - pending.pivotY) * s) * 100) / 100,
+      });
+    }
+    setPendingCalibration(null);
+  }, [pendingCalibration]);
 
   const handleExport = useCallback(() => {
     const projName = projectMeta?.name || 'Lichtplan';
@@ -536,6 +636,9 @@ const App: React.FC = () => {
               onToolChange={setActiveTool}
               onDropFixture={handleDropFixture}
               onMoveAim={handleMoveAim}
+              planMode={planMode}
+              onUpdateFloorPlan={handleUpdateFloorPlan}
+              onCalibrateSegment={handleCalibrateSegment}
             />
           ) : (
             <Suspense fallback={<div className="loading-3d">3D-Ansicht wird geladen…</div>}>
@@ -560,6 +663,27 @@ const App: React.FC = () => {
               Klicke auf den Plan um <strong>{fixtureToPlace.name}</strong> zu platzieren · ESC zum Abbrechen
             </div>
           )}
+          {planMode === 'calibrate' && viewMode === '2d' && (
+            <div className="placing-hint plan-calibrate-hint">
+              📏 Ziehe eine Linie entlang einer <strong>bekannten Strecke</strong> (z.&nbsp;B. eine Wand) · ESC zum Abbrechen
+            </div>
+          )}
+          {planMode === 'move' && viewMode === '2d' && (
+            <div className="placing-hint plan-calibrate-hint">
+              ✋ Ziehe den Grundriss, um ihn auszurichten · ESC zum Beenden
+            </div>
+          )}
+          {floorPlan && viewMode === '2d' && (
+            <FloorPlanPanel
+              floorPlan={floorPlan}
+              planMode={planMode}
+              onSetMode={setPlanMode}
+              onSetWidth={handleSetFloorPlanWidth}
+              onSetPage={handleSetFloorPlanPage}
+              onUpdate={handleUpdateFloorPlan}
+              onRemove={handleRemoveFloorPlan}
+            />
+          )}
         </div>
         <PropertyPanel
           fixtures={fixtures}
@@ -579,6 +703,13 @@ const App: React.FC = () => {
           targetLux={heatMapTarget}
           onGenerate={handleAutoThreePointConfigured}
           onCancel={() => setShowThreePointDialog(false)}
+        />
+      )}
+      {pendingCalibration && (
+        <ScaleDialog
+          measuredMeters={pendingCalibration.meters}
+          onApply={handleApplyScale}
+          onCancel={() => setPendingCalibration(null)}
         />
       )}
       {projectDialogMode && (
