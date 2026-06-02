@@ -268,7 +268,7 @@ const App: React.FC = () => {
   // ── Person handlers ──
   const handleAddPerson = useCallback((x: number, y: number) => {
     pushHistory();
-    const p: Person = { id: uid('per'), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, height: 1.75, label: '' };
+    const p: Person = { id: uid('per'), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, height: 1.75, label: '', pose: 'standing', facing: 270 };
     setPersons((prev) => [...prev, p]);
     setSelectedIds(new Set([p.id]));
   }, []);

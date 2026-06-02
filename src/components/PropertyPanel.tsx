@@ -559,6 +559,27 @@ const PropertyPanel: React.FC<Props> = ({
             <input type="text" value={p.label || ''} onChange={(e) => onUpdatePerson(p.id, { label: e.target.value })} />
           </label>
         </div>
+        <div className="prop-section">
+          <span className="prop-section-title">Haltung &amp; Blick (Foto-Ansicht)</span>
+          <label className="prop-field">
+            <span>Haltung</span>
+            <select value={p.pose ?? 'standing'} onChange={(e) => onUpdatePerson(p.id, { pose: e.target.value as 'standing' | 'sitting' })}>
+              <option value="standing">Stehend</option>
+              <option value="sitting">Sitzend</option>
+            </select>
+          </label>
+          <label className="prop-field">
+            <span>Blickrichtung ({Math.round(p.facing ?? 270)}°)</span>
+            <input type="range" min={0} max={360} step={5} value={p.facing ?? 270}
+              onChange={(e) => onUpdatePerson(p.id, { facing: Number(e.target.value) })} />
+          </label>
+          <div className="reflectance-presets">
+            {[['↑ Bühne', 90], ['↓ Publikum', 270], ['← Links', 180], ['→ Rechts', 0]].map(([lbl, v]) => (
+              <button key={lbl as string} className="refl-btn" onClick={() => onUpdatePerson(p.id, { facing: v as number })}>{lbl}</button>
+            ))}
+          </div>
+          <div className="prop-derived">Sitzend pairt gut mit einem Podest/Stuhl darunter. Wirkt im 3D-Foto-Modus.</div>
+        </div>
         <button className="auto-btn wide" onClick={() => onAutoThreePointForPerson(p.id)}>
           💡 3-Punkt-Licht erzeugen
         </button>

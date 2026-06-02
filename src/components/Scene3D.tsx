@@ -16,6 +16,24 @@ import { sampleWall, isCurved } from '../utils/geometry';
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
 const LIGHT_K = 0.0016;
 
+// Bend the standard (Mixamo/RPM) skeleton into a seated pose: thighs forward,
+// knees bent, slight forward lean + arms resting. Tuned for the bundled avatar.
+function applySitPose(root: THREE.Object3D) {
+  const rot = (name: string, x: number, z = 0) => {
+    const b = root.getObjectByName(name);
+    if (b) { b.rotation.x += x; if (z) b.rotation.z += z; }
+  };
+  rot('LeftUpLeg', -1.5, 0.12);
+  rot('RightUpLeg', -1.5, -0.12);
+  rot('LeftLeg', 1.55);
+  rot('RightLeg', 1.55);
+  rot('LeftFoot', 0.35);
+  rot('RightFoot', 0.35);
+  rot('Spine', 0.12);
+  rot('LeftArm', 0.25);
+  rot('RightArm', 0.25);
+}
+
 // A real (textured) human model, loaded once and reused for the photo view so
 // people cast and receive real shadows. Falls back to the simple cylinder when
 // it isn't loaded (or in the non-photo view).
@@ -486,8 +504,11 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         const m = cloneSkeleton(personModel.scene) as THREE.Group;
         const s = p.height / personModel.height;
         m.scale.setScalar(s);
-        m.position.set(p.x, floorH - personModel.minY * s, p.y);
-        m.rotation.y = Math.PI; // face toward −Z (typical "downstage")
+        // Facing: plan angle (0 = +X) → rotation about Y (model forward = +Z = plan +Y).
+        m.rotation.y = ((90 - (p.facing ?? 270)) * Math.PI) / 180;
+        const sitting = p.pose === 'sitting';
+        m.position.set(p.x, floorH - personModel.minY * s - (sitting ? 0.5 * s : 0), p.y);
+        if (sitting) applySitPose(m);
         const highlight = (mm: THREE.Material) => {
           const c = (mm as THREE.MeshStandardMaterial).clone();
           c.emissive = new THREE.Color('#ffcc33');

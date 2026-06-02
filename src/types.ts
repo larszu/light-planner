@@ -162,12 +162,16 @@ export interface Scene {
 }
 
 // ── Person on stage ──
+export type PersonPose = 'standing' | 'sitting';
+
 export interface Person {
   id: string;
   x: number;            // meters
   y: number;            // meters
   height: number;       // meters (default 1.75)
   label: string;
+  pose?: PersonPose;    // standing (default) or sitting (3D photo figure)
+  facing?: number;      // direction the person looks, degrees in plan (0 = +X). Default 270 (−Y / downstage)
 }
 
 // ── Stage elements (Podeste) ──

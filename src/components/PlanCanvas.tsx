@@ -610,6 +610,21 @@ const PlanCanvas: React.FC<Props> = ({
     if (layers.persons.visible) for (const p of persons) {
       const isSel = selectedIds.has(p.id);
       const r = 0.25;
+      // Facing arrow (direction the person looks).
+      const fa = ((p.facing ?? 270) * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(p.x + Math.cos(fa) * r, p.y + Math.sin(fa) * r);
+      ctx.lineTo(p.x + Math.cos(fa) * (r + 0.28), p.y + Math.sin(fa) * (r + 0.28));
+      ctx.strokeStyle = isSel ? '#ffcc33' : '#ff9633';
+      ctx.lineWidth = 2.5 / v.scale;
+      ctx.stroke();
+      ctx.beginPath();
+      const tip = { x: p.x + Math.cos(fa) * (r + 0.28), y: p.y + Math.sin(fa) * (r + 0.28) };
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(tip.x - Math.cos(fa - 0.5) * 0.13, tip.y - Math.sin(fa - 0.5) * 0.13);
+      ctx.lineTo(tip.x - Math.cos(fa + 0.5) * 0.13, tip.y - Math.sin(fa + 0.5) * 0.13);
+      ctx.closePath(); ctx.fillStyle = isSel ? '#ffcc33' : '#ff9633'; ctx.fill();
+      // Body (a ring; a square hint when sitting)
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fillStyle = isSel ? 'rgba(255,150,50,0.6)' : 'rgba(255,150,50,0.3)';
       ctx.fill();
@@ -622,7 +637,8 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.fillStyle = '#eee';
       ctx.font = `${11 / v.scale}px sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(p.label || `Person ${p.height}m`, p.x, p.y - r - 6 / v.scale);
+      const poseTag = p.pose === 'sitting' ? ' (sitzt)' : '';
+      ctx.fillText((p.label || `Person ${p.height}m`) + poseTag, p.x, p.y - r - 6 / v.scale);
       ctx.textAlign = 'start';
     }
 
