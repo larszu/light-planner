@@ -5,7 +5,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan } from '../types';
+import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
 import { sampleWall, isCurved } from '../utils/geometry';
@@ -27,6 +27,7 @@ interface Props {
   walls: Wall[];
   ceilings: Ceiling[];
   floorPlan: FloorPlan | null;
+  layers: Layers;
   selectedIds: Set<string>;
   showHeatMap: boolean;
   heatMapScale: number;
@@ -36,7 +37,7 @@ interface Props {
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -278,7 +279,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     });
 
     // Imported building plan textured onto the floor (matches 2D placement)
-    if (floorPlan) {
+    if (floorPlan && layers.floorPlan.visible) {
       const { offsetX, offsetY, widthMeters, heightMeters } = floorPlan;
       const tex = new THREE.Texture(floorPlan.image);
       tex.needsUpdate = true;
@@ -293,7 +294,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     }
 
     // Stage elements (podeste)
-    for (const se of stageElements) {
+    if (layers.stage.visible) for (const se of stageElements) {
       const geo = new THREE.BoxGeometry(se.width, se.height, se.depth);
       const isSel = selectedIds.has(se.id);
       const mat = new THREE.MeshStandardMaterial({
@@ -309,7 +310,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     }
 
     // Trusses (rigging / hanging positions)
-    for (const t of trusses) {
+    if (layers.trusses.visible) for (const t of trusses) {
       const len = Math.hypot(t.x2 - t.x1, t.y2 - t.y1);
       if (len < 0.05) continue;
       const isSel = selectedIds.has(t.id);
@@ -325,7 +326,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     }
 
     // Walls (vertical surfaces, straight or curved, that reflect light)
-    for (const w of walls) {
+    if (layers.walls.visible) for (const w of walls) {
       if (Math.hypot(w.x2 - w.x1, w.y2 - w.y1) < 0.05) continue;
       const isSel = selectedIds.has(w.id);
       const pts = sampleWall(w, isCurved(w) ? 18 : 1); // floor polyline
@@ -348,7 +349,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     }
 
     // Ceilings (translucent horizontal polygon at height)
-    for (const c of ceilings) {
+    if (layers.ceilings.visible) for (const c of ceilings) {
       if (c.points.length < 3) continue;
       const isSel = selectedIds.has(c.id);
       const pos: number[] = [];
@@ -368,7 +369,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     }
 
     // Persons (cylinder body + sphere head)
-    for (const p of persons) {
+    if (layers.persons.visible) for (const p of persons) {
       const isSel = selectedIds.has(p.id);
       const group = new THREE.Group();
       group.userData = { dynamic: true, selectId: p.id };
@@ -415,7 +416,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     }
 
     // Fixtures
-    for (const f of fixtures) {
+    if (layers.fixtures.visible) for (const f of fixtures) {
       const isSel = selectedIds.has(f.id);
       const hidden = !!f.hidden; // muted lamp: ghosted body, no beam
       const group = new THREE.Group();
@@ -589,7 +590,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
-import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling } from '../types';
+import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling, Layers } from '../types';
 import type { PlanMode } from '../App';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../utils/lightCalc';
 import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall } from '../utils/geometry';
@@ -15,6 +15,7 @@ interface Props {
   walls: Wall[];
   ceilings: Ceiling[];
   floorPlan: FloorPlan | null;
+  layers: Layers;
   snapStep: number;
   activeTool: Tool;
   fixtureToPlace: Fixture | null;
@@ -70,6 +71,7 @@ const PlanCanvas: React.FC<Props> = ({
   walls,
   ceilings,
   floorPlan,
+  layers,
   snapStep,
   activeTool,
   fixtureToPlace,
@@ -257,7 +259,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.stroke();
 
     // Floor plan (imported building plan)
-    if (floorPlan) {
+    if (floorPlan && layers.floorPlan.visible) {
       const { offsetX: ox, offsetY: oy, widthMeters: fw, heightMeters: fh } = floorPlan;
       ctx.globalAlpha = floorPlan.opacity;
       ctx.drawImage(floorPlan.image, ox, oy, fw, fh);
@@ -280,7 +282,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Stage elements
-    for (const se of stageElements) {
+    if (layers.stage.visible) for (const se of stageElements) {
       ctx.save();
       ctx.translate(se.x + se.width / 2, se.y + se.depth / 2);
       ctx.rotate((se.rotation * Math.PI) / 180);
@@ -341,7 +343,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Ceilings (overhead surface – shown as a dashed outline in plan view)
-    for (const c of ceilings) {
+    if (layers.ceilings.visible) for (const c of ceilings) {
       if (c.points.length < 3) continue;
       const isSel = selectedIds.has(c.id);
       ctx.beginPath();
@@ -366,7 +368,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Walls (architecture – reflect light back into the room; may be curved)
-    for (const wall of walls) {
+    if (layers.walls.visible) for (const wall of walls) {
       const isSel = selectedIds.has(wall.id);
       const curved = isCurved(wall);
       ctx.lineCap = 'round';
@@ -404,7 +406,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Trusses (rigging / hanging positions)
-    for (const t of trusses) {
+    if (layers.trusses.visible) for (const t of trusses) {
       const isSel = selectedIds.has(t.id);
       const dx = t.x2 - t.x1, dy = t.y2 - t.y1;
       const len = Math.hypot(dx, dy);
@@ -442,7 +444,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Shapes
-    for (const shape of shapes) {
+    if (layers.shapes.visible) for (const shape of shapes) {
       const isSelShape = selectedIds.has(shape.id);
       ctx.strokeStyle = isSelShape ? '#ffcc33' : (shape.color || '#5599ff');
       ctx.lineWidth = (isSelShape ? 3 : 2) / v.scale;
@@ -534,7 +536,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Persons
-    for (const p of persons) {
+    if (layers.persons.visible) for (const p of persons) {
       const isSel = selectedIds.has(p.id);
       const r = 0.25;
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -554,7 +556,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Fixtures
-    for (const f of fixtures) {
+    if (layers.fixtures.visible) for (const f of fixtures) {
       const isSel = selectedIds.has(f.id);
       const rad = 0.3;
 
@@ -810,7 +812,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -922,9 +924,11 @@ const PlanCanvas: React.FC<Props> = ({
 
     if (activeTool === 'select') {
       const ctrl = e.ctrlKey || e.metaKey;
+      // A layer that is hidden or locked is not pickable.
+      const pickable = (k: keyof Layers) => layers[k].visible && !layers[k].locked;
       // Check aim-point handles first (only for selected fixture)
       const aimHitR = 0.35;
-      for (const f of fixtures) {
+      if (pickable('fixtures')) for (const f of fixtures) {
         // Only grab the aim handle when it is actually offset from the body
         // (otherwise an invisible handle on a straight-down fixture would
         // swallow clicks meant to move/drag the fixture itself).
@@ -937,7 +941,7 @@ const PlanCanvas: React.FC<Props> = ({
       const cr = 0.5;
       // All fixtures under the cursor, nearest first — so overlapping lamps
       // can be told apart and cycled through.
-      const candidates = fixtures
+      const candidates = (pickable('fixtures') ? fixtures : [])
         .map((f) => ({ f, d: Math.hypot(wx - f.x, wy - f.y) }))
         .filter((c) => c.d < cr)
         .sort((a, b) => a.d - b.d)
@@ -974,21 +978,21 @@ const PlanCanvas: React.FC<Props> = ({
           targetId: target.id, pendingSelectId: already && !ctrl ? target.id : undefined };
         return;
       }
-      for (const p of persons) {
+      if (pickable('persons')) for (const p of persons) {
         if (Math.sqrt((wx - p.x) ** 2 + (wy - p.y) ** 2) < 0.4) {
           onSelect(p.id, ctrl);
           dragRef.current = { type: 'move-person', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: p.id };
           return;
         }
       }
-      for (const se of stageElements) {
+      if (pickable('stage')) for (const se of stageElements) {
         if (wx >= se.x && wx <= se.x + se.width && wy >= se.y && wy <= se.y + se.depth) {
           onSelect(se.id, ctrl);
           dragRef.current = { type: 'move-stage', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: se.id };
           return;
         }
       }
-      for (const t of trusses) {
+      if (pickable('trusses')) for (const t of trusses) {
         if (distToSegment(wx, wy, t.x1, t.y1, t.x2, t.y2) < 0.4) {
           onSelect(t.id, ctrl);
           dragRef.current = { type: 'move-truss', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: t.id };
@@ -996,7 +1000,7 @@ const PlanCanvas: React.FC<Props> = ({
         }
       }
       // Curve handle of the selected wall → bend it
-      for (const wall of walls) {
+      if (pickable('walls')) for (const wall of walls) {
         if (!selectedIds.has(wall.id)) continue;
         const hM = wallMidHandle(wall);
         if (Math.hypot(wx - hM.x, wy - hM.y) < 0.3) {
@@ -1004,7 +1008,7 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
-      for (const wall of walls) {
+      if (pickable('walls')) for (const wall of walls) {
         if (distToWall(wall, wx, wy) < 0.3) {
           onSelect(wall.id, ctrl);
           dragRef.current = { type: 'move-wall', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: wall.id };
@@ -1012,7 +1016,7 @@ const PlanCanvas: React.FC<Props> = ({
         }
       }
       // Ceiling outline → select (for editing height / reflectance / delete)
-      for (const c of ceilings) {
+      if (pickable('ceilings')) for (const c of ceilings) {
         if (c.points.length < 3) continue;
         let near = false;
         for (let i = 0; i < c.points.length; i++) {
@@ -1023,7 +1027,7 @@ const PlanCanvas: React.FC<Props> = ({
       }
       // Lines & measure lines: clicking near the segment selects it (so it
       // can be deleted from the property panel).
-      for (const shape of shapes) {
+      if (pickable('shapes')) for (const shape of shapes) {
         if ((shape.type === 'line' || shape.type === 'measure') && shape.points.length === 2
           && distToSegment(wx, wy, shape.points[0].x, shape.points[0].y, shape.points[1].x, shape.points[1].y) < 0.3) {
           onSelect(shape.id, ctrl);
@@ -1033,7 +1037,7 @@ const PlanCanvas: React.FC<Props> = ({
       }
       // Rectangle shapes: clicking the outline selects the area (interior is
       // left free for marquee selection / picking fixtures inside it).
-      for (const shape of shapes) {
+      if (pickable('shapes')) for (const shape of shapes) {
         if (shape.type !== 'rect' || shape.points.length !== 2) continue;
         const [p0, p1] = shape.points;
         const rx0 = Math.min(p0.x, p1.x), rx1 = Math.max(p0.x, p1.x);
@@ -1193,11 +1197,12 @@ const PlanCanvas: React.FC<Props> = ({
           if (!d.additive) onSelect(null);
         } else {
           const inside = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+          const ok = (k: keyof Layers) => layers[k].visible && !layers[k].locked;
           const ids: string[] = [];
-          for (const f of fixtures) if (inside(f.x, f.y)) ids.push(f.id);
-          for (const p of persons) if (inside(p.x, p.y)) ids.push(p.id);
-          for (const s of stageElements) if (inside(s.x + s.width / 2, s.y + s.depth / 2)) ids.push(s.id);
-          for (const t of trusses) if (inside((t.x1 + t.x2) / 2, (t.y1 + t.y2) / 2)) ids.push(t.id);
+          if (ok('fixtures')) for (const f of fixtures) if (inside(f.x, f.y)) ids.push(f.id);
+          if (ok('persons')) for (const p of persons) if (inside(p.x, p.y)) ids.push(p.id);
+          if (ok('stage')) for (const s of stageElements) if (inside(s.x + s.width / 2, s.y + s.depth / 2)) ids.push(s.id);
+          if (ok('trusses')) for (const t of trusses) if (inside((t.x1 + t.x2) / 2, (t.y1 + t.y2) / 2)) ids.push(t.id);
           onSelectMany(ids, d.additive ?? false);
         }
         marqueeEndRef.current = null;

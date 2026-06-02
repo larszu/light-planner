@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey } from './types';
 import { convexHull } from './utils/geometry';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
@@ -9,6 +9,7 @@ import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import FloorPlanPanel from './components/FloorPlanPanel';
 import ScenePanel from './components/ScenePanel';
+import LayersPanel from './components/LayersPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
 import { autoPatch, findPatchConflicts } from './utils/patch';
@@ -29,6 +30,17 @@ const Scene3D = lazy(() => import('./components/Scene3D'));
 
 let nextId = 1;
 function uid(prefix: string) { return `${prefix}-${Date.now()}-${nextId++}`; }
+
+const DEFAULT_LAYERS: Layers = {
+  fixtures: { visible: true, locked: false },
+  persons: { visible: true, locked: false },
+  trusses: { visible: true, locked: false },
+  stage: { visible: true, locked: false },
+  shapes: { visible: true, locked: false },
+  ceilings: { visible: true, locked: false },
+  walls: { visible: true, locked: false },
+  floorPlan: { visible: true, locked: false },
+};
 
 // The adjustable "look" of a fixture captured into / restored from a scene.
 function captureLook(f: PlacedFixture): SceneFixtureState {
@@ -82,6 +94,7 @@ const App: React.FC = () => {
   const [heatMapTarget, setHeatMapTarget] = useState(0);
   const [photoMode, setPhotoMode] = useState(false);
   const [exposure, setExposure] = useState(1.0);
+  const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
   const [cursorLux, setCursorLux] = useState<number | null>(null);
   const [showThreePointDialog, setShowThreePointDialog] = useState(false);
@@ -561,6 +574,7 @@ const App: React.FC = () => {
       walls,
       ceilings,
       scenes,
+      layers,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     try {
@@ -570,7 +584,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, layers, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -587,6 +601,7 @@ const App: React.FC = () => {
     setScenes(data.scenes ?? []);
     setActiveSceneId(null);
     preSceneRef.current = null;
+    setLayers(data.layers ?? DEFAULT_LAYERS);
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
     if (data.floorPlan) {
@@ -897,6 +912,15 @@ const App: React.FC = () => {
 
   const hiddenCount = fixtures.reduce((n, f) => n + (f.hidden ? 1 : 0), 0);
 
+  // ── Layers (Ebenen) ──
+  const toggleLayerVisible = useCallback((k: LayerKey) => setLayers((p) => ({ ...p, [k]: { ...p[k], visible: !p[k].visible } })), []);
+  const toggleLayerLocked = useCallback((k: LayerKey) => setLayers((p) => ({ ...p, [k]: { ...p[k], locked: !p[k].locked } })), []);
+  const layerCounts: Record<LayerKey, number> = {
+    fixtures: fixtures.length, persons: persons.length, trusses: trusses.length,
+    stage: stageElements.length, shapes: shapes.length, ceilings: ceilings.length,
+    walls: walls.length, floorPlan: floorPlan ? 1 : 0,
+  };
+
   return (
     <div className="app">
       <MenuBar
@@ -975,6 +999,7 @@ const App: React.FC = () => {
               walls={walls}
               ceilings={ceilings}
               floorPlan={floorPlan}
+              layers={layers}
               snapStep={snapStep}
               activeTool={activeTool}
               fixtureToPlace={fixtureToPlace}
@@ -1016,6 +1041,7 @@ const App: React.FC = () => {
                 walls={walls}
                 ceilings={ceilings}
                 floorPlan={floorPlan}
+                layers={layers}
                 selectedIds={selectedIds}
                 showHeatMap={showHeatMap}
                 heatMapScale={heatMapScale}
@@ -1066,6 +1092,12 @@ const App: React.FC = () => {
             onRenameScene={handleRenameScene}
             onDeleteScene={handleDeleteScene}
             onShowAll={handleShowAllFixtures}
+          />
+          <LayersPanel
+            layers={layers}
+            counts={layerCounts}
+            onToggleVisible={toggleLayerVisible}
+            onToggleLocked={toggleLayerLocked}
           />
         </div>
         <PropertyPanel

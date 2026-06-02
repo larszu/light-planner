@@ -290,6 +290,7 @@ export interface ProjectData {
   walls?: Wall[];
   ceilings?: Ceiling[];
   scenes?: Scene[];
+  layers?: Layers;
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
   floorPlan?: Omit<FloorPlan, 'image'>;
@@ -300,3 +301,12 @@ export interface FixtureGroup {
   label: string;
   fixtureIds: string[];
 }
+
+// ── Layers (Ebenen) – per-category visibility & lock, like Photoshop/Vectorworks.
+//    Visibility is visual only (hidden walls/ceilings still affect the light calc);
+//    a locked layer cannot be selected or edited on the canvas. ──
+export type LayerKey =
+  | 'fixtures' | 'persons' | 'trusses' | 'stage' | 'shapes' | 'ceilings' | 'walls' | 'floorPlan';
+
+export interface LayerInfo { visible: boolean; locked: boolean }
+export type Layers = Record<LayerKey, LayerInfo>;
