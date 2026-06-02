@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import type { Fixture, FixtureCategory, BeamShape, LensType, MountType } from '../types';
-import { extractFixtureSpecs, AI_MODELS, API_KEY_STORAGE, type ExtractedFields, type VerificationItem } from '../utils/aiExtract';
-import { useHost } from '../integration/hostContext';
+import { extractFixtureSpecs, AI_MODELS, type ExtractedFields, type VerificationItem } from '../utils/aiExtract';
 
 interface Props {
   onSave: (fixture: Fixture) => void;
@@ -43,7 +42,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
   // ── KI-Datenblatt-Extraktion ──
   const [aiOpen, setAiOpen] = useState(false);
   const [aiText, setAiText] = useState('');
-  const [aiKey, setAiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) ?? '');
+  const [aiKey, setAiKey] = useState('');
   const [aiModel, setAiModel] = useState<string>(AI_MODELS[0].id);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -82,7 +81,6 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
     if (!aiText.trim()) { setAiError('Bitte Datenblatt-Text oder Modellname einfügen.'); return; }
     if (!aiKey.trim()) { setAiError('Bitte Anthropic API-Schlüssel eingeben.'); return; }
     setAiLoading(true); setAiError(null);
-    localStorage.setItem(API_KEY_STORAGE, aiKey.trim());
     try {
       // Use the host's AI service when it provides one (e.g. Cable-Planner's
       // multi-provider aiSuggestions + keychain); else the direct browser call.
@@ -160,8 +158,8 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
                 </button>
               </div>
               <div className="ai-note">
-                Der Schlüssel bleibt lokal im Browser und geht direkt an api.anthropic.com.
-                Bitte alle übernommenen Werte unten prüfen, bevor du speicherst.
+                Der Schlüssel wird nur für diese Sitzung im Arbeitsspeicher gehalten und nicht gespeichert.
+                Er geht direkt an api.anthropic.com. Bitte alle übernommenen Werte unten prüfen.
               </div>
               {aiError && <div className="ai-error">⚠ {aiError}</div>}
               {aiVerification && (

@@ -723,7 +723,6 @@ const App: React.FC = () => {
         setPlanMode('none');
       })
       .catch((err) => {
-        console.error(err);
         window.alert(`Grundriss konnte nicht geladen werden:\n${err?.message ?? err}`);
       });
   }, []);
@@ -755,7 +754,7 @@ const App: React.FC = () => {
           pageIndex,
         });
       })
-      .catch((err) => console.error(err));
+      .catch(() => {});
   }, []);
 
   // Set the plan width directly; height follows the bitmap aspect ratio.
@@ -937,8 +936,12 @@ const App: React.FC = () => {
     const res = await host.openProjectFile();
     if (!res) return;
     try {
-      const data = JSON.parse(res.text) as ProjectData;
-      if (!data || !Array.isArray(data.fixtures)) throw new Error('Keine gültige Projektdatei.');
+      const raw = JSON.parse(res.text);
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Keine gültige Projektdatei.');
+      if ('__proto__' in raw || 'constructor' in raw) throw new Error('Ungültige Projektdatei (unerlaubte Schlüssel).');
+      if (!Array.isArray(raw.fixtures)) throw new Error('Keine gültige Projektdatei (fixtures fehlen).');
+      if (!raw.meta || typeof raw.meta.name !== 'string') throw new Error('Keine gültige Projektdatei (meta fehlt).');
+      const data = raw as ProjectData;
       handleLoadProject(data);
     } catch (err) {
       window.alert(`Projektdatei konnte nicht geladen werden:\n${err instanceof Error ? err.message : err}`);

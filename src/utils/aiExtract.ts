@@ -12,8 +12,6 @@ export const AI_MODELS = [
   { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (günstig)' },
 ] as const;
 
-export const API_KEY_STORAGE = 'lp-anthropic-key';
-
 export interface ExtractedFields {
   name?: string;
   manufacturer?: string;

@@ -14,7 +14,6 @@
     "dist:mac": "npm run build && electron-builder --mac zip --x64 --arm64 --publish never"
   },
   "dependencies": {
-    "@types/three": "^0.184.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
