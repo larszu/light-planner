@@ -334,12 +334,16 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     // Fixtures
     for (const f of fixtures) {
       const isSel = selectedIds.has(f.id);
+      const hidden = !!f.hidden; // muted lamp: ghosted body, no beam
       const group = new THREE.Group();
       group.userData = { dynamic: true, selectId: f.id };
 
       // Fixture body (small box at mounting height)
       const bodyGeo = new THREE.BoxGeometry(0.4, 0.3, 0.5);
-      const bodyMat = new THREE.MeshStandardMaterial({ color: isSel ? '#ffcc33' : '#4fc3f7' });
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: isSel ? '#ffcc33' : (hidden ? '#5a6270' : '#4fc3f7'),
+        transparent: hidden, opacity: hidden ? 0.4 : 1,
+      });
       const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
       bodyMesh.position.set(f.x, f.mountingHeight, f.y);
       bodyMesh.castShadow = true;
@@ -361,7 +365,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const beamRadAtBase = Math.tan((fieldAngle / 2) * (Math.PI / 180)) * coneHeight;
       const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
-      if (coneHeight > 0.1) {
+      if (!hidden && coneHeight > 0.1) {
         const coneGeo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
         // Shift geometry so tip is at local origin (tip at y=+h/2, base at y=-h/2)
         coneGeo.translate(0, -coneHeight / 2, 0);

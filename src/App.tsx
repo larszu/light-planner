@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState } from './types';
 import { convexHull } from './utils/geometry';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
@@ -8,6 +8,7 @@ import PropertyPanel from './components/PropertyPanel';
 import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import FloorPlanPanel from './components/FloorPlanPanel';
+import ScenePanel from './components/ScenePanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
 import { autoPatch, findPatchConflicts } from './utils/patch';
@@ -27,6 +28,19 @@ const Scene3D = lazy(() => import('./components/Scene3D'));
 
 let nextId = 1;
 function uid(prefix: string) { return `${prefix}-${Date.now()}-${nextId++}`; }
+
+// The adjustable "look" of a fixture captured into / restored from a scene.
+function captureLook(f: PlacedFixture): SceneFixtureState {
+  return {
+    dimming: f.dimming,
+    hidden: f.hidden,
+    currentColorTemp: f.currentColorTemp,
+    currentBeamAngle: f.currentBeamAngle,
+    gelFilterIds: f.gelFilterIds,
+    gelPlacement: f.gelPlacement,
+    barnDoors: f.barnDoors,
+  };
+}
 
 // Make a floor plan persistable: drop the live <img> and re-encode the bitmap
 // as a size-capped JPEG so the calibration survives a save without blowing the
@@ -80,6 +94,10 @@ const App: React.FC = () => {
   const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
+  const [scenes, setScenes] = useState<Scene[]>([]);
+  const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
+  // Look present just before a scene was switched on, so it can be switched off.
+  const preSceneRef = useRef<Record<string, SceneFixtureState> | null>(null);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const clipboardRef = useRef<PlacedFixture[]>([]);
   const scene3DRef = useRef<Scene3DHandle>(null);
@@ -539,6 +557,7 @@ const App: React.FC = () => {
       trusses,
       walls,
       ceilings,
+      scenes,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     try {
@@ -548,7 +567,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -562,6 +581,9 @@ const App: React.FC = () => {
     setTrusses(data.trusses ?? []);
     setWalls(data.walls ?? []);
     setCeilings(data.ceilings ?? []);
+    setScenes(data.scenes ?? []);
+    setActiveSceneId(null);
+    preSceneRef.current = null;
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
     if (data.floorPlan) {
@@ -790,6 +812,68 @@ const App: React.FC = () => {
   }, [pushHistoryThrottled]);
   const handleAddCustomFixture = useCallback((f: Fixture) => { setCustomFixtures((prev) => [...prev, f]); }, []);
 
+  // ── Scenes / Looks ──
+  const applyLooks = useCallback((looks: Record<string, SceneFixtureState>) => {
+    setFixtures((prev) => prev.map((f) => (looks[f.id] ? { ...f, ...looks[f.id] } : f)));
+  }, []);
+
+  const handleSaveScene = useCallback(() => {
+    const states: Record<string, SceneFixtureState> = {};
+    for (const f of fixtures) states[f.id] = captureLook(f);
+    setScenes((prev) => {
+      const scene: Scene = { id: uid('scene'), name: `Szene ${prev.length + 1}`, states };
+      setActiveSceneId(scene.id);
+      return [...prev, scene];
+    });
+    preSceneRef.current = null;
+  }, [fixtures]);
+
+  // Switch a scene on (apply its look) or, if it is already active, off again
+  // (restore the look from just before it was switched on).
+  const handleToggleScene = useCallback((id: string) => {
+    if (activeSceneId === id) {
+      pushHistory();
+      if (preSceneRef.current) applyLooks(preSceneRef.current);
+      preSceneRef.current = null;
+      setActiveSceneId(null);
+      return;
+    }
+    const scene = scenes.find((s) => s.id === id);
+    if (!scene) return;
+    pushHistory();
+    const pre: Record<string, SceneFixtureState> = {};
+    for (const f of fixtures) pre[f.id] = captureLook(f);
+    preSceneRef.current = pre;
+    applyLooks(scene.states);
+    setActiveSceneId(id);
+  }, [activeSceneId, scenes, fixtures, applyLooks, pushHistory]);
+
+  const handleUpdateScene = useCallback((id: string) => {
+    const states: Record<string, SceneFixtureState> = {};
+    for (const f of fixtures) states[f.id] = captureLook(f);
+    setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, states } : s)));
+    setActiveSceneId(id);
+    preSceneRef.current = null;
+  }, [fixtures]);
+
+  const handleRenameScene = useCallback((id: string, name: string) => {
+    setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  }, []);
+
+  const handleDeleteScene = useCallback((id: string) => {
+    setScenes((prev) => prev.filter((s) => s.id !== id));
+    setActiveSceneId((a) => (a === id ? null : a));
+  }, []);
+
+  // ── Temporarily mute / un-mute lamps ──
+  const handleShowAllFixtures = useCallback(() => {
+    if (!fixtures.some((f) => f.hidden)) return;
+    pushHistory();
+    setFixtures((prev) => prev.map((f) => (f.hidden ? { ...f, hidden: undefined } : f)));
+  }, [fixtures, pushHistory]);
+
+  const hiddenCount = fixtures.reduce((n, f) => n + (f.hidden ? 1 : 0), 0);
+
   return (
     <div className="app">
       <MenuBar
@@ -942,6 +1026,18 @@ const App: React.FC = () => {
               onRemove={handleRemoveFloorPlan}
             />
           )}
+          <ScenePanel
+            scenes={scenes}
+            activeSceneId={activeSceneId}
+            hiddenCount={hiddenCount}
+            fixtureCount={fixtures.length}
+            onSaveScene={handleSaveScene}
+            onToggleScene={handleToggleScene}
+            onUpdateScene={handleUpdateScene}
+            onRenameScene={handleRenameScene}
+            onDeleteScene={handleDeleteScene}
+            onShowAll={handleShowAllFixtures}
+          />
         </div>
         <PropertyPanel
           fixtures={fixtures}

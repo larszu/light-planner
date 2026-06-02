@@ -76,8 +76,9 @@ export interface Fixture {
   // ── Photometric reference (lux at specific distance) ──
   photometric?: PhotometricData;           // bare/with standard reflector
   // ── Beam geometry ──
-  beamAngle: number;      // 50 % peak (degrees)
-  fieldAngle: number;     // 10 % peak (degrees)
+  beamAngle: number;      // 50 % peak (degrees) – the bright core (FWHM)
+  fieldAngle: number;     // 10 % peak (degrees) – the usable beam edge
+  cutoffAngle?: number;   // 2.5 % peak (degrees) – where the light effectively ends
   beamShape: BeamShape;
   beamRatioWH: number;    // width / height ratio for elliptical (1.0 = circular)
   lensType: LensType;
@@ -116,12 +117,48 @@ export interface PlacedFixture {
   currentColorTemp?: number;   // current CCT for tunable fixtures
   // ── Gel filters ──
   gelFilterIds?: string[];     // ids of mounted gel filters (from gelLibrary)
+  // ── Barn doors (Flügeltore) – four flaps, closure 0 (open) … 1 (fully closed).
+  //    Each flap cuts one side of the beam in the fixture's own frame. ──
+  barnDoors?: { top: number; bottom: number; left: number; right: number };
+  // ── Where the gels/diffusion physically sit ──
+  //   'frame' – in the colour-frame runners at the lens (behind the doors):
+  //             the barn-door cut stays crisp, but the gel sits closest to the
+  //             lamp and runs hottest (shortest gel life).
+  //   'front' – hung in front of the barn doors: the illuminated diffusion
+  //             becomes the new, larger light source, so the cut is softened
+  //             (with real frost it is largely defeated); the gel runs cooler
+  //             and lasts longer. Defaults to 'frame'.
+  gelPlacement?: 'frame' | 'front';
   // ── Patch / paperwork (instrument schedule, channel hookup) ──
   channel?: number;            // control / dimmer channel number
   unitNumber?: string;         // unit (instrument) number on its position
   universe?: number;           // DMX universe (1-based)
   dmxAddress?: number;         // DMX start address within the universe (1–512)
   purpose?: string;            // focus / purpose note ("Frontlicht Bühne")
+  // ── Temporarily mute a single lamp without deleting it: it stops
+  //    contributing to the heatmap and is drawn ghosted (still selectable). ──
+  hidden?: boolean;
+}
+
+// ── Scene / Look ─────────────────────────────────────────────────────
+// A saved lighting state. Captures the adjustable per-fixture look (intensity,
+// colour, zoom, gels, barn doors, mute) keyed by fixture id, so it can be
+// recalled later. Focus/position (x, y, aim, height) belongs to the rig, not
+// the look, and is intentionally not stored.
+export interface SceneFixtureState {
+  dimming: number;
+  hidden?: boolean;
+  currentColorTemp?: number;
+  currentBeamAngle?: number;
+  gelFilterIds?: string[];
+  gelPlacement?: 'frame' | 'front';
+  barnDoors?: { top: number; bottom: number; left: number; right: number };
+}
+
+export interface Scene {
+  id: string;
+  name: string;
+  states: Record<string, SceneFixtureState>; // by fixture id
 }
 
 // ── Person on stage ──
@@ -252,6 +289,7 @@ export interface ProjectData {
   trusses?: Truss[];
   walls?: Wall[];
   ceilings?: Ceiling[];
+  scenes?: Scene[];
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
   floorPlan?: Omit<FloorPlan, 'image'>;

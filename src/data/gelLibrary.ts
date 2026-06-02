@@ -82,6 +82,21 @@ export function effectiveColorTemp(baseKelvin: number, gelIds: string[]): number
 }
 
 /**
+ * Dominant frost/diffusion strength (0..1) among the mounted gels. Used to
+ * judge how strongly a diffusion *hung in front of the barn doors* softens
+ * (and ultimately defeats) the barn-door cut – the illuminated frost becomes
+ * the new, larger light source. Returns 0 when no diffusion is mounted.
+ */
+export function frostLevel(gelIds: string[]): number {
+  let lvl = 0;
+  for (const id of gelIds) {
+    const gel = getGelById(id);
+    if (gel?.diffusionLevel) lvl = Math.max(lvl, gel.diffusionLevel);
+  }
+  return lvl;
+}
+
+/**
  * Compute effective beam angle widening from frost/diffusion gels.
  * Each diffusion gel widens the beam proportional to its diffusion level.
  */

@@ -1,8 +1,92 @@
 import type { PlacedFixture, Attachment, PhotometricData, Wall, Ceiling } from '../types';
-import { combinedTransmission, effectiveBeamAngleWithFrost } from '../data/gelLibrary';
+import { combinedTransmission, effectiveBeamAngleWithFrost, frostLevel } from '../data/gelLibrary';
 import { sampleWall, isCurved, pointInPolygon, polygonBounds } from './geometry';
 
 const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+
+/**
+ * Barn-door (Flügeltore) attenuation toward a point, given the *unit* vector
+ * (ux,uy,uz) from the fixture to that point and the effective field angle.
+ * Returns a factor in 0..1 that multiplies the beam intensity.
+ *
+ * Each of the four flaps (top/bottom/left/right) closes from 0 (fully open – no
+ * cut) to 1 (fully closed – blocks that half of the beam). A flap at closure c
+ * cuts everything beyond the half-angle (1−c)·refHalf on its side, measured in
+ * the fixture's own frame (aim axis, rolled by bodyRotation).
+ *
+ * Gel placement decides how crisp that cut is – the one thing that physically
+ * changes between putting a gel in the colour frame vs. in front of the doors:
+ *   'frame' (default) – gel sits behind the doors at the lens → hard, crisp cut.
+ *   'front'           – gel/diffusion hangs in front of the doors → the lit
+ *                       diffusion becomes the new, larger source, so the edge
+ *                       softens; with real frost the cut is largely defeated
+ *                       (the doors effectively stop working), as in practice.
+ */
+export function barnDoorAttenuation(
+  f: PlacedFixture,
+  ux: number, uy: number, uz: number,
+  fieldAngleDeg: number,
+): number {
+  const bd = f.barnDoors;
+  if (!bd) return 1;
+  const top = bd.top || 0, bottom = bd.bottom || 0, left = bd.left || 0, right = bd.right || 0;
+  if (top <= 0 && bottom <= 0 && left <= 0 && right <= 0) return 1;
+
+  // Aim axis (fixture → aim point on floor), normalised.
+  const h = f.mountingHeight;
+  const aDx = f.aimX - f.x, aDy = f.aimY - f.y;
+  const aimDist = Math.sqrt(aDx * aDx + aDy * aDy + h * h) || 1e-6;
+  const ax = aDx / aimDist, ay = aDy / aimDist, az = -h / aimDist;
+
+  // Orthonormal frame perpendicular to the aim axis.
+  //   right0 = aimAxis × worldZ  → horizontal; up0 = aimAxis × right0.
+  // For a (near-)vertical aim, right0 collapses → fall back to world X.
+  let rx = ay, ry = -ax, rz = 0;
+  let rl = Math.hypot(rx, ry, rz);
+  if (rl < 1e-4) { rx = 1; ry = 0; rz = 0; rl = 1; }
+  rx /= rl; ry /= rl; rz /= rl;
+  let upx = ay * rz - az * ry;
+  let upy = az * rx - ax * rz;
+  let upz = ax * ry - ay * rx;
+  const ul = Math.hypot(upx, upy, upz) || 1e-6;
+  upx /= ul; upy /= ul; upz /= ul;
+
+  // Roll the frame about the aim axis by the body rotation.
+  const br = f.bodyRotation * DEG2RAD;
+  const cb = Math.cos(br), sb = Math.sin(br);
+  const Rx = rx * cb + upx * sb, Ry = ry * cb + upy * sb, Rz = rz * cb + upz * sb;
+  const Ux = -rx * sb + upx * cb, Uy = -ry * sb + upy * cb, Uz = -rz * sb + upz * cb;
+
+  // Decompose the point direction into forward / right / up components.
+  const af = ux * ax + uy * ay + uz * az;      // = cos(theta) along the aim axis
+  if (af <= 1e-3) return 1;                     // ≥90° off-axis: beam is ~0 anyway
+  const ar = ux * Rx + uy * Ry + uz * Rz;
+  const au = ux * Ux + uy * Uy + uz * Uz;
+  const angR = Math.atan2(ar, af) * RAD2DEG;    // signed °, + toward the 'right' flap
+  const angU = Math.atan2(au, af) * RAD2DEG;    // signed °, + toward the 'top' flap
+
+  // The flaps measure against the beam edge (field half-angle).
+  const refHalf = Math.max(fieldAngleDeg / 2, 1);
+
+  // Crispness from gel placement.
+  const front = f.gelPlacement === 'front';
+  const frost = front ? frostLevel(f.gelFilterIds ?? []) : 0;
+  const baseSoft = refHalf * 0.12 + 0.5;                       // gentle even when crisp
+  const soft = baseSoft * (front ? 2.5 + 4 * frost : 1);       // front → softer edge
+  const defeat = front ? Math.min(0.85, 0.25 + 0.7 * frost) : 0; // front+frost → cut pulled back
+
+  const flap = (ang: number, closure: number): number => {
+    if (closure <= 0) return 1;
+    const cutCrisp = (1 - closure) * refHalf;
+    const cut = cutCrisp + (refHalf - cutCrisp) * defeat; // defeat eases the cut outward
+    const t = (cut - ang) / (2 * soft) + 0.5;             // 1 well inside → 0 well outside
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);                            // smoothstep
+  };
+
+  return flap(angR, right) * flap(-angR, left) * flap(angU, top) * flap(-angU, bottom);
+}
 
 /**
  * Get the active attachment for a placed fixture, if any.
@@ -260,7 +344,10 @@ export function luxFromFixture(
     peakIntensity(eff.lumens, refAngle, effectiveFieldAngle, ratio, eff.photometric)
     * dimFactor
     * gelTransmission;
-  const I = Ipeak * Math.exp(-(effectiveTheta * effectiveTheta) / (2 * sigma * sigma));
+  let I = Ipeak * Math.exp(-(effectiveTheta * effectiveTheta) / (2 * sigma * sigma));
+
+  // Flügeltore: clip the beam asymmetrically (crispness depends on gel placement).
+  if (f.barnDoors) I *= barnDoorAttenuation(f, pxU, pyU, pzU, effectiveFieldAngle);
 
   const cosIncidence = h / dist;
   return (I * cosIncidence) / dist2;
@@ -287,7 +374,9 @@ function beamIntensityToward(f: PlacedFixture, px: number, py: number, pz: numbe
   const theta = Math.acos(Math.min(1, Math.max(-1, cosT)));
   const sigma = beamSigma(fieldAngle);
   const Ipeak = peakIntensity(eff.lumens, eff.refFieldAngle, fieldAngle, eff.beamRatioWH, eff.photometric) * dimFactor * gelT;
-  return Ipeak * Math.exp(-(theta * theta) / (2 * sigma * sigma));
+  let I = Ipeak * Math.exp(-(theta * theta) / (2 * sigma * sigma));
+  if (f.barnDoors) I *= barnDoorAttenuation(f, ex / dist, ny / dist, vz / dist, fieldAngle);
+  return I;
 }
 
 // A small reflecting surface patch with its pre-computed reflected exitance.
@@ -369,6 +458,72 @@ export function wallBounceAt(samples: WallSample[], px: number, py: number): num
 }
 
 /**
+ * Step-by-step breakdown of the illuminance at a floor point from one fixture,
+ * so the user can follow (and hand-check) the calculation. The factors multiply
+ * to `lux`:  lux = peakCd · dim · gel · gauss · barnDoor · cos(incidence) / distance²
+ * (circular-beam form; the elliptical refinement is omitted here for clarity).
+ */
+export interface LuxBreakdown {
+  source: 'photometric' | 'lumens';
+  refLux?: number; refDistance?: number; refBeamAngle?: number;
+  basePeakCd: number;      // peak candela of the reference (before zoom comp)
+  zoomComp: number;        // zoom/frost flux-conservation factor (photometric path)
+  peakCd: number;          // effective peak candela (basePeakCd × zoomComp)
+  fieldAngleDeg: number;   // effective field angle used for σ
+  dimming: number;         // 0..1
+  gel: number;             // gel transmission 0..1
+  distance: number;        // m (fixture → point, 3D)
+  offAxisDeg: number;      // θ between aim axis and the point
+  gauss: number;           // exp(−θ²/2σ²)
+  barnDoor: number;        // Flügeltor-Schnitt 0..1 (1 = kein Schnitt)
+  cosIncidence: number;    // h / distance
+  lux: number;
+}
+
+export function explainLux(f: PlacedFixture, px: number, py: number): LuxBreakdown {
+  const h = f.mountingHeight;
+  const dimFactor = Math.max(0, f.dimming / 100);
+  const eff = getEffectiveBeam(f);
+  let fieldAngle = eff.fieldAngle;
+  if (f.gelFilterIds && f.gelFilterIds.length > 0) fieldAngle = effectiveBeamAngleWithFrost(eff.fieldAngle, f.gelFilterIds);
+  const gel = (f.gelFilterIds && f.gelFilterIds.length > 0) ? combinedTransmission(f.gelFilterIds) : 1;
+
+  const dx = px - f.x, dy = py - f.y;
+  const dist2 = dx * dx + dy * dy + h * h;
+  const dist = Math.sqrt(dist2) || 1e-6;
+  const aDx = f.aimX - f.x, aDy = f.aimY - f.y;
+  const aimDist = Math.sqrt(aDx * aDx + aDy * aDy + h * h) || 1e-6;
+  const cosT = (aDx * dx + aDy * dy + h * h) / (aimDist * dist);
+  const theta = Math.acos(Math.min(1, Math.max(-1, cosT)));
+
+  let source: 'photometric' | 'lumens';
+  let basePeakCd: number, zoomComp: number, peakCd: number;
+  if (eff.photometric && eff.photometric.lux > 0 && eff.photometric.distance > 0) {
+    source = 'photometric';
+    basePeakCd = candelaFromPhotometric(eff.photometric);
+    zoomComp = zoomCompensation(eff.refFieldAngle, fieldAngle);
+    peakCd = basePeakCd * zoomComp;
+  } else {
+    source = 'lumens';
+    basePeakCd = peakIntensityFromLumens(eff.lumens, fieldAngle, eff.beamRatioWH);
+    zoomComp = 1;
+    peakCd = basePeakCd;
+  }
+  const sigma = beamSigma(fieldAngle);
+  const gauss = Math.exp(-(theta * theta) / (2 * sigma * sigma));
+  const barnDoor = f.barnDoors ? barnDoorAttenuation(f, dx / dist, dy / dist, -h / dist, fieldAngle) : 1;
+  const cosIncidence = h / dist;
+  const lux = (peakCd * dimFactor * gel * gauss * barnDoor * cosIncidence) / dist2;
+
+  return {
+    source,
+    refLux: eff.photometric?.lux, refDistance: eff.photometric?.distance, refBeamAngle: eff.photometric?.beamAngle,
+    basePeakCd, zoomComp, peakCd, fieldAngleDeg: fieldAngle,
+    dimming: dimFactor, gel, distance: dist, offAxisDeg: (theta * 180) / Math.PI, gauss, barnDoor, cosIncidence, lux,
+  };
+}
+
+/**
  * Total illuminance at a point from all fixtures (+ optional wall bounce).
  */
 export function totalLux(
@@ -379,6 +534,7 @@ export function totalLux(
 ): number {
   let sum = 0;
   for (const f of fixtures) {
+    if (f.hidden) continue; // muted lamp – contributes no light
     sum += luxFromFixture(f, px, py);
   }
   if (wallSamples.length) sum += wallBounceAt(wallSamples, px, py);
@@ -404,14 +560,17 @@ export function computeHeatMap(
   const stepY = heightM / resY;
   let maxLux = 0;
 
+  // Muted lamps contribute no light – drop them up front (also from the bounce).
+  const lit = fixtures.filter((f) => !f.hidden);
+
   // Pre-compute the reflecting surface patches once for the whole grid.
-  const wallSamples = (walls.length || ceilings.length) ? precomputeSurfaceSamples(walls, ceilings, fixtures) : [];
+  const wallSamples = (walls.length || ceilings.length) ? precomputeSurfaceSamples(walls, ceilings, lit) : [];
 
   for (let yi = 0; yi < resY; yi++) {
     const py = originY + (yi + 0.5) * stepY;
     for (let xi = 0; xi < resX; xi++) {
       const px = originX + (xi + 0.5) * stepX;
-      const lux = totalLux(fixtures, px, py, wallSamples);
+      const lux = totalLux(lit, px, py, wallSamples);
       data[yi * resX + xi] = lux;
       if (lux > maxLux) maxLux = lux;
     }
