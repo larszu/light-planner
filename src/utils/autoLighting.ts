@@ -4,6 +4,18 @@ import { luxFromFixture } from './lightCalc';
 
 const DEG2RAD = Math.PI / 180;
 
+/** A truss the auto-lighting can hang fixtures on (so throws aren't random). */
+export interface TrussLine { x1: number; y1: number; x2: number; y2: number; height: number }
+
+/** Closest point on segment (x1,y1)-(x2,y2) to (px,py). */
+function nearestOnSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): { x: number; y: number } {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len2 = dx * dx + dy * dy || 1e-9;
+  let t = ((px - x1) * dx + (py - y1) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return { x: x1 + dx * t, y: y1 + dy * t };
+}
+
 function findFixture(id: string): Fixture | undefined {
   return fixtureLibrary.find((f) => f.id === id);
 }
@@ -85,6 +97,10 @@ export interface ThreePointConfig {
   keyDimming?: number;
   fillDimming?: number;
   backDimming?: number;
+  /** Hang key & fill on this truss (uses its height) so throws are consistent. */
+  truss?: TrussLine;
+  /** Horizontal distance person→lamp (m). 0/undef ⇒ derive from mounting height. */
+  throwDistance?: number;
 }
 
 export function generate3PointLighting(
@@ -102,40 +118,33 @@ export function generate3PointLighting(
   const backRatio = config.backRatio ?? 1.0;
   const targetLux = config.targetLux ?? 0;
 
-  // ── Key light: 45° front-left, 45° elevation ──
-  const keyElevation = 45;
-  const keyDist = mountingHeight / Math.tan(keyElevation * DEG2RAD);
-  const keyAzimuth = -135 * DEG2RAD; // front-left (audience = −Y)
-  const keyX = px + keyDist * Math.cos(keyAzimuth);
-  const keyY = py + keyDist * Math.sin(keyAzimuth);
+  // Horizontal throw (person → lamp). Adjustable; default = mounting height (45°).
+  const throwDist = config.throwDistance && config.throwDistance > 0 ? config.throwDistance : mountingHeight;
+  const truss = config.truss;
+  const mh = truss ? truss.height : mountingHeight;
 
-  // ── Fill light: 45° front-right, ~30° elevation ──
-  const fillElevation = 30;
-  const fillDist = mountingHeight / Math.tan(fillElevation * DEG2RAD);
-  const fillAzimuth = -45 * DEG2RAD; // front-right
-  const fillX = px + fillDist * Math.cos(fillAzimuth);
-  const fillY = py + fillDist * Math.sin(fillAzimuth);
+  // Place a lamp at a given azimuth + throw; when a truss is chosen, snap key &
+  // fill onto it (consistent distances instead of random ones).
+  const place = (azDeg: number, snap: boolean): { x: number; y: number } => {
+    const az = azDeg * DEG2RAD;
+    let x = px + throwDist * Math.cos(az);
+    let y = py + throwDist * Math.sin(az);
+    if (truss && snap) { const n = nearestOnSegment(x, y, truss.x1, truss.y1, truss.x2, truss.y2); x = n.x; y = n.y; }
+    return { x, y };
+  };
 
-  // ── Back light: behind subject, 60° elevation ──
-  const backElevation = 60;
-  const backDist = mountingHeight / Math.tan(backElevation * DEG2RAD);
-  const backX = px;
-  const backY = py + backDist; // behind = +Y
+  const { x: keyX, y: keyY } = place(-135, true);   // front-left
+  const { x: fillX, y: fillY } = place(-45, true);  // front-right
+  const backX = px;                                  // back light stays behind
+  const backY = py + throwDist;
 
   // ── Compute dimming ──
   let keyDim: number, fillDim: number, backDim: number;
 
   if (targetLux > 0) {
-    // Key: match target lux
-    keyDim = computeDimmingForTarget(keyF, keyX, keyY, mountingHeight, px, py, targetLux);
-
-    // Fill: key output / contrast ratio
-    const fillTargetLux = targetLux / ratio;
-    fillDim = computeDimmingForTarget(fillF, fillX, fillY, mountingHeight, px, py, fillTargetLux);
-
-    // Back: relative to key
-    const backTargetLux = targetLux * backRatio;
-    backDim = computeDimmingForTarget(backF, backX, backY, mountingHeight, px, py, backTargetLux);
+    keyDim = computeDimmingForTarget(keyF, keyX, keyY, mh, px, py, targetLux);
+    fillDim = computeDimmingForTarget(fillF, fillX, fillY, mh, px, py, targetLux / ratio);
+    backDim = computeDimmingForTarget(backF, backX, backY, mh, px, py, targetLux * backRatio);
   } else {
     keyDim = config.keyDimming ?? 100;
     fillDim = config.fillDimming ?? Math.round(100 / ratio);
@@ -143,24 +152,9 @@ export function generate3PointLighting(
   }
 
   return [
-    {
-      id: nextId(), fixture: keyF,
-      x: Math.round(keyX * 10) / 10, y: Math.round(keyY * 10) / 10,
-      mountingHeight, aimX: px, aimY: py,
-      bodyRotation: 0, dimming: keyDim,
-    },
-    {
-      id: nextId(), fixture: fillF,
-      x: Math.round(fillX * 10) / 10, y: Math.round(fillY * 10) / 10,
-      mountingHeight, aimX: px, aimY: py,
-      bodyRotation: 0, dimming: fillDim,
-    },
-    {
-      id: nextId(), fixture: backF,
-      x: Math.round(backX * 10) / 10, y: Math.round(backY * 10) / 10,
-      mountingHeight, aimX: px, aimY: py,
-      bodyRotation: 0, dimming: backDim,
-    },
+    { id: nextId(), fixture: keyF, x: Math.round(keyX * 10) / 10, y: Math.round(keyY * 10) / 10, mountingHeight: mh, aimX: px, aimY: py, bodyRotation: 0, dimming: keyDim },
+    { id: nextId(), fixture: fillF, x: Math.round(fillX * 10) / 10, y: Math.round(fillY * 10) / 10, mountingHeight: mh, aimX: px, aimY: py, bodyRotation: 0, dimming: fillDim },
+    { id: nextId(), fixture: backF, x: Math.round(backX * 10) / 10, y: Math.round(backY * 10) / 10, mountingHeight: mh, aimX: px, aimY: py, bodyRotation: 0, dimming: backDim },
   ];
 }
 
@@ -207,6 +201,13 @@ export interface AreaLightConfig {
   targetLux?: number;
   fixture?: Fixture;
   mountingHeight?: number;
+  /** Cross-light: beams cross the area (each lamp aims at the opposite side) for
+   *  even coverage that beats a flat straight-on wash — McCandless principle. */
+  cross?: boolean;
+  /** Hang the fixtures on this truss instead of synthetic side rows. */
+  truss?: TrussLine;
+  /** Horizontal throw / side offset (m). 0/undef ⇒ = mounting height (45°). */
+  throwDistance?: number;
 }
 
 function mkFixture(fixture: Fixture, x: number, y: number, mh: number, aimX: number, aimY: number, dim = 80): PlacedFixture {
@@ -222,7 +223,9 @@ function mkFixture(fixture: Fixture, x: number, y: number, mh: number, aimX: num
 export function generateAreaLighting(area: LightArea, config: AreaLightConfig): PlacedFixture[] {
   const fixture = config.fixture ?? defaultFresnel();
   const targetLux = config.targetLux ?? 0;
-  const mh = config.mountingHeight ?? 5;
+  const truss = config.truss;
+  const mh = truss ? truss.height : (config.mountingHeight ?? 5);
+  const cross = !!config.cross;
   const sides = config.sides.length ? config.sides : (['N', 'S'] as LightSide[]);
   const { minX, minY, maxX, maxY } = area;
   const w = Math.max(0.1, maxX - minX), d = Math.max(0.1, maxY - minY);
@@ -231,22 +234,44 @@ export function generateAreaLighting(area: LightArea, config: AreaLightConfig): 
 
   const beamAngle = fixture.zoomRange ? fixture.zoomRange[1] : fixture.beamAngle;
   const beamR = Math.tan((beamAngle / 2) * DEG2RAD) * mh;
-  const throwDist = mh; // tan(45°) = 1
+  const throwDist = config.throwDistance && config.throwDistance > 0 ? config.throwDistance : mh;
 
-  // Build one truss row per chosen side at the given spacing (fixtures at 100 %).
+  // Straight: aim into the area perpendicular to the row.
+  // Cross (über Kreuz): aim at the mirrored point across the area centre, so the
+  // beams cross — even coverage that doesn't fall off like a flat frontal wash.
   const build = (spacing: number): PlacedFixture[] => {
     const out: PlacedFixture[] = [];
+    if (truss) {
+      const tdx = truss.x2 - truss.x1, tdy = truss.y2 - truss.y1;
+      const tlen = Math.hypot(tdx, tdy) || 0.1;
+      const horiz = Math.abs(tdx) >= Math.abs(tdy);
+      const count = Math.max(2, Math.ceil(tlen / spacing) + 1);
+      for (let i = 0; i < count; i++) {
+        const f = count > 1 ? i / (count - 1) : 0.5;
+        const fx = truss.x1 + tdx * f, fy = truss.y1 + tdy * f;
+        const aimX = horiz ? (cross ? 2 * cx - fx : fx) : cx;
+        const aimY = horiz ? cy : (cross ? 2 * cy - fy : fy);
+        out.push(mkFixture(fixture, fx, fy, mh, aimX, aimY, 100));
+      }
+      return out;
+    }
     for (const side of sides) {
       if (side === 'N' || side === 'S') {
         const count = Math.max(2, Math.ceil(w / spacing) + 1);
         const startX = cx - ((count - 1) * spacing) / 2;
         const ty = side === 'N' ? minY - throwDist : maxY + throwDist;
-        for (let i = 0; i < count; i++) out.push(mkFixture(fixture, startX + i * spacing, ty, mh, startX + i * spacing, cy, 100));
+        for (let i = 0; i < count; i++) {
+          const fxw = startX + i * spacing;
+          out.push(mkFixture(fixture, fxw, ty, mh, cross ? 2 * cx - fxw : fxw, cy, 100));
+        }
       } else {
         const count = Math.max(2, Math.ceil(d / spacing) + 1);
         const startY = cy - ((count - 1) * spacing) / 2;
         const tx = side === 'W' ? minX - throwDist : maxX + throwDist;
-        for (let i = 0; i < count; i++) out.push(mkFixture(fixture, tx, startY + i * spacing, mh, cx, startY + i * spacing, 100));
+        for (let i = 0; i < count; i++) {
+          const fyw = startY + i * spacing;
+          out.push(mkFixture(fixture, tx, fyw, mh, cx, cross ? 2 * cy - fyw : fyw, 100));
+        }
       }
     }
     return out;

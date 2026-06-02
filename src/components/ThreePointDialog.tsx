@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import type { Fixture } from '../types';
+import type { Fixture, Truss } from '../types';
 import { fixtureLibrary } from '../data/fixtureLibrary';
 import type { ThreePointConfig } from '../utils/autoLighting';
 
 interface Props {
   targetLux: number; // from heatmap target, 0 = off
+  trusses: Truss[];
   onGenerate: (config: ThreePointConfig) => void;
   onCancel: () => void;
 }
@@ -17,7 +18,7 @@ const CONTRAST_PRESETS = [
   { label: '8:1 – Noir / Low-Key', value: 8 },
 ];
 
-const ThreePointDialog: React.FC<Props> = ({ targetLux, onGenerate, onCancel }) => {
+const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onCancel }) => {
   const [keyId, setKeyId] = useState('etc-s4-26');
   const [fillId, setFillId] = useState('fresnel-1kw');
   const [backId, setBackId] = useState('etc-s4-36');
@@ -25,11 +26,14 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, onGenerate, onCancel }) 
   const [backRatio, setBackRatio] = useState(1.0);
   const [keyDim, setKeyDim] = useState(100);
   const [localTargetLux, setLocalTargetLux] = useState(targetLux);
+  const [trussId, setTrussId] = useState('');
+  const [distance, setDistance] = useState(4);
 
   const handleSubmit = () => {
     const keyF = fixtureLibrary.find((f) => f.id === keyId) ?? fixtureLibrary[0];
     const fillF = fixtureLibrary.find((f) => f.id === fillId) ?? fixtureLibrary[0];
     const backF = fixtureLibrary.find((f) => f.id === backId) ?? fixtureLibrary[0];
+    const t = trusses.find((tr) => tr.id === trussId);
     onGenerate({
       keyFixture: keyF,
       fillFixture: fillF,
@@ -38,6 +42,8 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, onGenerate, onCancel }) 
       backRatio,
       targetLux: localTargetLux,
       keyDimming: keyDim,
+      truss: t ? { x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2, height: t.height } : undefined,
+      throwDistance: distance,
     });
   };
 
@@ -68,6 +74,28 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, onGenerate, onCancel }) 
             {useTargetMode
               ? `Key wird auf ${localTargetLux} lx gedimmt, Fill auf ${Math.round(localTargetLux / contrastRatio)} lx`
               : 'Manuell: Key-Dimmer wird direkt verwendet'}
+          </div>
+        </div>
+
+        {/* Position: truss + distance so throws aren't random */}
+        <div className="three-point-role">
+          <div className="three-point-role-label">📐 Position der Leuchten</div>
+          <select value={trussId} onChange={(e) => setTrussId(e.target.value)}>
+            <option value="">Freie Position (kein Truss)</option>
+            {trusses.map((t, i) => (
+              <option key={t.id} value={t.id}>{t.label || `Traverse ${i + 1}`} · h={t.height} m</option>
+            ))}
+          </select>
+          <label className="three-point-dim" style={{ marginTop: 6 }}>
+            <span>Abstand zur Person</span>
+            <input type="range" min={1.5} max={12} step={0.5} value={distance}
+              onChange={(e) => setDistance(Number(e.target.value))} />
+            <span className="dim-val">{distance.toFixed(1)} m</span>
+          </label>
+          <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
+            {trussId
+              ? 'Key & Fill werden auf den Truss gesetzt (gleiche Höhe & saubere Abstände). Back bleibt hinter der Person.'
+              : 'Ohne Truss: Key/Fill stehen im eingestellten Abstand zur Person (statt zufällig).'}
           </div>
         </div>
 

@@ -1171,6 +1171,7 @@ const App: React.FC = () => {
       {showThreePointDialog && (
         <ThreePointDialog
           targetLux={heatMapTarget}
+          trusses={trusses}
           onGenerate={handleAutoThreePointConfigured}
           onCancel={() => setShowThreePointDialog(false)}
         />
@@ -1186,6 +1187,7 @@ const App: React.FC = () => {
         <AreaLightDialog
           area={lightArea}
           defaultTargetLux={heatMapTarget}
+          trusses={trusses}
           onGenerate={handleAreaLight}
           onCancel={() => setAreaLightOpen(false)}
         />

@@ -1579,6 +1579,28 @@ kbd {
 }
 .gel-placement-note { margin-top: 2px; }
 
+/* Straight / cross distribution toggle (area lighting) */
+.dist-toggle { display: inline-flex; gap: 4px; }
+.dist-toggle button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-alt);
+  color: var(--text2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.dist-toggle button:hover { border-color: var(--accent); color: var(--text); }
+.dist-toggle button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.area-physics {
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text2);
+  border-left: 2px solid var(--accent);
+  padding-left: 6px;
+}
+
 /* Hide / mute a single lamp */
 .hide-toggle {
   width: 100%;
