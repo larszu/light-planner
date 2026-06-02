@@ -80,6 +80,8 @@ const App: React.FC = () => {
   const [showHeatMap, setShowHeatMap] = useState(false);
   const [heatMapScale, setHeatMapScale] = useState(1000);
   const [heatMapTarget, setHeatMapTarget] = useState(0);
+  const [photoMode, setPhotoMode] = useState(false);
+  const [exposure, setExposure] = useState(1.0);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
   const [cursorLux, setCursorLux] = useState<number | null>(null);
   const [showThreePointDialog, setShowThreePointDialog] = useState(false);
@@ -925,6 +927,10 @@ const App: React.FC = () => {
         heatMapTarget={heatMapTarget}
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
+        photoMode={photoMode}
+        exposure={exposure}
+        onTogglePhotoMode={() => setPhotoMode((v) => !v)}
+        onExposureChange={setExposure}
         onUploadFloorPlan={handleUploadFloorPlan}
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
@@ -1014,6 +1020,8 @@ const App: React.FC = () => {
                 showHeatMap={showHeatMap}
                 heatMapScale={heatMapScale}
                 heatMapTarget={heatMapTarget}
+                photoMode={photoMode}
+                exposure={exposure}
                 onSelect={handleSelectWithGroups}
               />
             </Suspense>

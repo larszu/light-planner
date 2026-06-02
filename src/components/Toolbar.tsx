@@ -12,6 +12,10 @@ interface Props {
   onToggleHeatMap: () => void;
   onHeatMapScaleChange: (v: number) => void;
   onHeatMapTargetChange: (v: number) => void;
+  photoMode: boolean;
+  exposure: number;
+  onTogglePhotoMode: () => void;
+  onExposureChange: (v: number) => void;
   onUploadFloorPlan: (file: File) => void;
   onExport: () => void;
   onAutoThreePoint: () => void;
@@ -50,6 +54,10 @@ const Toolbar: React.FC<Props> = ({
   onToggleHeatMap,
   onHeatMapScaleChange,
   onHeatMapTargetChange,
+  photoMode,
+  exposure,
+  onTogglePhotoMode,
+  onExposureChange,
   onUploadFloorPlan,
   onExport,
   onAutoThreePoint,
@@ -191,6 +199,37 @@ const Toolbar: React.FC<Props> = ({
           </label>
         )}
       </div>
+
+      {/* Photo-realistic relight – only meaningful in the 3D view */}
+      {viewMode === '3d' && (
+        <>
+          <div className="toolbar-separator" />
+          <div className="toolbar-group">
+            <button
+              className={`tool-btn ${photoMode ? 'active' : ''}`}
+              onClick={onTogglePhotoMode}
+              title="Foto-Ansicht: echte Scheinwerfer mit Schattenwurf, Bloom & Lichtkegeln"
+            >
+              <span className="tool-icon">📷</span>
+              <span className="tool-label">Foto</span>
+            </button>
+            {photoMode && (
+              <label className="heat-scale-label" title="Belichtung (wie Kamera-Blende/ISO)">
+                <span>☀</span>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={3}
+                  step={0.05}
+                  value={exposure}
+                  onChange={(e) => onExposureChange(Number(e.target.value))}
+                />
+                <span>{exposure.toFixed(2)}</span>
+              </label>
+            )}
+          </div>
+        </>
+      )}
 
       <div className="toolbar-separator" />
 
