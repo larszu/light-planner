@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Tool, ViewMode } from '../types';
+import { useTranslation } from '../i18n';
 
 interface Props {
   activeTool: Tool;
@@ -88,18 +89,19 @@ const Toolbar: React.FC<Props> = ({
   onUngroupSelection,
   onRotateSelection,
 }) => {
+  const { t } = useTranslation();
   const tools: { id: Tool; label: string; icon: string }[] = [
-    { id: 'select', label: 'Auswahl', icon: '⊹' },
-    { id: 'pan', label: 'Verschieben', icon: '✋' },
-    { id: 'rect', label: 'Rechteck', icon: '▭' },
-    { id: 'line', label: 'Linie', icon: '╱' },
-    { id: 'measure', label: 'Messen', icon: '📏' },
-    { id: 'person', label: 'Person', icon: '🧑' },
-    { id: 'stage', label: 'Podest', icon: '⬜' },
-    { id: 'stagepoly', label: 'Bühne (Polygon)', icon: '⬠' },
-    { id: 'truss', label: 'Traverse', icon: '▤' },
-    { id: 'wall', label: 'Wand', icon: '▬' },
-    { id: 'camera', label: 'Kamera', icon: '🎥' },
+    { id: 'select', label: t('tool.select', 'Auswahl'), icon: '⊹' },
+    { id: 'pan', label: t('tool.pan', 'Verschieben'), icon: '✋' },
+    { id: 'rect', label: t('tool.rect', 'Rechteck'), icon: '▭' },
+    { id: 'line', label: t('tool.line', 'Linie'), icon: '╱' },
+    { id: 'measure', label: t('tool.measure', 'Messen'), icon: '📏' },
+    { id: 'person', label: t('tool.person', 'Person'), icon: '🧑' },
+    { id: 'stage', label: t('tool.stage', 'Podest'), icon: '⬜' },
+    { id: 'stagepoly', label: t('tool.stagepoly', 'Bühne (Polygon)'), icon: '⬠' },
+    { id: 'truss', label: t('tool.truss', 'Traverse'), icon: '▤' },
+    { id: 'wall', label: t('tool.wall', 'Wand'), icon: '▬' },
+    { id: 'camera', label: t('tool.camera', 'Kamera'), icon: '🎥' },
   ];
 
   return (
