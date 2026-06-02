@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall } from './types';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import PlanCanvas from './components/PlanCanvas';
@@ -72,6 +72,7 @@ const App: React.FC = () => {
   const [projectId, setProjectId] = useState<string>('proj-' + Date.now());
   const [fixtureGroups, setFixtureGroups] = useState<FixtureGroup[]>([]);
   const [trusses, setTrusses] = useState<Truss[]>([]);
+  const [walls, setWalls] = useState<Wall[]>([]);
   const [planMode, setPlanMode] = useState<PlanMode>('none');
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
   const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
@@ -84,12 +85,12 @@ const App: React.FC = () => {
   const defaultMountingHeight = 6;
 
   // ── Undo / Redo ──
-  interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[]; trusses: Truss[] }
+  interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[]; trusses: Truss[]; walls: Wall[] }
   const historyRef = useRef<Snapshot[]>([]);
   const futureRef = useRef<Snapshot[]>([]);
   const lastPushRef = useRef(0);
-  const stateRef = useRef<Snapshot>({ fixtures, persons, stageElements, shapes, fixtureGroups, trusses });
-  stateRef.current = { fixtures, persons, stageElements, shapes, fixtureGroups, trusses };
+  const stateRef = useRef<Snapshot>({ fixtures, persons, stageElements, shapes, fixtureGroups, trusses, walls });
+  stateRef.current = { fixtures, persons, stageElements, shapes, fixtureGroups, trusses, walls };
 
   const pushHistory = useCallback(() => {
     if (historyRef.current.length >= 50) historyRef.current.shift();
@@ -109,6 +110,7 @@ const App: React.FC = () => {
     setShapes(snap.shapes);
     setFixtureGroups(snap.fixtureGroups);
     setTrusses(snap.trusses);
+    setWalls(snap.walls);
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -281,6 +283,26 @@ const App: React.FC = () => {
     setTrusses((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
   }, [pushHistoryThrottled]);
 
+  // ── Wall handlers (architecture with reflectance / colour) ──
+  const handleAddWall = useCallback((x1: number, y1: number, x2: number, y2: number) => {
+    pushHistory();
+    const w: Wall = { id: uid('wall'), x1, y1, x2, y2, height: 3, reflectance: 0.5, color: '#c9c4b8', label: '' };
+    setWalls((prev) => [...prev, w]);
+    setSelectedIds(new Set([w.id]));
+  }, []);
+
+  const handleMoveWall = useCallback((id: string, dx: number, dy: number) => {
+    pushHistoryThrottled();
+    setWalls((prev) => prev.map((w) => (w.id === id
+      ? { ...w, x1: Math.round((w.x1 + dx) * 10) / 10, y1: Math.round((w.y1 + dy) * 10) / 10, x2: Math.round((w.x2 + dx) * 10) / 10, y2: Math.round((w.y2 + dy) * 10) / 10 }
+      : w)));
+  }, [pushHistoryThrottled]);
+
+  const handleUpdateWall = useCallback((id: string, updates: Partial<Wall>) => {
+    pushHistoryThrottled();
+    setWalls((prev) => prev.map((w) => (w.id === id ? { ...w, ...updates } : w)));
+  }, [pushHistoryThrottled]);
+
   // ── Delete any element ──
   const handleDelete = useCallback((id: string) => {
     pushHistory();
@@ -289,6 +311,7 @@ const App: React.FC = () => {
     setStageElements((prev) => prev.filter((s) => s.id !== id));
     setShapes((prev) => prev.filter((s) => s.id !== id));
     setTrusses((prev) => prev.filter((t) => t.id !== id));
+    setWalls((prev) => prev.filter((w) => w.id !== id));
     setFixtureGroups((prev) => prev.map((g) => ({ ...g, fixtureIds: g.fixtureIds.filter((fid) => fid !== id) })).filter((g) => g.fixtureIds.length > 0));
     setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
   }, []);
@@ -485,6 +508,7 @@ const App: React.FC = () => {
       customFixtures,
       fixtureGroups,
       trusses,
+      walls,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     try {
@@ -494,7 +518,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -506,6 +530,7 @@ const App: React.FC = () => {
     setCustomFixtures(data.customFixtures);
     setFixtureGroups(data.fixtureGroups ?? []);
     setTrusses(data.trusses ?? []);
+    setWalls(data.walls ?? []);
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
     if (data.floorPlan) {
@@ -678,6 +703,8 @@ const App: React.FC = () => {
     setStageElements((prev) => prev.map((s) => (selectedIds.has(s.id) ? { ...s, x: round1(s.x + dx), y: round1(s.y + dy) } : s)));
     setTrusses((prev) => prev.map((t) => (selectedIds.has(t.id)
       ? { ...t, x1: round1(t.x1 + dx), y1: round1(t.y1 + dy), x2: round1(t.x2 + dx), y2: round1(t.y2 + dy) } : t)));
+    setWalls((prev) => prev.map((w) => (selectedIds.has(w.id)
+      ? { ...w, x1: round1(w.x1 + dx), y1: round1(w.y1 + dy), x2: round1(w.x2 + dx), y2: round1(w.y2 + dy) } : w)));
   }, [selectedIds, pushHistoryThrottled]);
 
   useEffect(() => {
@@ -801,6 +828,7 @@ const App: React.FC = () => {
               persons={persons}
               stageElements={stageElements}
               trusses={trusses}
+              walls={walls}
               floorPlan={floorPlan}
               snapStep={snapStep}
               activeTool={activeTool}
@@ -821,6 +849,8 @@ const App: React.FC = () => {
               onMoveStageElement={handleMoveStageElement}
               onAddTruss={handleAddTruss}
               onMoveTruss={handleMoveTruss}
+              onAddWall={handleAddWall}
+              onMoveWall={handleMoveWall}
               onCursorLux={setCursorLux}
               onToolChange={handleToolChange}
               onDropFixture={handleDropFixture}
@@ -837,6 +867,7 @@ const App: React.FC = () => {
                 persons={persons}
                 stageElements={stageElements}
                 trusses={trusses}
+                walls={walls}
                 floorPlan={floorPlan}
                 selectedIds={selectedIds}
                 showHeatMap={showHeatMap}
@@ -881,6 +912,7 @@ const App: React.FC = () => {
           persons={persons}
           stageElements={stageElements}
           trusses={trusses}
+          walls={walls}
           shapes={shapes}
           selectedIds={selectedIds}
           cursorLux={cursorLux}
@@ -889,6 +921,7 @@ const App: React.FC = () => {
           onUpdatePerson={handleUpdatePerson}
           onUpdateStageElement={handleUpdateStageElement}
           onUpdateTruss={handleUpdateTruss}
+          onUpdateWall={handleUpdateWall}
           onDelete={handleDelete}
           onAutoThreePointForPerson={handleAutoThreePointForPerson}
           onAreaLight={() => setAreaLightOpen(true)}

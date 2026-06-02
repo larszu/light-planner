@@ -1,4 +1,4 @@
-import type { PlacedFixture, Attachment, PhotometricData } from '../types';
+import type { PlacedFixture, Attachment, PhotometricData, Wall } from '../types';
 import { combinedTransmission, effectiveBeamAngleWithFrost } from '../data/gelLibrary';
 
 const DEG2RAD = Math.PI / 180;
@@ -266,17 +266,94 @@ export function luxFromFixture(
 }
 
 /**
- * Total illuminance at a point from all fixtures.
+ * Luminous intensity (candela) from a fixture toward an arbitrary 3D point.
+ * Same beam model as luxFromFixture but without the inverse-square / incidence
+ * terms — used to light non-floor surfaces (walls) for the bounce calc.
+ */
+function beamIntensityToward(f: PlacedFixture, px: number, py: number, pz: number): number {
+  const dimFactor = f.dimming / 100;
+  if (dimFactor <= 0) return 0;
+  const eff = getEffectiveBeam(f);
+  let fieldAngle = eff.fieldAngle;
+  if (f.gelFilterIds && f.gelFilterIds.length > 0) fieldAngle = effectiveBeamAngleWithFrost(eff.fieldAngle, f.gelFilterIds);
+  const gelT = (f.gelFilterIds && f.gelFilterIds.length > 0) ? combinedTransmission(f.gelFilterIds) : 1;
+
+  const ex = px - f.x, ny = py - f.y, vz = pz - f.mountingHeight;
+  const dist = Math.sqrt(ex * ex + ny * ny + vz * vz) || 1e-6;
+  const aEx = f.aimX - f.x, aNy = f.aimY - f.y, aVz = -f.mountingHeight;
+  const aimDist = Math.sqrt(aEx * aEx + aNy * aNy + aVz * aVz) || 1e-6;
+  const cosT = (ex * aEx + ny * aNy + vz * aVz) / (dist * aimDist);
+  const theta = Math.acos(Math.min(1, Math.max(-1, cosT)));
+  const sigma = beamSigma(fieldAngle);
+  const Ipeak = peakIntensity(eff.lumens, eff.refFieldAngle, fieldAngle, eff.beamRatioWH, eff.photometric) * dimFactor * gelT;
+  return Ipeak * Math.exp(-(theta * theta) / (2 * sigma * sigma));
+}
+
+// A small reflecting patch on a wall, with its pre-computed reflected exitance.
+export interface WallSample { x: number; y: number; z: number; nx: number; ny: number; m: number; dA: number }
+
+/**
+ * Pre-compute reflecting patches for all walls: how much light each wall patch
+ * receives (from all fixtures) × its reflectance. One bounce, wall → floor.
+ */
+export function precomputeWallSamples(walls: Wall[], fixtures: PlacedFixture[]): WallSample[] {
+  const out: WallSample[] = [];
+  for (const w of walls) {
+    if (w.reflectance <= 0 || w.height <= 0) continue;
+    const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+    const L = Math.hypot(dx, dy);
+    if (L < 0.1) continue;
+    const K = Math.max(2, Math.min(14, Math.ceil(L / 1.5)));
+    const nx = -dy / L, ny = dx / L;   // wall normal (double-sided via abs below)
+    const zc = w.height / 2;
+    const dA = (L / K) * w.height;
+    for (let k = 0; k < K; k++) {
+      const t = (k + 0.5) / K;
+      const sx = w.x1 + dx * t, sy = w.y1 + dy * t;
+      let E = 0;
+      for (const f of fixtures) {
+        const I = beamIntensityToward(f, sx, sy, zc);
+        if (I <= 0) continue;
+        const rx = sx - f.x, ry = sy - f.y, rz = zc - f.mountingHeight;
+        const d2 = rx * rx + ry * ry + rz * rz; const d = Math.sqrt(d2) || 1e-6;
+        const cosInc = Math.abs((rx / d) * nx + (ry / d) * ny); // double-sided
+        E += (I * cosInc) / d2;
+      }
+      out.push({ x: sx, y: sy, z: zc, nx, ny, m: w.reflectance * E, dA });
+    }
+  }
+  return out;
+}
+
+/** Reflected illuminance at a floor point from pre-computed wall patches. */
+export function wallBounceAt(samples: WallSample[], px: number, py: number): number {
+  let extra = 0;
+  for (const s of samples) {
+    if (s.m <= 0) continue;
+    const rx = px - s.x, ry = py - s.y, rz = -s.z;
+    const rd2 = rx * rx + ry * ry + rz * rz; const rd = Math.sqrt(rd2) || 1e-6;
+    const cosEmit = Math.abs((rx / rd) * s.nx + (ry / rd) * s.ny); // double-sided
+    const cosRecv = s.z / rd; // floor normal (up) · direction to patch
+    if (cosEmit <= 0 || cosRecv <= 0) continue;
+    extra += (s.m / Math.PI) * ((cosEmit * cosRecv) / rd2) * s.dA;
+  }
+  return extra;
+}
+
+/**
+ * Total illuminance at a point from all fixtures (+ optional wall bounce).
  */
 export function totalLux(
   fixtures: PlacedFixture[],
   px: number,
   py: number,
+  wallSamples: WallSample[] = [],
 ): number {
   let sum = 0;
   for (const f of fixtures) {
     sum += luxFromFixture(f, px, py);
   }
+  if (wallSamples.length) sum += wallBounceAt(wallSamples, px, py);
   return sum;
 }
 
@@ -291,17 +368,21 @@ export function computeHeatMap(
   heightM: number,
   resX: number,
   resY: number,
+  walls: Wall[] = [],
 ): { data: Float32Array; maxLux: number } {
   const data = new Float32Array(resX * resY);
   const stepX = widthM / resX;
   const stepY = heightM / resY;
   let maxLux = 0;
 
+  // Pre-compute the wall reflecting patches once for the whole grid.
+  const wallSamples = walls.length ? precomputeWallSamples(walls, fixtures) : [];
+
   for (let yi = 0; yi < resY; yi++) {
     const py = originY + (yi + 0.5) * stepY;
     for (let xi = 0; xi < resX; xi++) {
       const px = originX + (xi + 0.5) * stepX;
-      const lux = totalLux(fixtures, px, py);
+      const lux = totalLux(fixtures, px, py, wallSamples);
       data[yi * resX + xi] = lux;
       if (lux > maxLux) maxLux = lux;
     }

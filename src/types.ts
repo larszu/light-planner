@@ -156,6 +156,17 @@ export interface Shape {
   color: string;
 }
 
+// ── Wall (architecture) – reflects light back into the room ──
+export interface Wall {
+  id: string;
+  x1: number; y1: number;   // endpoints on the floor (meters)
+  x2: number; y2: number;
+  height: number;           // wall height (meters)
+  reflectance: number;      // 0..1 diffuse reflectance (Reflexionsgrad)
+  color: string;            // surface colour (hex)
+  label: string;
+}
+
 // ── Truss / hanging position (rigging) ──
 export interface Truss {
   id: string;
@@ -167,7 +178,7 @@ export interface Truss {
   label: string;
 }
 
-export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'truss';
+export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'truss' | 'wall';
 export type ViewMode = '2d' | '3d';
 
 export interface ViewTransform {
@@ -227,6 +238,7 @@ export interface ProjectData {
   customFixtures: Fixture[];
   fixtureGroups?: FixtureGroup[];
   trusses?: Truss[];
+  walls?: Wall[];
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
   floorPlan?: Omit<FloorPlan, 'image'>;

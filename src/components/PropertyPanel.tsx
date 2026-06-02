@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PlacedFixture, Person, StageElement, Fixture, Truss, Shape } from '../types';
+import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Shape } from '../types';
 import { luxFromFixture, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { gelLibrary, effectiveColorTemp } from '../data/gelLibrary';
 import { fixtureLibrary } from '../data/fixtureLibrary';
@@ -10,6 +10,7 @@ interface Props {
   persons: Person[];
   stageElements: StageElement[];
   trusses: Truss[];
+  walls: Wall[];
   shapes: Shape[];
   selectedIds: Set<string>;
   cursorLux: number | null;
@@ -18,6 +19,7 @@ interface Props {
   onUpdatePerson: (id: string, updates: Partial<Person>) => void;
   onUpdateStageElement: (id: string, updates: Partial<StageElement>) => void;
   onUpdateTruss: (id: string, updates: Partial<Truss>) => void;
+  onUpdateWall: (id: string, updates: Partial<Wall>) => void;
   onDelete: (id: string) => void;
   onAutoThreePointForPerson: (personId: string) => void;
   onAreaLight: () => void;
@@ -38,6 +40,7 @@ const PropertyPanel: React.FC<Props> = ({
   persons,
   stageElements,
   trusses,
+  walls,
   shapes,
   selectedIds,
   cursorLux,
@@ -46,6 +49,7 @@ const PropertyPanel: React.FC<Props> = ({
   onUpdatePerson,
   onUpdateStageElement,
   onUpdateTruss,
+  onUpdateWall,
   onDelete,
   onAutoThreePointForPerson,
   onAreaLight,
@@ -55,6 +59,7 @@ const PropertyPanel: React.FC<Props> = ({
   const selPerson = persons.find((p) => p.id === selectedId);
   const selStage = stageElements.find((s) => s.id === selectedId);
   const selTruss = trusses.find((t) => t.id === selectedId);
+  const selWall = walls.find((w) => w.id === selectedId);
   const selShape = shapes.find((s) => s.id === selectedId);
 
   // Multi-selection info
@@ -425,6 +430,40 @@ const PropertyPanel: React.FC<Props> = ({
           </label>
         </div>
         <button className="delete-btn" onClick={() => onDelete(t.id)}>Traverse löschen</button>
+      </div>
+    );
+  }
+
+  if (selWall) {
+    const w = selWall;
+    const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+    return (
+      <div className="property-panel">
+        <h3>Wand</h3>
+        <div className="prop-section">
+          <div className="prop-derived lux-readout">Länge: {len.toFixed(2)} m</div>
+          {numField('Höhe (m)', w.height, (v) => onUpdateWall(w.id, { height: v }), 0.1, 0.1, 20)}
+          <label className="prop-field">
+            <span>Reflexion ({Math.round(w.reflectance * 100)}%)</span>
+            <input type="range" min={0} max={1} step={0.05} value={w.reflectance}
+              onChange={(e) => onUpdateWall(w.id, { reflectance: Number(e.target.value) })} />
+          </label>
+          <div className="reflectance-presets">
+            {[['Schwarz', 0.05], ['Beton', 0.35], ['Hell', 0.6], ['Weiß', 0.85]].map(([lbl, v]) => (
+              <button key={lbl as string} className="refl-btn" onClick={() => onUpdateWall(w.id, { reflectance: v as number })}>{lbl}</button>
+            ))}
+          </div>
+          <label className="prop-field">
+            <span>Farbe</span>
+            <input type="color" value={w.color} onChange={(e) => onUpdateWall(w.id, { color: e.target.value })} />
+          </label>
+          <label className="prop-field">
+            <span>Bezeichnung</span>
+            <input type="text" value={w.label || ''} onChange={(e) => onUpdateWall(w.id, { label: e.target.value })} />
+          </label>
+          <div className="prop-derived">Reflektiert Licht diffus in den Raum (Ein-Bounce) – fließt in die Heatmap ein.</div>
+        </div>
+        <button className="delete-btn" onClick={() => onDelete(w.id)}>Wand löschen</button>
       </div>
     );
   }

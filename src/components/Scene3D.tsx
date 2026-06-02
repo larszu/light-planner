@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { PlacedFixture, Person, StageElement, Truss, FloorPlan } from '../types';
+import type { PlacedFixture, Person, StageElement, Truss, Wall, FloorPlan } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
 
@@ -15,6 +15,7 @@ interface Props {
   persons: Person[];
   stageElements: StageElement[];
   trusses: Truss[];
+  walls: Wall[];
   floorPlan: FloorPlan | null;
   selectedIds: Set<string>;
   showHeatMap: boolean;
@@ -23,7 +24,7 @@ interface Props {
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -189,6 +190,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     for (const p of persons) acc(p.x, p.y);
     for (const se of stageElements) { acc(se.x, se.y); acc(se.x + se.width, se.y + se.depth); }
     for (const t of trusses) { acc(t.x1, t.y1); acc(t.x2, t.y2); }
+    for (const w of walls) { acc(w.x1, w.y1); acc(w.x2, w.y2); }
     if (floorPlan) { acc(floorPlan.offsetX, floorPlan.offsetY); acc(floorPlan.offsetX + floorPlan.widthMeters, floorPlan.offsetY + floorPlan.heightMeters); }
     const hasContent = bMinX !== Infinity;
 
@@ -247,6 +249,24 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       mesh.rotation.y = -angle;
       mesh.castShadow = true;
       mesh.userData = { dynamic: true, selectId: t.id };
+      scene.add(mesh);
+    }
+
+    // Walls (architecture – vertical surfaces that reflect light)
+    for (const w of walls) {
+      const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+      if (len < 0.05) continue;
+      const isSel = selectedIds.has(w.id);
+      const angle = Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(len, w.height, 0.15),
+        new THREE.MeshStandardMaterial({ color: isSel ? '#ffcc33' : w.color, roughness: 0.85, metalness: 0 }),
+      );
+      mesh.position.set((w.x1 + w.x2) / 2, w.height / 2, (w.y1 + w.y2) / 2);
+      mesh.rotation.y = -angle;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.userData = { dynamic: true, selectId: w.id };
       scene.add(mesh);
     }
 
@@ -356,7 +376,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const hw = Math.max(8, (bMaxX - bMinX) + 2 * pad);
       const hd = Math.max(8, (bMaxY - bMinY) + 2 * pad);
       const hmRes = 180;
-      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes);
+      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls);
       const scale = heatMapScale > 0 ? heatMapScale : (maxLux || 1000);
 
       const canvas2d = document.createElement('canvas');
@@ -425,7 +445,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
+  }, [fixtures, persons, stageElements, trusses, walls, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {

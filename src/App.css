@@ -1457,6 +1457,34 @@ kbd {
   background: rgba(239, 83, 80, 0.15);
 }
 
+/* ── Wall reflectance presets & colour ─────────────────── */
+.reflectance-presets {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+.refl-btn {
+  flex: 1;
+  padding: 4px 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-alt);
+  color: var(--text2);
+  font-size: 10px;
+  cursor: pointer;
+}
+.refl-btn:hover { border-color: var(--accent); color: var(--text); }
+
+.prop-field input[type='color'] {
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-alt);
+  cursor: pointer;
+}
+
 /* ── Fixture Editor Modal ──────────────────────────────── */
 .modal-backdrop {
   position: fixed;

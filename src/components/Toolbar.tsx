@@ -81,6 +81,7 @@ const Toolbar: React.FC<Props> = ({
     { id: 'person', label: 'Person', icon: '🧑' },
     { id: 'stage', label: 'Podest', icon: '⬜' },
     { id: 'truss', label: 'Traverse', icon: '▤' },
+    { id: 'wall', label: 'Wand', icon: '▬' },
   ];
 
   return (

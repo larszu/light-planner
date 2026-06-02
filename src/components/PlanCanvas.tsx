@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss } from '../types';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall } from '../types';
 import type { PlanMode } from '../App';
-import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg } from '../utils/lightCalc';
+import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeWallSamples } from '../utils/lightCalc';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
 import { getBeamColorRgba } from '../utils/colorTemp';
 
@@ -11,6 +11,7 @@ interface Props {
   persons: Person[];
   stageElements: StageElement[];
   trusses: Truss[];
+  walls: Wall[];
   floorPlan: FloorPlan | null;
   snapStep: number;
   activeTool: Tool;
@@ -32,6 +33,8 @@ interface Props {
   onMoveStageElement: (id: string, x: number, y: number) => void;
   onAddTruss: (x1: number, y1: number, x2: number, y2: number) => void;
   onMoveTruss: (id: string, dx: number, dy: number) => void;
+  onAddWall: (x1: number, y1: number, x2: number, y2: number) => void;
+  onMoveWall: (id: string, dx: number, dy: number) => void;
   onCursorLux: (lux: number | null) => void;
   onToolChange: (tool: Tool) => void;
   onDropFixture: (fixture: Fixture, x: number, y: number) => void;
@@ -61,6 +64,7 @@ const PlanCanvas: React.FC<Props> = ({
   persons,
   stageElements,
   trusses,
+  walls,
   floorPlan,
   snapStep,
   activeTool,
@@ -82,6 +86,8 @@ const PlanCanvas: React.FC<Props> = ({
   onMoveStageElement,
   onAddTruss,
   onMoveTruss,
+  onAddWall,
+  onMoveWall,
   onCursorLux,
   onToolChange,
   onDropFixture,
@@ -93,7 +99,7 @@ const PlanCanvas: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'calibrate' | 'move-plan' | 'marquee';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'move-wall' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'calibrate' | 'move-plan' | 'marquee';
     startScreenX: number;
     startScreenY: number;
     startWorldX: number;
@@ -120,6 +126,9 @@ const PlanCanvas: React.FC<Props> = ({
     const v = viewRef.current;
     return [(sx - v.offsetX) / v.scale, (sy - v.offsetY) / v.scale];
   }, []);
+
+  // Reflecting wall patches (for the cursor lux readout incl. bounce).
+  const wallSamples = useMemo(() => precomputeWallSamples(walls, fixtures), [walls, fixtures]);
 
   // Snap a world coordinate to the grid (if enabled), else to 0.1 m.
   const snap = useCallback(
@@ -326,6 +335,32 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.restore();
     }
 
+    // Walls (architecture – reflect light back into the room)
+    for (const wall of walls) {
+      const isSel = selectedIds.has(wall.id);
+      const wlen = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = isSel ? '#ffcc33' : wall.color;
+      ctx.lineWidth = 0.22; // ~0.22 m thick (world units)
+      ctx.beginPath();
+      ctx.moveTo(wall.x1, wall.y1); ctx.lineTo(wall.x2, wall.y2);
+      ctx.stroke();
+      if (isSel) {
+        ctx.strokeStyle = '#ffcc33';
+        ctx.lineWidth = 1.5 / v.scale;
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      if (wlen > 0.5) {
+        const mx = (wall.x1 + wall.x2) / 2, my = (wall.y1 + wall.y2) / 2;
+        ctx.fillStyle = isSel ? '#ffcc33' : '#b9c2cf';
+        ctx.font = `${9 / v.scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${wall.label ? wall.label + ' · ' : ''}ρ${Math.round(wall.reflectance * 100)}% · ${wall.height}m`, mx, my - 0.25);
+        ctx.textAlign = 'start';
+      }
+    }
+
     // Trusses (rigging / hanging positions)
     for (const t of trusses) {
       const isSel = selectedIds.has(t.id);
@@ -426,10 +461,10 @@ const PlanCanvas: React.FC<Props> = ({
       const hmWidth = Math.min(right, planRight) - hmLeft;
       const hmHeight = Math.min(bottom, planBottom) - hmTop;
       if (hmWidth > 0 && hmHeight > 0) {
-        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
+        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}`).join('|')}|${walls.map((w) => `${w.x1}:${w.y1}:${w.x2}:${w.y2}:${w.height}:${w.reflectance}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
         let imgData = heatMapCacheRef.current.imageData;
         if (heatMapCacheRef.current.key !== cacheKey || !imgData) {
-          const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY);
+          const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY, walls);
           imgData = new ImageData(hmResX, hmResY);
           const useTarget = heatMapTarget > 0;
           for (let i = 0; i < data.length; i++) {
@@ -660,14 +695,17 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'start';
     }
 
-    // Active truss being drawn
-    if (dragRef.current?.type === 'draw-truss' && measureEndRef.current) {
+    // Active truss / wall being drawn
+    if ((dragRef.current?.type === 'draw-truss' || dragRef.current?.type === 'draw-wall') && measureEndRef.current) {
       const d = dragRef.current;
       const end = measureEndRef.current;
       const len = Math.hypot(end.x - d.startWorldX, end.y - d.startWorldY);
-      ctx.strokeStyle = '#9aa4b2';
-      ctx.lineWidth = 3 / v.scale;
+      const isWall = d.type === 'draw-wall';
+      ctx.strokeStyle = isWall ? '#c9c4b8' : '#9aa4b2';
+      ctx.lineCap = isWall ? 'round' : 'butt';
+      ctx.lineWidth = isWall ? 0.22 : 3 / v.scale;
       ctx.beginPath(); ctx.moveTo(d.startWorldX, d.startWorldY); ctx.lineTo(end.x, end.y); ctx.stroke();
+      ctx.lineCap = 'butt';
       const mx = (d.startWorldX + end.x) / 2, my = (d.startWorldY + end.y) / 2;
       ctx.fillStyle = '#c8d0da';
       ctx.font = `bold ${12 / v.scale}px sans-serif`;
@@ -696,7 +734,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -784,6 +822,12 @@ const PlanCanvas: React.FC<Props> = ({
       const s = { x: snap(wx), y: snap(wy) };
       measureEndRef.current = s;
       dragRef.current = { type: 'draw-truss', startScreenX: sx, startScreenY: sy, startWorldX: s.x, startWorldY: s.y };
+      return;
+    }
+    if (activeTool === 'wall') {
+      const s = { x: snap(wx), y: snap(wy) };
+      measureEndRef.current = s;
+      dragRef.current = { type: 'draw-wall', startScreenX: sx, startScreenY: sy, startWorldX: s.x, startWorldY: s.y };
       return;
     }
     if (activeTool === 'measure') {
@@ -875,6 +919,23 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
+      for (const wall of walls) {
+        if (distToSegment(wx, wy, wall.x1, wall.y1, wall.x2, wall.y2) < 0.3) {
+          onSelect(wall.id, ctrl);
+          dragRef.current = { type: 'move-wall', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: wall.id };
+          return;
+        }
+      }
+      // Lines & measure lines: clicking near the segment selects it (so it
+      // can be deleted from the property panel).
+      for (const shape of shapes) {
+        if ((shape.type === 'line' || shape.type === 'measure') && shape.points.length === 2
+          && distToSegment(wx, wy, shape.points[0].x, shape.points[0].y, shape.points[1].x, shape.points[1].y) < 0.3) {
+          onSelect(shape.id, ctrl);
+          dragRef.current = { type: 'move-shape', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: shape.id };
+          return;
+        }
+      }
       // Rectangle shapes: clicking the outline selects the area (interior is
       // left free for marquee selection / picking fixtures inside it).
       for (const shape of shapes) {
@@ -903,7 +964,7 @@ const PlanCanvas: React.FC<Props> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     const [sx, sy] = getCanvasPos(e);
     const [wx, wy] = screenToWorld(sx, sy);
-    if (fixtures.length > 0) onCursorLux(totalLux(fixtures, wx, wy));
+    if (fixtures.length > 0) onCursorLux(totalLux(fixtures, wx, wy, wallSamples));
     else onCursorLux(null);
 
     if (!dragRef.current) return;
@@ -947,13 +1008,18 @@ const PlanCanvas: React.FC<Props> = ({
       d.startWorldX = wx; d.startWorldY = wy;
       return;
     }
+    if (d.type === 'move-wall' && d.targetId) {
+      onMoveWall(d.targetId, wx - d.startWorldX, wy - d.startWorldY);
+      d.startWorldX = wx; d.startWorldY = wy;
+      return;
+    }
     if (d.type === 'move-shape' && d.targetId) {
       onMoveShape(d.targetId, wx - d.startWorldX, wy - d.startWorldY);
       d.startWorldX = wx; d.startWorldY = wy;
       return;
     }
     if (d.type === 'draw-measure') measureEndRef.current = { x: wx, y: wy };
-    if (d.type === 'draw-truss') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
+    if (d.type === 'draw-truss' || d.type === 'draw-wall') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
     if (d.type === 'marquee') { marqueeEndRef.current = { x: wx, y: wy }; return; }
     if (d.type === 'calibrate') { calibEndRef.current = { x: wx, y: wy }; return; }
     if (d.type === 'move-plan') {
@@ -1011,6 +1077,11 @@ const PlanCanvas: React.FC<Props> = ({
         if (len > 0.3) onAddTruss(d.startWorldX, d.startWorldY, snap(ewx), snap(ewy));
         measureEndRef.current = null;
       }
+      if (d.type === 'draw-wall') {
+        const len = Math.hypot(ewx - d.startWorldX, ewy - d.startWorldY);
+        if (len > 0.3) onAddWall(d.startWorldX, d.startWorldY, snap(ewx), snap(ewy));
+        measureEndRef.current = null;
+      }
       if (d.type === 'marquee') {
         const x0 = Math.min(d.startWorldX, ewx), x1 = Math.max(d.startWorldX, ewx);
         const y0 = Math.min(d.startWorldY, ewy), y1 = Math.max(d.startWorldY, ewy);
@@ -1045,7 +1116,7 @@ const PlanCanvas: React.FC<Props> = ({
 
   const cursor = activeTool === 'pan' || spaceDownRef.current ? 'grab'
     : planMode === 'move' ? 'move'
-    : planMode === 'calibrate' || fixtureToPlace || ['person', 'stage', 'rect', 'line', 'measure', 'truss'].includes(activeTool) ? 'crosshair'
+    : planMode === 'calibrate' || fixtureToPlace || ['person', 'stage', 'rect', 'line', 'measure', 'truss', 'wall'].includes(activeTool) ? 'crosshair'
     : 'default';
 
   return (
