@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PlacedFixture, Person, StageElement, Fixture, Truss } from '../types';
+import type { PlacedFixture, Person, StageElement, Fixture, Truss, Shape } from '../types';
 import { luxFromFixture, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { gelLibrary, effectiveColorTemp } from '../data/gelLibrary';
 import { fixtureLibrary } from '../data/fixtureLibrary';
@@ -10,6 +10,7 @@ interface Props {
   persons: Person[];
   stageElements: StageElement[];
   trusses: Truss[];
+  shapes: Shape[];
   selectedIds: Set<string>;
   cursorLux: number | null;
   patchConflicts: Set<string>;
@@ -19,6 +20,7 @@ interface Props {
   onUpdateTruss: (id: string, updates: Partial<Truss>) => void;
   onDelete: (id: string) => void;
   onAutoThreePointForPerson: (personId: string) => void;
+  onAreaLight: () => void;
 }
 
 const MOUNT_LABELS: Record<string, string> = {
@@ -36,6 +38,7 @@ const PropertyPanel: React.FC<Props> = ({
   persons,
   stageElements,
   trusses,
+  shapes,
   selectedIds,
   cursorLux,
   patchConflicts,
@@ -45,12 +48,14 @@ const PropertyPanel: React.FC<Props> = ({
   onUpdateTruss,
   onDelete,
   onAutoThreePointForPerson,
+  onAreaLight,
 }) => {
   const selectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
   const selFixture = fixtures.find((f) => f.id === selectedId);
   const selPerson = persons.find((p) => p.id === selectedId);
   const selStage = stageElements.find((s) => s.id === selectedId);
   const selTruss = trusses.find((t) => t.id === selectedId);
+  const selShape = shapes.find((s) => s.id === selectedId);
 
   // Multi-selection info
   const multiFixtures = fixtures.filter((f) => selectedIds.has(f.id));
@@ -420,6 +425,28 @@ const PropertyPanel: React.FC<Props> = ({
           </label>
         </div>
         <button className="delete-btn" onClick={() => onDelete(t.id)}>Traverse löschen</button>
+      </div>
+    );
+  }
+
+  if (selShape) {
+    const sh = selShape;
+    const isRect = sh.type === 'rect' && sh.points.length === 2;
+    const w = isRect ? Math.abs(sh.points[1].x - sh.points[0].x) : 0;
+    const h = isRect ? Math.abs(sh.points[1].y - sh.points[0].y) : 0;
+    return (
+      <div className="property-panel">
+        <h3>{isRect ? 'Fläche (Rechteck)' : sh.type === 'measure' ? 'Maßlinie' : 'Linie'}</h3>
+        <div className="prop-section">
+          {isRect
+            ? <div className="prop-derived lux-readout">Größe: {w.toFixed(1)} × {h.toFixed(1)} m · {(w * h).toFixed(1)} m²</div>
+            : <div className="prop-derived">{sh.label}</div>}
+          <p className="prop-hint">Kante ziehen verschiebt die Fläche.</p>
+        </div>
+        {isRect && (
+          <button className="auto-btn wide" onClick={onAreaLight}>🔆 Diese Fläche ausleuchten</button>
+        )}
+        <button className="delete-btn" onClick={() => onDelete(sh.id)}>Löschen</button>
       </div>
     );
   }

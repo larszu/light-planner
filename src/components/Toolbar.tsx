@@ -29,6 +29,7 @@ interface Props {
   onToggleSnap: () => void;
   hasPersons: boolean;
   hasStageElements: boolean;
+  hasArea: boolean;
   hasSelection: boolean;
   multiSelected: boolean;
   onGroupSelection: () => void;
@@ -64,6 +65,7 @@ const Toolbar: React.FC<Props> = ({
   onToggleSnap,
   hasPersons,
   hasStageElements,
+  hasArea,
   hasSelection,
   multiSelected,
   onGroupSelection,
@@ -210,8 +212,8 @@ const Toolbar: React.FC<Props> = ({
         <button
           className="tool-btn auto-btn"
           onClick={onAutoDistribute}
-          disabled={!hasPersons && !hasStageElements}
-          title="Gleichmäßige Flächenausleuchtung (Front/Back 45°)"
+          disabled={!hasArea}
+          title="Fläche ausleuchten – Seiten (N/O/S/W) & Ziel-Lux wählbar. Markierte Fläche: gezeichnetes Rechteck, Podest oder Personen."
         >
           <span className="tool-icon">🔆</span>
           <span className="tool-label">Verteilen</span>

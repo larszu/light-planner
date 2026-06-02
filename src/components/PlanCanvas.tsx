@@ -24,6 +24,7 @@ interface Props {
   onMoveFixture: (id: string, x: number, y: number) => void;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
   onSelectMany: (ids: string[], additive: boolean) => void;
+  onMoveShape: (id: string, dx: number, dy: number) => void;
   onAddShape: (shape: Shape) => void;
   onAddPerson: (x: number, y: number) => void;
   onAddStageElement: (x: number, y: number) => void;
@@ -73,6 +74,7 @@ const PlanCanvas: React.FC<Props> = ({
   onMoveFixture,
   onSelect,
   onSelectMany,
+  onMoveShape,
   onAddShape,
   onAddPerson,
   onAddStageElement,
@@ -91,7 +93,7 @@ const PlanCanvas: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'calibrate' | 'move-plan' | 'marquee';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'calibrate' | 'move-plan' | 'marquee';
     startScreenX: number;
     startScreenY: number;
     startWorldX: number;
@@ -361,15 +363,18 @@ const PlanCanvas: React.FC<Props> = ({
 
     // Shapes
     for (const shape of shapes) {
-      ctx.strokeStyle = shape.color || '#5599ff';
-      ctx.lineWidth = 2 / v.scale;
+      const isSelShape = selectedIds.has(shape.id);
+      ctx.strokeStyle = isSelShape ? '#ffcc33' : (shape.color || '#5599ff');
+      ctx.lineWidth = (isSelShape ? 3 : 2) / v.scale;
       ctx.fillStyle = shape.color ? shape.color + '22' : '#5599ff22';
       if (shape.type === 'rect' && shape.points.length === 2) {
         const [p0, p1] = shape.points;
         const rx = Math.min(p0.x, p1.x), ry = Math.min(p0.y, p1.y);
         const rw = Math.abs(p1.x - p0.x), rh = Math.abs(p1.y - p0.y);
         ctx.fillRect(rx, ry, rw, rh);
+        if (isSelShape) ctx.setLineDash([6 / v.scale, 4 / v.scale]);
         ctx.strokeRect(rx, ry, rw, rh);
+        ctx.setLineDash([]);
         if (shape.label) {
           ctx.fillStyle = '#ccc';
           ctx.font = `${12 / v.scale}px sans-serif`;
@@ -823,6 +828,25 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
+      // Rectangle shapes: clicking the outline selects the area (interior is
+      // left free for marquee selection / picking fixtures inside it).
+      for (const shape of shapes) {
+        if (shape.type !== 'rect' || shape.points.length !== 2) continue;
+        const [p0, p1] = shape.points;
+        const rx0 = Math.min(p0.x, p1.x), rx1 = Math.max(p0.x, p1.x);
+        const ry0 = Math.min(p0.y, p1.y), ry1 = Math.max(p0.y, p1.y);
+        const edge = Math.min(
+          distToSegment(wx, wy, rx0, ry0, rx1, ry0),
+          distToSegment(wx, wy, rx1, ry0, rx1, ry1),
+          distToSegment(wx, wy, rx1, ry1, rx0, ry1),
+          distToSegment(wx, wy, rx0, ry1, rx0, ry0),
+        );
+        if (edge < 0.3) {
+          onSelect(shape.id, ctrl);
+          dragRef.current = { type: 'move-shape', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: shape.id };
+          return;
+        }
+      }
       // Empty space → start a box / marquee selection
       marqueeEndRef.current = { x: wx, y: wy };
       dragRef.current = { type: 'marquee', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, additive: ctrl };
@@ -873,6 +897,11 @@ const PlanCanvas: React.FC<Props> = ({
     }
     if (d.type === 'move-truss' && d.targetId) {
       onMoveTruss(d.targetId, wx - d.startWorldX, wy - d.startWorldY);
+      d.startWorldX = wx; d.startWorldY = wy;
+      return;
+    }
+    if (d.type === 'move-shape' && d.targetId) {
+      onMoveShape(d.targetId, wx - d.startWorldX, wy - d.startWorldY);
       d.startWorldX = wx; d.startWorldY = wy;
       return;
     }

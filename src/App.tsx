@@ -10,8 +10,9 @@ import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
 import { autoPatch, findPatchConflicts } from './utils/patch';
-import { generate3PointLighting, generateEvenDistribution } from './utils/autoLighting';
-import type { ThreePointConfig } from './utils/autoLighting';
+import { generate3PointLighting, generateAreaLighting } from './utils/autoLighting';
+import type { ThreePointConfig, AreaLightConfig, LightArea } from './utils/autoLighting';
+import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
 import { jpegToPdfBlob, dataUrlToBytes, downloadBlob, downloadDataUrl } from './utils/pdfExport';
@@ -75,6 +76,7 @@ const App: React.FC = () => {
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
   const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [areaLightOpen, setAreaLightOpen] = useState(false);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const clipboardRef = useRef<PlacedFixture[]>([]);
   const scene3DRef = useRef<Scene3DHandle>(null);
@@ -329,14 +331,38 @@ const App: React.FC = () => {
     setShowThreePointDialog(false);
   }, [persons, selectedId, defaultMountingHeight, pushHistory]);
 
-  const handleAutoDistribute = useCallback(() => {
-    if (persons.length === 0 && stageElements.length === 0) return;
+  // Pick the area to light: selected rectangle > selected stage > all stage > persons.
+  const computeLightArea = useCallback((): LightArea | null => {
+    const selRect = shapes.find((s) => s.type === 'rect' && selectedIds.has(s.id) && s.points.length === 2);
+    if (selRect) {
+      const [a, b] = selRect.points;
+      return { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minY: Math.min(a.y, b.y), maxY: Math.max(a.y, b.y) };
+    }
+    const selS = stageElements.filter((s) => selectedIds.has(s.id));
+    const useS = selS.length ? selS : stageElements;
+    if (useS.length) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const s of useS) { minX = Math.min(minX, s.x); minY = Math.min(minY, s.y); maxX = Math.max(maxX, s.x + s.width); maxY = Math.max(maxY, s.y + s.depth); }
+      return { minX, minY, maxX, maxY };
+    }
+    if (persons.length) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of persons) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+      return { minX: minX - 2, minY: minY - 2, maxX: maxX + 2, maxY: maxY + 2 };
+    }
+    return null;
+  }, [shapes, stageElements, persons, selectedIds]);
+
+  const lightArea = computeLightArea();
+
+  const handleAreaLight = useCallback((cfg: AreaLightConfig) => {
+    const area = computeLightArea();
+    if (!area) return;
     pushHistory();
-    const newFixtures = generateEvenDistribution(persons, defaultMountingHeight, {
-      targetLux: heatMapTarget,
-    }, stageElements);
+    const newFixtures = generateAreaLighting(area, { ...cfg, mountingHeight: defaultMountingHeight });
     setFixtures((prev) => [...prev, ...newFixtures]);
-  }, [persons, stageElements, defaultMountingHeight, heatMapTarget]);
+    setAreaLightOpen(false);
+  }, [computeLightArea, defaultMountingHeight, pushHistory]);
 
   // ── Group / Ungroup / Rotate ──
   const handleGroupSelection = useCallback(() => {
@@ -698,6 +724,12 @@ const App: React.FC = () => {
   }, [viewMode, projectMeta]);
 
   const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
+  const handleMoveShape = useCallback((id: string, dx: number, dy: number) => {
+    pushHistoryThrottled();
+    setShapes((prev) => prev.map((s) => (s.id === id
+      ? { ...s, points: s.points.map((p) => ({ x: Math.round((p.x + dx) * 10) / 10, y: Math.round((p.y + dy) * 10) / 10 })) }
+      : s)));
+  }, [pushHistoryThrottled]);
   const handleAddCustomFixture = useCallback((f: Fixture) => { setCustomFixtures((prev) => [...prev, f]); }, []);
 
   return (
@@ -734,7 +766,8 @@ const App: React.FC = () => {
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
         onAutoThreePointConfig={() => setShowThreePointDialog(true)}
-        onAutoDistribute={handleAutoDistribute}
+        onAutoDistribute={() => setAreaLightOpen(true)}
+        hasArea={lightArea !== null}
         onAlignX={() => handleAlign('x')}
         onAlignY={() => handleAlign('y')}
         onAlignZ={() => handleAlign('z')}
@@ -780,6 +813,7 @@ const App: React.FC = () => {
               onMoveFixture={handleMoveFixture}
               onSelect={handleSelectWithGroups}
               onSelectMany={handleSelectMany}
+              onMoveShape={handleMoveShape}
               onAddShape={handleAddShape}
               onAddPerson={handleAddPerson}
               onAddStageElement={handleAddStageElement}
@@ -847,6 +881,7 @@ const App: React.FC = () => {
           persons={persons}
           stageElements={stageElements}
           trusses={trusses}
+          shapes={shapes}
           selectedIds={selectedIds}
           cursorLux={cursorLux}
           patchConflicts={patchConflicts}
@@ -856,6 +891,7 @@ const App: React.FC = () => {
           onUpdateTruss={handleUpdateTruss}
           onDelete={handleDelete}
           onAutoThreePointForPerson={handleAutoThreePointForPerson}
+          onAreaLight={() => setAreaLightOpen(true)}
         />
       </div>
       {showThreePointDialog && (
@@ -870,6 +906,14 @@ const App: React.FC = () => {
           measuredMeters={pendingCalibration.meters}
           onApply={handleApplyScale}
           onCancel={() => setPendingCalibration(null)}
+        />
+      )}
+      {areaLightOpen && lightArea && (
+        <AreaLightDialog
+          area={lightArea}
+          defaultTargetLux={heatMapTarget}
+          onGenerate={handleAreaLight}
+          onCancel={() => setAreaLightOpen(false)}
         />
       )}
       {scheduleOpen && (
