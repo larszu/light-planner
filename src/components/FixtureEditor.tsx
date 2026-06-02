@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Fixture, FixtureCategory, BeamShape, LensType, MountType } from '../types';
 import { extractFixtureSpecs, AI_MODELS, API_KEY_STORAGE, type ExtractedFields, type VerificationItem } from '../utils/aiExtract';
+import { useHost } from '../integration/hostContext';
 
 interface Props {
   onSave: (fixture: Fixture) => void;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
+  const host = useHost();
   const [name, setName] = useState(initial?.name ?? '');
   const [manufacturer, setManufacturer] = useState(initial?.manufacturer ?? '');
   const [category, setCategory] = useState<FixtureCategory>(initial?.category ?? 'custom');
@@ -82,7 +84,10 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
     setAiLoading(true); setAiError(null);
     localStorage.setItem(API_KEY_STORAGE, aiKey.trim());
     try {
-      const { fields, verification } = await extractFixtureSpecs(aiText, { apiKey: aiKey.trim(), model: aiModel });
+      // Use the host's AI service when it provides one (e.g. Cable-Planner's
+      // multi-provider aiSuggestions + keychain); else the direct browser call.
+      const extract = host.extractDatasheet ?? extractFixtureSpecs;
+      const { fields, verification } = await extract(aiText, { apiKey: aiKey.trim(), model: aiModel });
       applyExtracted(fields);
       setAiVerification(verification);
     } catch (e) {

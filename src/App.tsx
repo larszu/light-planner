@@ -22,7 +22,7 @@ import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
 import MenuBar from './components/MenuBar';
 import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
-import { saveBlobToFile, openTextFile } from './utils/fileSave';
+import { useHost } from './integration/hostContext';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 
@@ -124,6 +124,7 @@ const App: React.FC = () => {
   const scene3DRef = useRef<Scene3DHandle>(null);
   const exportCounterRef = useRef(1);
   const defaultMountingHeight = 6;
+  const host = useHost(); // platform seam: files / export / AI
 
   // ── Undo / Redo ──
   interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[]; trusses: Truss[]; walls: Wall[]; ceilings: Ceiling[] }
@@ -896,34 +897,33 @@ const App: React.FC = () => {
     // download fallback when the File System Access API isn't available).
     if (format === 'pdf') {
       const bytes = dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
-      await saveBlobToFile(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
+      await host.exportFile(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
     } else {
       const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
       const blob = await new Promise<Blob | null>((res) => canvas.toBlob((b) => res(b), mime, 0.92));
       if (blob) {
         const accept: Record<string, string[]> = format === 'jpg' ? { 'image/jpeg': ['.jpg', '.jpeg'] } : { 'image/png': ['.png'] };
-        await saveBlobToFile(blob, `${base}.${format}`, accept);
+        await host.exportFile(blob, `${base}.${format}`, accept);
       }
     }
-  }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget]);
+  }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget, host]);
 
-  // ── Project save/load to a real file (user picks the location) ──
+  // ── Project save/load to a real file (the host decides where) ──
   const handleSaveToFile = useCallback(async () => {
     const now = new Date().toISOString();
     const meta: ProjectMeta = projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now };
     const data: ProjectData = {
       meta: { ...meta, updatedAt: now },
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
-      trusses, walls, ceilings, scenes, layers,
+      trusses, walls, ceilings, scenes, cameras, layers,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
-    await saveBlobToFile(blob, `${safe}.lightplan.json`, { 'application/json': ['.json'] });
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, layers, floorPlan]);
+    await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, host]);
 
   const handleLoadFromFile = useCallback(async () => {
-    const res = await openTextFile({ 'application/json': ['.json'] });
+    const res = await host.openProjectFile();
     if (!res) return;
     try {
       const data = JSON.parse(res.text) as ProjectData;
@@ -932,7 +932,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projektdatei konnte nicht geladen werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [handleLoadProject]);
+  }, [handleLoadProject, host]);
 
   const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
   const handleMoveShape = useCallback((id: string, dx: number, dy: number) => {
