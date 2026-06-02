@@ -14,8 +14,10 @@ interface Props {
   onHeatMapTargetChange: (v: number) => void;
   photoMode: boolean;
   exposure: number;
+  haze: number;
   onTogglePhotoMode: () => void;
   onExposureChange: (v: number) => void;
+  onHazeChange: (v: number) => void;
   onUploadFloorPlan: (file: File) => void;
   onExport: () => void;
   onAutoThreePoint: () => void;
@@ -56,8 +58,10 @@ const Toolbar: React.FC<Props> = ({
   onHeatMapTargetChange,
   photoMode,
   exposure,
+  haze,
   onTogglePhotoMode,
   onExposureChange,
+  onHazeChange,
   onUploadFloorPlan,
   onExport,
   onAutoThreePoint,
@@ -227,6 +231,20 @@ const Toolbar: React.FC<Props> = ({
                   onChange={(e) => onExposureChange(Number(e.target.value))}
                 />
                 <span>{exposure.toFixed(2)}</span>
+              </label>
+            )}
+            {photoMode && (
+              <label className="heat-scale-label" title="Dunst / Haze – Lichtkegel sind nur im Dunst sichtbar (wie in echt)">
+                <span>🌫</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.02}
+                  value={haze}
+                  onChange={(e) => onHazeChange(Number(e.target.value))}
+                />
+                <span>{Math.round(haze * 100)}%</span>
               </label>
             )}
           </div>

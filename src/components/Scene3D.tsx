@@ -65,10 +65,11 @@ interface Props {
   heatMapTarget: number;
   photoMode: boolean;
   exposure: number;
+  haze: number;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -79,8 +80,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     composer: EffectComposer;
     bloom: UnrealBloomPass;
     ambient: THREE.AmbientLight;
+    hemi: THREE.HemisphereLight;
     dir: THREE.DirectionalLight;
     grid: THREE.GridHelper;
+    ground: THREE.Mesh;
   } | null>(null);
   // Whether the camera has been framed to the content yet (once per mount).
   const framedRef = useRef(false);
@@ -119,23 +122,26 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     controls.dampingFactor = 0.08;
     controls.target.set(10, 0, 10);
 
-    // Ground grid
+    // Ground grid (hidden in the photo view)
     const grid = new THREE.GridHelper(60, 60, '#3a3a50', '#2a2a3c');
     scene.add(grid);
 
-    // Ground plane (for shadows)
-    const groundGeo = new THREE.PlaneGeometry(60, 60);
-    const groundMat = new THREE.MeshStandardMaterial({ color: '#222238', roughness: 0.9 });
+    // Ground plane – large so it always reads as a real floor; receives shadows.
+    const groundGeo = new THREE.PlaneGeometry(400, 400);
+    const groundMat = new THREE.MeshStandardMaterial({ color: photoModeRef.current ? '#313139' : '#222238', roughness: 0.9, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Ambient + key light. In photo mode these are dimmed right down so the
-    // fixtures themselves light the scene (and cast the real shadows).
-    const ambient = new THREE.AmbientLight('#666680', photoModeRef.current ? 0.12 : 0.5);
+    // Lighting. Photo mode keeps a gentle sky/ground hemisphere fill so the
+    // floor and shadows stay readable, while the fixtures dominate and cast the
+    // real shadows; the flat ambient/key are dimmed right down.
+    const ambient = new THREE.AmbientLight('#666680', photoModeRef.current ? 0.06 : 0.5);
     scene.add(ambient);
-    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.04 : 0.3);
+    const hemi = new THREE.HemisphereLight('#44506e', '#11111a', photoModeRef.current ? 0.6 : 0.0);
+    scene.add(hemi);
+    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.05 : 0.3);
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
@@ -146,9 +152,9 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     composer.addPass(new RenderPass(scene, camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(container.clientWidth, container.clientHeight),
-      0.7,  // strength
-      0.6,  // radius
-      0.75, // threshold (only the bright bits bloom)
+      0.5,  // strength (subtle – just a halo on the brightest bits)
+      0.5,  // radius
+      0.8,  // threshold (only the bright bits bloom)
     );
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
@@ -157,7 +163,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     renderer.toneMappingExposure = exposureRef.current;
 
     const animId = 0;
-    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, dir: dirLight, grid };
+    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, grid, ground };
 
     // ── WASD keyboard movement ──
     const keys: Record<string, boolean> = {};
@@ -268,10 +274,14 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     if (!s) return;
     s.renderer.toneMapping = photoMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     s.renderer.toneMappingExposure = exposure;
-    s.ambient.intensity = photoMode ? 0.12 : 0.5;
+    s.ambient.intensity = photoMode ? 0.06 : 0.5;
+    s.hemi.intensity = photoMode ? 0.6 : 0.0;
     s.dir.intensity = photoMode ? 0.05 : 0.3;
     s.grid.visible = !photoMode;
-    s.scene.background = new THREE.Color(photoMode ? '#08080d' : '#1a1a2e');
+    (s.ground.material as THREE.MeshStandardMaterial).color.set(photoMode ? '#313139' : '#222238');
+    const bg = photoMode ? '#0e0e16' : '#1a1a2e';
+    s.scene.background = new THREE.Color(bg);
+    if (s.scene.fog) (s.scene.fog as THREE.Fog).color.set(bg);
     // Tone-mapping change requires existing materials to recompile.
     s.scene.traverse((o) => {
       const m = (o as THREE.Mesh).material;
@@ -470,25 +480,24 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         }
       }
 
-      // Photo view: a real, textured human that casts & receives real shadows.
+      // Photo view: a real human figure that casts & receives real shadows.
+      // The model's camo textures are swapped for a clean, neutral mannequin
+      // material – the kind of scale-reference figure previz tools use.
       if (photoMode && personModel) {
         const m = cloneSkeleton(personModel.scene) as THREE.Group;
         const s = p.height / personModel.height;
         m.scale.setScalar(s);
         m.position.set(p.x, floorH - personModel.minY * s, p.y);
         m.rotation.y = Math.PI; // face toward −Z (typical "downstage")
+        const skin = new THREE.MeshStandardMaterial({
+          color: isSel ? '#ffcc33' : '#c2ad9a', roughness: 0.78, metalness: 0,
+          emissive: new THREE.Color('#ffcc33'), emissiveIntensity: isSel ? 0.18 : 0,
+        });
         m.traverse((o) => {
           const mesh = o as THREE.Mesh;
-          if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+          if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; mesh.material = skin; }
         });
         m.userData = { dynamic: true, selectId: p.id };
-        if (isSel) m.traverse((o) => {
-          const mesh = o as THREE.Mesh;
-          if (mesh.isMesh && mesh.material) {
-            const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.MeshStandardMaterial;
-            mat.emissive = new THREE.Color('#ffcc33'); mat.emissiveIntensity = 0.25;
-          }
-        });
         scene.add(m);
         continue;
       }
@@ -560,19 +569,21 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const beamRadAtBase = Math.tan((fieldAngle / 2) * (Math.PI / 180)) * coneHeight;
       const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
-      if (!hidden && coneHeight > 0.1) {
+      // In the photo view a beam is only visible where there's haze in the air
+      // (just like reality) – the shaft fades out as haze → 0.
+      if (!hidden && coneHeight > 0.1 && (!photoMode || haze > 0.01)) {
         const coneGeo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
         // Shift geometry so tip is at local origin (tip at y=+h/2, base at y=-h/2)
         coneGeo.translate(0, -coneHeight / 2, 0);
 
-        // Photo mode: additively-blended haze so the beam reads as a volumetric
-        // shaft (bloom then turns the bright core into a glow). Only the back
-        // faces are drawn so the shaft doesn't wash out subjects in front of it.
-        const volA = 0.04 + 0.08 * (f.dimming / 100);
+        // Photo mode: additive haze shaft scaled by the haze amount; bloom then
+        // turns the bright core into a glow. Back faces only so the shaft
+        // doesn't wash out subjects in front of it.
+        const volA = (0.05 + 0.10 * (f.dimming / 100)) * Math.min(1.2, haze * 4);
         const coneMat = new THREE.MeshBasicMaterial({
           color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
           transparent: true,
-          opacity: photoMode ? (isSel ? Math.max(volA, 0.04) : volA) : (isSel ? Math.max(dimOpacity, 0.02) : dimOpacity),
+          opacity: photoMode ? volA : (isSel ? Math.max(dimOpacity, 0.02) : dimOpacity),
           side: photoMode ? THREE.BackSide : THREE.DoubleSide,
           depthWrite: false,
           blending: photoMode ? THREE.AdditiveBlending : THREE.NormalBlending,
@@ -754,7 +765,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, personModel]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, personModel]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {

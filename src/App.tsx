@@ -96,6 +96,7 @@ const App: React.FC = () => {
   const [heatMapTarget, setHeatMapTarget] = useState(0);
   const [photoMode, setPhotoMode] = useState(false);
   const [exposure, setExposure] = useState(1.0);
+  const [haze, setHaze] = useState(0.15);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [cameras, setCameras] = useState<CameraView[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
@@ -1048,8 +1049,10 @@ const App: React.FC = () => {
         onHeatMapTargetChange={setHeatMapTarget}
         photoMode={photoMode}
         exposure={exposure}
+        haze={haze}
         onTogglePhotoMode={() => setPhotoMode((v) => !v)}
         onExposureChange={setExposure}
+        onHazeChange={setHaze}
         onUploadFloorPlan={handleUploadFloorPlan}
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
@@ -1150,6 +1153,7 @@ const App: React.FC = () => {
                 heatMapTarget={heatMapTarget}
                 photoMode={photoMode}
                 exposure={exposure}
+                haze={haze}
                 onSelect={handleSelectWithGroups}
               />
             </Suspense>
