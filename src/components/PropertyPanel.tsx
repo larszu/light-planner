@@ -570,12 +570,22 @@ const PropertyPanel: React.FC<Props> = ({
           {numField('Y (m)', se.y, (v) => onUpdateStageElement(se.id, { y: v }))}
           {numField('Breite (m)', se.width, (v) => onUpdateStageElement(se.id, { width: v }), 0.5, 0.5)}
           {numField('Tiefe (m)', se.depth, (v) => onUpdateStageElement(se.id, { depth: v }), 0.5, 0.5)}
-          {numField('Höhe (m)', se.height, (v) => onUpdateStageElement(se.id, { height: v }), 0.1, 0.1, 5)}
+          {numField(se.height2 != null ? 'Höhe vorne (m)' : 'Höhe (m)', se.height, (v) => onUpdateStageElement(se.id, { height: v }), 0.1, 0.1, 5)}
+          <label className="prop-field">
+            <span>Höhe hinten (m)</span>
+            <input type="number" step={0.1} min={0} value={se.height2 ?? ''} placeholder="= flach"
+              onChange={(e) => onUpdateStageElement(se.id, { height2: e.target.value === '' ? undefined : Number(e.target.value) })} />
+          </label>
           {numField('Rotation (°)', se.rotation, (v) => onUpdateStageElement(se.id, { rotation: v }), 15, 0, 360)}
           <label className="prop-field">
             <span>Bezeichnung</span>
             <input type="text" value={se.label || ''} onChange={(e) => onUpdateStageElement(se.id, { label: e.target.value })} />
           </label>
+          <div className="prop-derived">
+            {se.height2 != null && Math.abs(se.height2 - se.height) > 0.01
+              ? `Rampe / Schräge: ${se.height} m → ${se.height2} m (über ${se.depth} m Tiefe)`
+              : 'Tipp: „Höhe hinten" setzen ergibt eine Rampe/Schräge. Ecken ziehen ändert die Größe.'}
+          </div>
         </div>
         <button className="delete-btn" onClick={() => onDelete(se.id)}>Element löschen</button>
       </div>

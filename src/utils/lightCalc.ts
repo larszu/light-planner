@@ -119,6 +119,24 @@ export function effectiveFieldAngleDeg(f: PlacedFixture): number {
   return effectiveBeamAngleWithFrost(eff.fieldAngle, f.gelFilterIds ?? []);
 }
 
+/**
+ * Effective on-axis peak luminous intensity (candela) for a placed fixture,
+ * including dimming, gel transmission and zoom/frost — the very same engine the
+ * heat-map uses. Drives the 3D spotlight intensity so the relit ("photo") view
+ * stays physically consistent with the lux calculation. Muted lamps return 0.
+ */
+export function peakCandela(f: PlacedFixture): number {
+  if (f.hidden) return 0;
+  const dim = Math.max(0, f.dimming / 100);
+  if (dim <= 0) return 0;
+  const eff = getEffectiveBeam(f);
+  let fieldAngle = eff.fieldAngle;
+  if (f.gelFilterIds && f.gelFilterIds.length > 0) fieldAngle = effectiveBeamAngleWithFrost(eff.fieldAngle, f.gelFilterIds);
+  const gel = (f.gelFilterIds && f.gelFilterIds.length > 0) ? combinedTransmission(f.gelFilterIds) : 1;
+  const cd = peakIntensity(eff.lumens, eff.refFieldAngle, fieldAngle, eff.beamRatioWH, eff.photometric);
+  return cd * dim * gel;
+}
+
 function getEffectiveBeam(f: PlacedFixture): {
   beamAngle: number;       // 50 % FWHM (metadata / labelling)
   fieldAngle: number;      // 10 % – used for the Gaussian σ

@@ -7,6 +7,8 @@ interface Props {
   snapEnabled: boolean;
   onSave: () => void;
   onLoad: () => void;
+  onSaveToFile: () => void;
+  onLoadFromFile: () => void;
   onExport: (format: 'png' | 'jpg' | 'pdf') => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -17,6 +19,7 @@ interface Props {
   onViewModeChange: (m: ViewMode) => void;
   onToggleHeatMap: () => void;
   onToggleSnap: () => void;
+  onAbout: () => void;
 }
 
 interface MenuItem { label: string; shortcut?: string; onClick?: () => void; separator?: boolean; checked?: boolean }
@@ -36,12 +39,15 @@ const MenuBar: React.FC<Props> = (props) => {
 
   const menus: { id: string; label: string; items: MenuItem[] }[] = [
     { id: 'file', label: 'Datei', items: [
-      { label: 'Speichern…', shortcut: 'Strg+S', onClick: props.onSave },
-      { label: 'Laden…', onClick: props.onLoad },
+      { label: 'Speichern (Browser)…', shortcut: 'Strg+S', onClick: props.onSave },
+      { label: 'Laden (Browser)…', onClick: props.onLoad },
       { label: '', separator: true },
-      { label: 'Export als PNG', onClick: () => props.onExport('png') },
-      { label: 'Export als JPG', onClick: () => props.onExport('jpg') },
-      { label: 'Export als PDF', onClick: () => props.onExport('pdf') },
+      { label: 'Projekt als Datei… (Speicherort wählen)', onClick: props.onSaveToFile },
+      { label: 'Projekt aus Datei…', onClick: props.onLoadFromFile },
+      { label: '', separator: true },
+      { label: 'Export als PNG…', onClick: () => props.onExport('png') },
+      { label: 'Export als JPG…', onClick: () => props.onExport('jpg') },
+      { label: 'Export als PDF…', onClick: () => props.onExport('pdf') },
       { label: '', separator: true },
       { label: 'Geräteliste & Patch…', onClick: props.onOpenSchedule },
     ] },
@@ -59,6 +65,9 @@ const MenuBar: React.FC<Props> = (props) => {
       { label: '', separator: true },
       { label: 'Heatmap', checked: props.showHeatMap, onClick: props.onToggleHeatMap },
       { label: 'Raster einrasten', checked: props.snapEnabled, onClick: props.onToggleSnap },
+    ] },
+    { id: 'help', label: 'Hilfe', items: [
+      { label: 'Über Light Planner…', onClick: props.onAbout },
     ] },
   ];
 

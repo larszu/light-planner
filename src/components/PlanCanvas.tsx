@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
-import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling } from '../types';
+import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling, Layers } from '../types';
 import type { PlanMode } from '../App';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../utils/lightCalc';
 import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall } from '../utils/geometry';
@@ -15,6 +15,7 @@ interface Props {
   walls: Wall[];
   ceilings: Ceiling[];
   floorPlan: FloorPlan | null;
+  layers: Layers;
   snapStep: number;
   activeTool: Tool;
   fixtureToPlace: Fixture | null;
@@ -30,9 +31,10 @@ interface Props {
   onMoveShape: (id: string, dx: number, dy: number) => void;
   onAddShape: (shape: Shape) => void;
   onAddPerson: (x: number, y: number) => void;
-  onAddStageElement: (x: number, y: number) => void;
+  onAddStageElement: (x: number, y: number, width?: number, depth?: number) => void;
   onMovePerson: (id: string, x: number, y: number) => void;
   onMoveStageElement: (id: string, x: number, y: number) => void;
+  onUpdateStageElement: (id: string, updates: Partial<StageElement>) => void;
   onAddTruss: (x1: number, y1: number, x2: number, y2: number) => void;
   onMoveTruss: (id: string, dx: number, dy: number) => void;
   onAddWall: (x1: number, y1: number, x2: number, y2: number) => void;
@@ -70,6 +72,7 @@ const PlanCanvas: React.FC<Props> = ({
   walls,
   ceilings,
   floorPlan,
+  layers,
   snapStep,
   activeTool,
   fixtureToPlace,
@@ -88,6 +91,7 @@ const PlanCanvas: React.FC<Props> = ({
   onAddStageElement,
   onMovePerson,
   onMoveStageElement,
+  onUpdateStageElement,
   onAddTruss,
   onMoveTruss,
   onAddWall,
@@ -104,7 +108,8 @@ const PlanCanvas: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'calibrate' | 'move-plan' | 'marquee';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'resize-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'draw-stage' | 'calibrate' | 'move-plan' | 'marquee';
+    corner?: 0 | 1 | 2 | 3;
     startScreenX: number;
     startScreenY: number;
     startWorldX: number;
@@ -120,6 +125,9 @@ const PlanCanvas: React.FC<Props> = ({
   const measureEndRef = useRef<{ x: number; y: number } | null>(null);
   const marqueeEndRef = useRef<{ x: number; y: number } | null>(null);
   const calibEndRef = useRef<{ x: number; y: number } | null>(null);
+  // Wall path tool: committed vertices of the current chain + the live cursor.
+  const wallPathRef = useRef<{ x: number; y: number }[]>([]);
+  const wallCursorRef = useRef<{ x: number; y: number } | null>(null);
   const heatMapCacheRef = useRef<{ imageData: ImageData | null; key: string }>({ imageData: null, key: '' });
   const animFrameRef = useRef<number>(0);
   const spaceDownRef = useRef(false);
@@ -257,7 +265,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.stroke();
 
     // Floor plan (imported building plan)
-    if (floorPlan) {
+    if (floorPlan && layers.floorPlan.visible) {
       const { offsetX: ox, offsetY: oy, widthMeters: fw, heightMeters: fh } = floorPlan;
       ctx.globalAlpha = floorPlan.opacity;
       ctx.drawImage(floorPlan.image, ox, oy, fw, fh);
@@ -280,7 +288,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Stage elements
-    for (const se of stageElements) {
+    if (layers.stage.visible) for (const se of stageElements) {
       ctx.save();
       ctx.translate(se.x + se.width / 2, se.y + se.depth / 2);
       ctx.rotate((se.rotation * Math.PI) / 180);
@@ -337,11 +345,39 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.restore();
       ctx.textBaseline = 'alphabetic';
 
+      // Ramp / slope indicator (arrow toward the higher edge)
+      if (se.height2 != null && Math.abs(se.height2 - se.height) > 0.01) {
+        const up = se.height2 > se.height ? 1 : -1;
+        const a = (se.depth / 2) * 0.6;
+        ctx.strokeStyle = '#ffb74d';
+        ctx.fillStyle = '#ffb74d';
+        ctx.lineWidth = 1.5 / v.scale;
+        ctx.beginPath();
+        ctx.moveTo(0, -up * a); ctx.lineTo(0, up * a);
+        ctx.moveTo(-0.18, up * a - up * 0.3); ctx.lineTo(0, up * a); ctx.lineTo(0.18, up * a - up * 0.3);
+        ctx.stroke();
+        ctx.font = `${8.5 / v.scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`⤴ ${se.height}→${se.height2} m`, 0, -up * a - 4 / v.scale * up - 2 / v.scale);
+      }
+
+      // Corner resize handles when selected
+      if (isSel) {
+        const hs = 7 / v.scale;
+        ctx.fillStyle = '#ffcc33';
+        ctx.strokeStyle = '#1a1a2e';
+        ctx.lineWidth = 1 / v.scale;
+        for (const [lx, ly] of [[-se.width / 2, -se.depth / 2], [se.width / 2, -se.depth / 2], [se.width / 2, se.depth / 2], [-se.width / 2, se.depth / 2]]) {
+          ctx.fillRect(lx - hs / 2, ly - hs / 2, hs, hs);
+          ctx.strokeRect(lx - hs / 2, ly - hs / 2, hs, hs);
+        }
+      }
+
       ctx.restore();
     }
 
     // Ceilings (overhead surface – shown as a dashed outline in plan view)
-    for (const c of ceilings) {
+    if (layers.ceilings.visible) for (const c of ceilings) {
       if (c.points.length < 3) continue;
       const isSel = selectedIds.has(c.id);
       ctx.beginPath();
@@ -366,7 +402,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Walls (architecture – reflect light back into the room; may be curved)
-    for (const wall of walls) {
+    if (layers.walls.visible) for (const wall of walls) {
       const isSel = selectedIds.has(wall.id);
       const curved = isCurved(wall);
       ctx.lineCap = 'round';
@@ -404,7 +440,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Trusses (rigging / hanging positions)
-    for (const t of trusses) {
+    if (layers.trusses.visible) for (const t of trusses) {
       const isSel = selectedIds.has(t.id);
       const dx = t.x2 - t.x1, dy = t.y2 - t.y1;
       const len = Math.hypot(dx, dy);
@@ -442,7 +478,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Shapes
-    for (const shape of shapes) {
+    if (layers.shapes.visible) for (const shape of shapes) {
       const isSelShape = selectedIds.has(shape.id);
       ctx.strokeStyle = isSelShape ? '#ffcc33' : (shape.color || '#5599ff');
       ctx.lineWidth = (isSelShape ? 3 : 2) / v.scale;
@@ -534,7 +570,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Persons
-    for (const p of persons) {
+    if (layers.persons.visible) for (const p of persons) {
       const isSel = selectedIds.has(p.id);
       const r = 0.25;
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
@@ -554,7 +590,7 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     // Fixtures
-    for (const f of fixtures) {
+    if (layers.fixtures.visible) for (const f of fixtures) {
       const isSel = selectedIds.has(f.id);
       const rad = 0.3;
 
@@ -771,22 +807,69 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'start';
     }
 
-    // Active truss / wall being drawn
-    if ((dragRef.current?.type === 'draw-truss' || dragRef.current?.type === 'draw-wall') && measureEndRef.current) {
+    // Active truss being drawn (drag)
+    if (dragRef.current?.type === 'draw-truss' && measureEndRef.current) {
       const d = dragRef.current;
       const end = measureEndRef.current;
       const len = Math.hypot(end.x - d.startWorldX, end.y - d.startWorldY);
-      const isWall = d.type === 'draw-wall';
-      ctx.strokeStyle = isWall ? '#c9c4b8' : '#9aa4b2';
-      ctx.lineCap = isWall ? 'round' : 'butt';
-      ctx.lineWidth = isWall ? 0.22 : 3 / v.scale;
+      ctx.strokeStyle = '#9aa4b2';
+      ctx.lineWidth = 3 / v.scale;
       ctx.beginPath(); ctx.moveTo(d.startWorldX, d.startWorldY); ctx.lineTo(end.x, end.y); ctx.stroke();
-      ctx.lineCap = 'butt';
       const mx = (d.startWorldX + end.x) / 2, my = (d.startWorldY + end.y) / 2;
       ctx.fillStyle = '#c8d0da';
       ctx.font = `bold ${12 / v.scale}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(`${len.toFixed(1)} m`, mx, my - 8 / v.scale);
+      ctx.textAlign = 'start';
+    }
+
+    // Stage/podest being sized (drag)
+    if (dragRef.current?.type === 'draw-stage' && measureEndRef.current) {
+      const d = dragRef.current; const end = measureEndRef.current;
+      const x0 = Math.min(d.startWorldX, end.x), y0 = Math.min(d.startWorldY, end.y);
+      const w = Math.abs(end.x - d.startWorldX), h = Math.abs(end.y - d.startWorldY);
+      ctx.fillStyle = 'rgba(139,69,19,0.25)';
+      ctx.strokeStyle = '#ffcc33';
+      ctx.lineWidth = 1.5 / v.scale;
+      ctx.fillRect(x0, y0, w, h);
+      ctx.strokeRect(x0, y0, w, h);
+      ctx.fillStyle = '#ffcc33';
+      ctx.font = `bold ${11 / v.scale}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${w.toFixed(1)} × ${h.toFixed(1)} m`, x0 + w / 2, y0 + h / 2);
+      ctx.textAlign = 'start';
+    }
+
+    // Wall path tool: rubber-band from the last vertex + length & angle readout.
+    if (activeTool === 'wall' && wallPathRef.current.length > 0 && wallCursorRef.current) {
+      const path = wallPathRef.current;
+      const cur = wallCursorRef.current;
+      const last = path[path.length - 1];
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#c9c4b8';
+      ctx.lineWidth = 0.22;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(cur.x, cur.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineCap = 'butt';
+      // vertices placed so far
+      for (const p of path) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 0.1, 0, Math.PI * 2);
+        ctx.fillStyle = '#4fc3f7'; ctx.fill();
+      }
+      // start ring (click to close the loop)
+      if (path.length >= 2) {
+        ctx.beginPath(); ctx.arc(path[0].x, path[0].y, 0.2, 0, Math.PI * 2);
+        ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 1.5 / v.scale; ctx.stroke();
+      }
+      const len = Math.hypot(cur.x - last.x, cur.y - last.y);
+      let ang = (Math.atan2(cur.y - last.y, cur.x - last.x) * 180) / Math.PI;
+      if (ang < 0) ang += 360;
+      const mx = (last.x + cur.x) / 2, my = (last.y + cur.y) / 2;
+      ctx.fillStyle = '#ffcc33';
+      ctx.font = `bold ${12 / v.scale}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${len.toFixed(2)} m · ${ang.toFixed(0)}°`, mx, my - 10 / v.scale);
       ctx.textAlign = 'start';
     }
 
@@ -810,7 +893,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, activeTool, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -842,13 +925,26 @@ const PlanCanvas: React.FC<Props> = ({
           window.dispatchEvent(new CustomEvent('lp-delete', { detail: id }));
         }
       }
-      if (e.code === 'Escape') { onSelect(null); onToolChange('select'); }
+      if (e.code === 'Escape') {
+        // First Escape ends an in-progress wall chain (keeping the wall tool).
+        if (wallPathRef.current.length > 0) { wallPathRef.current = []; wallCursorRef.current = null; return; }
+        onSelect(null); onToolChange('select');
+      }
+      if (e.code === 'Enter' && wallPathRef.current.length > 0) { wallPathRef.current = []; wallCursorRef.current = null; }
     };
     const handleKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') spaceDownRef.current = false; };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
   }, [selectedIds, onSelect, onToolChange]);
+
+  // Leaving the wall tool ends any chain in progress.
+  useEffect(() => {
+    if (activeTool !== 'wall') { wallPathRef.current = []; wallCursorRef.current = null; }
+  }, [activeTool]);
+
+  // Double-click finishes the current wall chain (without closing the loop).
+  const handleDoubleClick = () => { wallPathRef.current = []; wallCursorRef.current = null; };
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; };
   const handleDrop = (e: React.DragEvent) => {
@@ -866,6 +962,31 @@ const PlanCanvas: React.FC<Props> = ({
   const getCanvasPos = (e: React.MouseEvent): [number, number] => {
     const rect = canvasRef.current!.getBoundingClientRect();
     return [e.clientX - rect.left, e.clientY - rect.top];
+  };
+
+  // Precise point for the wall path tool. Priority:
+  //  1. exact snap to a nearby existing wall endpoint (so walls connect cleanly)
+  //  2. Shift → constrain to 15° from the previous vertex
+  //  3. grid snap (respects the snap step)
+  const snapWallPoint = (wx: number, wy: number, shift: boolean): { x: number; y: number } => {
+    let best: { x: number; y: number } | null = null;
+    let bestD = 0.4;
+    for (const w of walls) {
+      for (const e of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) {
+        const d = Math.hypot(wx - e.x, wy - e.y);
+        if (d < bestD) { bestD = d; best = e; }
+      }
+    }
+    if (best) return best;
+    const path = wallPathRef.current;
+    if (shift && path.length > 0) {
+      const prev = path[path.length - 1];
+      const len = Math.hypot(wx - prev.x, wy - prev.y);
+      const step = Math.PI / 12; // 15°
+      const a = Math.round(Math.atan2(wy - prev.y, wx - prev.x) / step) * step;
+      return { x: Math.round((prev.x + Math.cos(a) * len) * 10) / 10, y: Math.round((prev.y + Math.sin(a) * len) * 10) / 10 };
+    }
+    return { x: snap(wx), y: snap(wy) };
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -893,7 +1014,12 @@ const PlanCanvas: React.FC<Props> = ({
 
     if (fixtureToPlace) { onPlaceFixture(fixtureToPlace, snap(wx), snap(wy)); return; }
     if (activeTool === 'person') { onAddPerson(snap(wx), snap(wy)); return; }
-    if (activeTool === 'stage') { onAddStageElement(snap(wx), snap(wy)); return; }
+    if (activeTool === 'stage') {
+      // Drag to size a podest/stage frame (a tiny click falls back to 1×1).
+      measureEndRef.current = { x: snap(wx), y: snap(wy) };
+      dragRef.current = { type: 'draw-stage', startScreenX: sx, startScreenY: sy, startWorldX: snap(wx), startWorldY: snap(wy) };
+      return;
+    }
     if (activeTool === 'truss') {
       const s = { x: snap(wx), y: snap(wy) };
       measureEndRef.current = s;
@@ -901,9 +1027,21 @@ const PlanCanvas: React.FC<Props> = ({
       return;
     }
     if (activeTool === 'wall') {
-      const s = { x: snap(wx), y: snap(wy) };
-      measureEndRef.current = s;
-      dragRef.current = { type: 'draw-wall', startScreenX: sx, startScreenY: sy, startWorldX: s.x, startWorldY: s.y };
+      // Click-to-add path: each click extends the chain with a new wall segment;
+      // click the start point (blue ring) to close the loop, Esc / double-click ends it.
+      const p = snapWallPoint(wx, wy, e.shiftKey);
+      const path = wallPathRef.current;
+      if (path.length === 0) {
+        wallPathRef.current = [p];
+      } else {
+        const prev = path[path.length - 1];
+        const closing = path.length >= 2 && Math.hypot(p.x - path[0].x, p.y - path[0].y) < 0.3;
+        const end = closing ? path[0] : p;
+        if (Math.hypot(end.x - prev.x, end.y - prev.y) > 0.05) onAddWall(prev.x, prev.y, end.x, end.y);
+        wallPathRef.current = closing ? [] : [...path, p];
+      }
+      wallCursorRef.current = p;
+      draw();
       return;
     }
     if (activeTool === 'measure') {
@@ -922,9 +1060,11 @@ const PlanCanvas: React.FC<Props> = ({
 
     if (activeTool === 'select') {
       const ctrl = e.ctrlKey || e.metaKey;
+      // A layer that is hidden or locked is not pickable.
+      const pickable = (k: keyof Layers) => layers[k].visible && !layers[k].locked;
       // Check aim-point handles first (only for selected fixture)
       const aimHitR = 0.35;
-      for (const f of fixtures) {
+      if (pickable('fixtures')) for (const f of fixtures) {
         // Only grab the aim handle when it is actually offset from the body
         // (otherwise an invisible handle on a straight-down fixture would
         // swallow clicks meant to move/drag the fixture itself).
@@ -937,7 +1077,7 @@ const PlanCanvas: React.FC<Props> = ({
       const cr = 0.5;
       // All fixtures under the cursor, nearest first — so overlapping lamps
       // can be told apart and cycled through.
-      const candidates = fixtures
+      const candidates = (pickable('fixtures') ? fixtures : [])
         .map((f) => ({ f, d: Math.hypot(wx - f.x, wy - f.y) }))
         .filter((c) => c.d < cr)
         .sort((a, b) => a.d - b.d)
@@ -974,21 +1114,40 @@ const PlanCanvas: React.FC<Props> = ({
           targetId: target.id, pendingSelectId: already && !ctrl ? target.id : undefined };
         return;
       }
-      for (const p of persons) {
+      if (pickable('persons')) for (const p of persons) {
         if (Math.sqrt((wx - p.x) ** 2 + (wy - p.y) ** 2) < 0.4) {
           onSelect(p.id, ctrl);
           dragRef.current = { type: 'move-person', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: p.id };
           return;
         }
       }
-      for (const se of stageElements) {
-        if (wx >= se.x && wx <= se.x + se.width && wy >= se.y && wy <= se.y + se.depth) {
+      // Corner handles of the selected stage → resize the frame
+      if (pickable('stage')) for (const se of stageElements) {
+        if (!selectedIds.has(se.id)) continue;
+        const cx = se.x + se.width / 2, cy = se.y + se.depth / 2;
+        const th = (se.rotation * Math.PI) / 180, c = Math.cos(th), s = Math.sin(th);
+        const local = [[-se.width / 2, -se.depth / 2], [se.width / 2, -se.depth / 2], [se.width / 2, se.depth / 2], [-se.width / 2, se.depth / 2]];
+        for (let i = 0; i < 4; i++) {
+          const hx = cx + local[i][0] * c - local[i][1] * s, hy = cy + local[i][0] * s + local[i][1] * c;
+          if (Math.hypot(wx - hx, wy - hy) < 0.3) {
+            dragRef.current = { type: 'resize-stage', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: se.id, corner: i as 0 | 1 | 2 | 3 };
+            return;
+          }
+        }
+      }
+      // Rotated stages need an inside-the-rotated-rect test, not the AABB.
+      if (pickable('stage')) for (const se of stageElements) {
+        const cx = se.x + se.width / 2, cy = se.y + se.depth / 2;
+        const th = (se.rotation * Math.PI) / 180;
+        const lx = (wx - cx) * Math.cos(th) + (wy - cy) * Math.sin(th);
+        const ly = -(wx - cx) * Math.sin(th) + (wy - cy) * Math.cos(th);
+        if (Math.abs(lx) <= se.width / 2 && Math.abs(ly) <= se.depth / 2) {
           onSelect(se.id, ctrl);
           dragRef.current = { type: 'move-stage', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: se.id };
           return;
         }
       }
-      for (const t of trusses) {
+      if (pickable('trusses')) for (const t of trusses) {
         if (distToSegment(wx, wy, t.x1, t.y1, t.x2, t.y2) < 0.4) {
           onSelect(t.id, ctrl);
           dragRef.current = { type: 'move-truss', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: t.id };
@@ -996,7 +1155,7 @@ const PlanCanvas: React.FC<Props> = ({
         }
       }
       // Curve handle of the selected wall → bend it
-      for (const wall of walls) {
+      if (pickable('walls')) for (const wall of walls) {
         if (!selectedIds.has(wall.id)) continue;
         const hM = wallMidHandle(wall);
         if (Math.hypot(wx - hM.x, wy - hM.y) < 0.3) {
@@ -1004,7 +1163,7 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
-      for (const wall of walls) {
+      if (pickable('walls')) for (const wall of walls) {
         if (distToWall(wall, wx, wy) < 0.3) {
           onSelect(wall.id, ctrl);
           dragRef.current = { type: 'move-wall', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: wall.id };
@@ -1012,7 +1171,7 @@ const PlanCanvas: React.FC<Props> = ({
         }
       }
       // Ceiling outline → select (for editing height / reflectance / delete)
-      for (const c of ceilings) {
+      if (pickable('ceilings')) for (const c of ceilings) {
         if (c.points.length < 3) continue;
         let near = false;
         for (let i = 0; i < c.points.length; i++) {
@@ -1023,7 +1182,7 @@ const PlanCanvas: React.FC<Props> = ({
       }
       // Lines & measure lines: clicking near the segment selects it (so it
       // can be deleted from the property panel).
-      for (const shape of shapes) {
+      if (pickable('shapes')) for (const shape of shapes) {
         if ((shape.type === 'line' || shape.type === 'measure') && shape.points.length === 2
           && distToSegment(wx, wy, shape.points[0].x, shape.points[0].y, shape.points[1].x, shape.points[1].y) < 0.3) {
           onSelect(shape.id, ctrl);
@@ -1033,7 +1192,7 @@ const PlanCanvas: React.FC<Props> = ({
       }
       // Rectangle shapes: clicking the outline selects the area (interior is
       // left free for marquee selection / picking fixtures inside it).
-      for (const shape of shapes) {
+      if (pickable('shapes')) for (const shape of shapes) {
         if (shape.type !== 'rect' || shape.points.length !== 2) continue;
         const [p0, p1] = shape.points;
         const rx0 = Math.min(p0.x, p1.x), rx1 = Math.max(p0.x, p1.x);
@@ -1061,6 +1220,12 @@ const PlanCanvas: React.FC<Props> = ({
     const [wx, wy] = screenToWorld(sx, sy);
     if (fixtures.length > 0) onCursorLux(totalLux(fixtures, wx, wy, wallSamples));
     else onCursorLux(null);
+
+    // Live rubber-band for the wall path tool (no drag involved).
+    if (activeTool === 'wall' && wallPathRef.current.length > 0) {
+      wallCursorRef.current = snapWallPoint(wx, wy, e.shiftKey);
+      draw();
+    }
 
     if (!dragRef.current) return;
     const d = dragRef.current;
@@ -1098,6 +1263,27 @@ const PlanCanvas: React.FC<Props> = ({
       }
       return;
     }
+    if (d.type === 'resize-stage' && d.targetId && d.corner != null) {
+      const se = stageElements.find((s) => s.id === d.targetId);
+      if (se) {
+        // Keep the opposite corner fixed; drag this corner to the cursor.
+        const cx = se.x + se.width / 2, cy = se.y + se.depth / 2;
+        const th = (se.rotation * Math.PI) / 180, c = Math.cos(th), s = Math.sin(th);
+        const local = [[-se.width / 2, -se.depth / 2], [se.width / 2, -se.depth / 2], [se.width / 2, se.depth / 2], [-se.width / 2, se.depth / 2]];
+        const opp = local[(d.corner + 2) % 4];
+        const fixed = { x: cx + opp[0] * c - opp[1] * s, y: cy + opp[0] * s + opp[1] * c };
+        const dragPt = { x: snap(wx), y: snap(wy) };
+        // vector fixed→drag in the stage's un-rotated frame
+        const dx = dragPt.x - fixed.x, dy = dragPt.y - fixed.y;
+        const ux = dx * c + dy * s, uy = -dx * s + dy * c;
+        const nw = Math.max(0.2, Math.abs(ux)), nd = Math.max(0.2, Math.abs(uy));
+        const ncx = (fixed.x + dragPt.x) / 2, ncy = (fixed.y + dragPt.y) / 2;
+        const r = (v: number) => Math.round(v * 10) / 10;
+        onUpdateStageElement(d.targetId, { x: r(ncx - nw / 2), y: r(ncy - nd / 2), width: r(nw), depth: r(nd) });
+      }
+      return;
+    }
+    if (d.type === 'draw-stage') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
     if (d.type === 'move-truss' && d.targetId) {
       onMoveTruss(d.targetId, wx - d.startWorldX, wy - d.startWorldY);
       d.startWorldX = wx; d.startWorldY = wy;
@@ -1122,7 +1308,7 @@ const PlanCanvas: React.FC<Props> = ({
       return;
     }
     if (d.type === 'draw-measure') measureEndRef.current = { x: wx, y: wy };
-    if (d.type === 'draw-truss' || d.type === 'draw-wall') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
+    if (d.type === 'draw-truss') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
     if (d.type === 'marquee') { marqueeEndRef.current = { x: wx, y: wy }; return; }
     if (d.type === 'calibrate') { calibEndRef.current = { x: wx, y: wy }; return; }
     if (d.type === 'move-plan') {
@@ -1180,9 +1366,12 @@ const PlanCanvas: React.FC<Props> = ({
         if (len > 0.3) onAddTruss(d.startWorldX, d.startWorldY, snap(ewx), snap(ewy));
         measureEndRef.current = null;
       }
-      if (d.type === 'draw-wall') {
-        const len = Math.hypot(ewx - d.startWorldX, ewy - d.startWorldY);
-        if (len > 0.3) onAddWall(d.startWorldX, d.startWorldY, snap(ewx), snap(ewy));
+      if (d.type === 'draw-stage') {
+        const x0 = Math.min(d.startWorldX, snap(ewx)), y0 = Math.min(d.startWorldY, snap(ewy));
+        const w = Math.abs(snap(ewx) - d.startWorldX), h = Math.abs(snap(ewy) - d.startWorldY);
+        // A real drag sizes the frame; a tiny click drops a default 1×1 podest.
+        if (w > 0.3 && h > 0.3) onAddStageElement(x0, y0, w, h);
+        else onAddStageElement(d.startWorldX, d.startWorldY);
         measureEndRef.current = null;
       }
       if (d.type === 'marquee') {
@@ -1193,11 +1382,12 @@ const PlanCanvas: React.FC<Props> = ({
           if (!d.additive) onSelect(null);
         } else {
           const inside = (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+          const ok = (k: keyof Layers) => layers[k].visible && !layers[k].locked;
           const ids: string[] = [];
-          for (const f of fixtures) if (inside(f.x, f.y)) ids.push(f.id);
-          for (const p of persons) if (inside(p.x, p.y)) ids.push(p.id);
-          for (const s of stageElements) if (inside(s.x + s.width / 2, s.y + s.depth / 2)) ids.push(s.id);
-          for (const t of trusses) if (inside((t.x1 + t.x2) / 2, (t.y1 + t.y2) / 2)) ids.push(t.id);
+          if (ok('fixtures')) for (const f of fixtures) if (inside(f.x, f.y)) ids.push(f.id);
+          if (ok('persons')) for (const p of persons) if (inside(p.x, p.y)) ids.push(p.id);
+          if (ok('stage')) for (const s of stageElements) if (inside(s.x + s.width / 2, s.y + s.depth / 2)) ids.push(s.id);
+          if (ok('trusses')) for (const t of trusses) if (inside((t.x1 + t.x2) / 2, (t.y1 + t.y2) / 2)) ids.push(t.id);
           onSelectMany(ids, d.additive ?? false);
         }
         marqueeEndRef.current = null;
@@ -1226,6 +1416,7 @@ const PlanCanvas: React.FC<Props> = ({
     <div ref={containerRef} className="plan-canvas-container">
       <canvas ref={canvasRef} className="plan-canvas"
         onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
         onWheel={handleWheel} onDragOver={handleDragOver} onDrop={handleDrop}
         onContextMenu={(e) => e.preventDefault()} style={{ cursor }} />
     </div>

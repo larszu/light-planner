@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey } from './types';
 import { convexHull } from './utils/geometry';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
@@ -9,6 +9,7 @@ import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import FloorPlanPanel from './components/FloorPlanPanel';
 import ScenePanel from './components/ScenePanel';
+import LayersPanel from './components/LayersPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
 import { autoPatch, findPatchConflicts } from './utils/patch';
@@ -17,9 +18,11 @@ import type { ThreePointConfig, AreaLightConfig, LightArea } from './utils/autoL
 import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
-import { jpegToPdfBlob, dataUrlToBytes, downloadBlob, downloadDataUrl } from './utils/pdfExport';
+import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
 import MenuBar from './components/MenuBar';
+import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
+import { saveBlobToFile, openTextFile } from './utils/fileSave';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 
@@ -29,6 +32,17 @@ const Scene3D = lazy(() => import('./components/Scene3D'));
 
 let nextId = 1;
 function uid(prefix: string) { return `${prefix}-${Date.now()}-${nextId++}`; }
+
+const DEFAULT_LAYERS: Layers = {
+  fixtures: { visible: true, locked: false },
+  persons: { visible: true, locked: false },
+  trusses: { visible: true, locked: false },
+  stage: { visible: true, locked: false },
+  shapes: { visible: true, locked: false },
+  ceilings: { visible: true, locked: false },
+  walls: { visible: true, locked: false },
+  floorPlan: { visible: true, locked: false },
+};
 
 // The adjustable "look" of a fixture captured into / restored from a scene.
 function captureLook(f: PlacedFixture): SceneFixtureState {
@@ -80,6 +94,9 @@ const App: React.FC = () => {
   const [showHeatMap, setShowHeatMap] = useState(false);
   const [heatMapScale, setHeatMapScale] = useState(1000);
   const [heatMapTarget, setHeatMapTarget] = useState(0);
+  const [photoMode, setPhotoMode] = useState(false);
+  const [exposure, setExposure] = useState(1.0);
+  const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
   const [cursorLux, setCursorLux] = useState<number | null>(null);
   const [showThreePointDialog, setShowThreePointDialog] = useState(false);
@@ -95,6 +112,7 @@ const App: React.FC = () => {
   const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   // Look present just before a scene was switched on, so it can be switched off.
@@ -264,12 +282,14 @@ const App: React.FC = () => {
   }, [pushHistoryThrottled]);
 
   // ── Stage element handlers ──
-  const handleAddStageElement = useCallback((x: number, y: number) => {
+  const handleAddStageElement = useCallback((x: number, y: number, width = 1, depth = 1) => {
     pushHistory();
+    const r = (v: number) => Math.round(v * 10) / 10;
     const se: StageElement = {
-      id: uid('stg'), type: 'podest-1x1',
-      x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
-      width: 1, depth: 1, height: 0.4, rotation: 0, label: '',
+      id: uid('stg'), type: width === 1 && depth === 1 ? 'podest-1x1' : 'custom',
+      x: r(x), y: r(y),
+      width: Math.max(0.2, r(width)), depth: Math.max(0.2, r(depth)),
+      height: 0.4, rotation: 0, label: '',
     };
     setStageElements((prev) => [...prev, se]);
     setSelectedIds(new Set([se.id]));
@@ -559,6 +579,7 @@ const App: React.FC = () => {
       walls,
       ceilings,
       scenes,
+      layers,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     try {
@@ -568,7 +589,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, layers, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -585,6 +606,7 @@ const App: React.FC = () => {
     setScenes(data.scenes ?? []);
     setActiveSceneId(null);
     preSceneRef.current = null;
+    setLayers(data.layers ?? DEFAULT_LAYERS);
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
     if (data.floorPlan) {
@@ -783,7 +805,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [handleCopy, handlePaste, handleDuplicate, handleNudge, selectedIds, snapStep, viewMode]);
 
-  const handleExport = useCallback((format: 'png' | 'jpg' | 'pdf' = 'png') => {
+  const handleExport = useCallback(async (format: 'png' | 'jpg' | 'pdf' = 'png') => {
     const projName = projectMeta?.name || 'Lichtplan';
     const viewLabel = viewMode === '3d' ? '3D' : '2D';
     const num = exportCounterRef.current++;
@@ -814,15 +836,47 @@ const App: React.FC = () => {
       }
     }
 
+    // Build the file as a Blob, then let the user pick where it goes (with a
+    // download fallback when the File System Access API isn't available).
     if (format === 'pdf') {
       const bytes = dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
-      downloadBlob(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`);
-    } else if (format === 'jpg') {
-      downloadDataUrl(canvas.toDataURL('image/jpeg', 0.92), `${base}.jpg`);
+      await saveBlobToFile(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
     } else {
-      downloadDataUrl(canvas.toDataURL('image/png'), `${base}.png`);
+      const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob((b) => res(b), mime, 0.92));
+      if (blob) {
+        const accept: Record<string, string[]> = format === 'jpg' ? { 'image/jpeg': ['.jpg', '.jpeg'] } : { 'image/png': ['.png'] };
+        await saveBlobToFile(blob, `${base}.${format}`, accept);
+      }
     }
   }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget]);
+
+  // ── Project save/load to a real file (user picks the location) ──
+  const handleSaveToFile = useCallback(async () => {
+    const now = new Date().toISOString();
+    const meta: ProjectMeta = projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now };
+    const data: ProjectData = {
+      meta: { ...meta, updatedAt: now },
+      fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
+      trusses, walls, ceilings, scenes, layers,
+      floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
+    await saveBlobToFile(blob, `${safe}.lightplan.json`, { 'application/json': ['.json'] });
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, layers, floorPlan]);
+
+  const handleLoadFromFile = useCallback(async () => {
+    const res = await openTextFile({ 'application/json': ['.json'] });
+    if (!res) return;
+    try {
+      const data = JSON.parse(res.text) as ProjectData;
+      if (!data || !Array.isArray(data.fixtures)) throw new Error('Keine gültige Projektdatei.');
+      handleLoadProject(data);
+    } catch (err) {
+      window.alert(`Projektdatei konnte nicht geladen werden:\n${err instanceof Error ? err.message : err}`);
+    }
+  }, [handleLoadProject]);
 
   const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
   const handleMoveShape = useCallback((id: string, dx: number, dy: number) => {
@@ -895,6 +949,15 @@ const App: React.FC = () => {
 
   const hiddenCount = fixtures.reduce((n, f) => n + (f.hidden ? 1 : 0), 0);
 
+  // ── Layers (Ebenen) ──
+  const toggleLayerVisible = useCallback((k: LayerKey) => setLayers((p) => ({ ...p, [k]: { ...p[k], visible: !p[k].visible } })), []);
+  const toggleLayerLocked = useCallback((k: LayerKey) => setLayers((p) => ({ ...p, [k]: { ...p[k], locked: !p[k].locked } })), []);
+  const layerCounts: Record<LayerKey, number> = {
+    fixtures: fixtures.length, persons: persons.length, trusses: trusses.length,
+    stage: stageElements.length, shapes: shapes.length, ceilings: ceilings.length,
+    walls: walls.length, floorPlan: floorPlan ? 1 : 0,
+  };
+
   return (
     <div className="app">
       <MenuBar
@@ -903,6 +966,8 @@ const App: React.FC = () => {
         snapEnabled={snapStep > 0}
         onSave={() => setProjectDialogMode('save')}
         onLoad={() => setProjectDialogMode('load')}
+        onSaveToFile={handleSaveToFile}
+        onLoadFromFile={handleLoadFromFile}
         onExport={handleExport}
         onUndo={handleUndo}
         onRedo={handleRedo}
@@ -913,6 +978,7 @@ const App: React.FC = () => {
         onViewModeChange={setViewMode}
         onToggleHeatMap={() => setShowHeatMap((v) => !v)}
         onToggleSnap={() => setSnapStep((s) => (s > 0 ? 0 : 0.5))}
+        onAbout={() => setAboutOpen(true)}
       />
       <Toolbar
         activeTool={activeTool}
@@ -925,6 +991,10 @@ const App: React.FC = () => {
         heatMapTarget={heatMapTarget}
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
+        photoMode={photoMode}
+        exposure={exposure}
+        onTogglePhotoMode={() => setPhotoMode((v) => !v)}
+        onExposureChange={setExposure}
         onUploadFloorPlan={handleUploadFloorPlan}
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
@@ -969,6 +1039,7 @@ const App: React.FC = () => {
               walls={walls}
               ceilings={ceilings}
               floorPlan={floorPlan}
+              layers={layers}
               snapStep={snapStep}
               activeTool={activeTool}
               fixtureToPlace={fixtureToPlace}
@@ -986,6 +1057,7 @@ const App: React.FC = () => {
               onAddStageElement={handleAddStageElement}
               onMovePerson={handleMovePerson}
               onMoveStageElement={handleMoveStageElement}
+              onUpdateStageElement={handleUpdateStageElement}
               onAddTruss={handleAddTruss}
               onMoveTruss={handleMoveTruss}
               onAddWall={handleAddWall}
@@ -1010,10 +1082,13 @@ const App: React.FC = () => {
                 walls={walls}
                 ceilings={ceilings}
                 floorPlan={floorPlan}
+                layers={layers}
                 selectedIds={selectedIds}
                 showHeatMap={showHeatMap}
                 heatMapScale={heatMapScale}
                 heatMapTarget={heatMapTarget}
+                photoMode={photoMode}
+                exposure={exposure}
                 onSelect={handleSelectWithGroups}
               />
             </Suspense>
@@ -1024,6 +1099,11 @@ const App: React.FC = () => {
           {fixtureToPlace && viewMode === '2d' && (
             <div className="placing-hint">
               Klicke auf den Plan um <strong>{fixtureToPlace.name}</strong> zu platzieren · ESC zum Abbrechen
+            </div>
+          )}
+          {activeTool === 'wall' && viewMode === '2d' && (
+            <div className="placing-hint">
+              🧱 <strong>Wand-Pfad</strong>: Punkte nacheinander klicken · Startpunkt klicken schließt den Raum · <kbd>Shift</kbd> = 15°-Winkel · Doppelklick/<kbd>ESC</kbd> beendet
             </div>
           )}
           {planMode === 'calibrate' && viewMode === '2d' && (
@@ -1058,6 +1138,12 @@ const App: React.FC = () => {
             onRenameScene={handleRenameScene}
             onDeleteScene={handleDeleteScene}
             onShowAll={handleShowAllFixtures}
+          />
+          <LayersPanel
+            layers={layers}
+            counts={layerCounts}
+            onToggleVisible={toggleLayerVisible}
+            onToggleLocked={toggleLayerLocked}
           />
         </div>
         <PropertyPanel
@@ -1124,6 +1210,7 @@ const App: React.FC = () => {
           onCancel={() => setProjectDialogMode(null)}
         />
       )}
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
     </div>
   );
 };
