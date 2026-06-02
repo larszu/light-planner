@@ -529,14 +529,15 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         // Shift geometry so tip is at local origin (tip at y=+h/2, base at y=-h/2)
         coneGeo.translate(0, -coneHeight / 2, 0);
 
-        // Photo mode: brighter, additively-blended haze so the beam reads as a
-        // volumetric shaft (bloom then turns the bright core into a glow).
-        const volA = 0.05 + 0.13 * (f.dimming / 100);
+        // Photo mode: additively-blended haze so the beam reads as a volumetric
+        // shaft (bloom then turns the bright core into a glow). Only the back
+        // faces are drawn so the shaft doesn't wash out subjects in front of it.
+        const volA = 0.04 + 0.08 * (f.dimming / 100);
         const coneMat = new THREE.MeshBasicMaterial({
           color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
           transparent: true,
-          opacity: photoMode ? (isSel ? Math.max(volA, 0.05) : volA) : (isSel ? Math.max(dimOpacity, 0.02) : dimOpacity),
-          side: THREE.DoubleSide,
+          opacity: photoMode ? (isSel ? Math.max(volA, 0.04) : volA) : (isSel ? Math.max(dimOpacity, 0.02) : dimOpacity),
+          side: photoMode ? THREE.BackSide : THREE.DoubleSide,
           depthWrite: false,
           blending: photoMode ? THREE.AdditiveBlending : THREE.NormalBlending,
         });
