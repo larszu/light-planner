@@ -511,7 +511,7 @@ const PlanCanvas: React.FC<Props> = ({
       const hmWidth = Math.min(right, planRight) - hmLeft;
       const hmHeight = Math.min(bottom, planBottom) - hmTop;
       if (hmWidth > 0 && hmHeight > 0) {
-        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.bodyRotation}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}:${f.gelPlacement ?? ''}:${f.barnDoors ? `${f.barnDoors.top},${f.barnDoors.bottom},${f.barnDoors.left},${f.barnDoors.right}` : ''}`).join('|')}|${walls.map((w) => `${w.x1}:${w.y1}:${w.x2}:${w.y2}:${w.cx ?? ''}:${w.cy ?? ''}:${w.height}:${w.reflectance}`).join('|')}|${ceilings.map((c) => `${c.points.map((p) => `${p.x},${p.y}`).join(';')}:${c.height}:${c.reflectance}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
+        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.bodyRotation}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}:${f.gelPlacement ?? ''}:${f.barnDoors ? `${f.barnDoors.top},${f.barnDoors.bottom},${f.barnDoors.left},${f.barnDoors.right}` : ''}:${f.hidden ? 'h' : ''}`).join('|')}|${walls.map((w) => `${w.x1}:${w.y1}:${w.x2}:${w.y2}:${w.cx ?? ''}:${w.cy ?? ''}:${w.height}:${w.reflectance}`).join('|')}|${ceilings.map((c) => `${c.points.map((p) => `${p.x},${p.y}`).join(';')}:${c.height}:${c.reflectance}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
         let imgData = heatMapCacheRef.current.imageData;
         if (heatMapCacheRef.current.key !== cacheKey || !imgData) {
           const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY, walls, ceilings);
@@ -557,6 +557,32 @@ const PlanCanvas: React.FC<Props> = ({
     for (const f of fixtures) {
       const isSel = selectedIds.has(f.id);
       const rad = 0.3;
+
+      // Muted lamp: ghosted marker only, no beam – it visually goes dark but
+      // stays selectable so it can be switched back on.
+      if (f.hidden) {
+        const a = Math.atan2(f.aimY - f.y, f.aimX - f.x);
+        ctx.save();
+        ctx.globalAlpha = 0.38;
+        ctx.translate(f.x, f.y);
+        ctx.rotate(a);
+        drawFixtureSymbol(ctx, f.fixture.category, rad, isSel, v.scale);
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, rad + 0.14, 0, Math.PI * 2);
+        ctx.setLineDash([3 / v.scale, 3 / v.scale]);
+        ctx.strokeStyle = isSel ? '#ffcc33' : '#6a7280';
+        ctx.lineWidth = 1.5 / v.scale;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = isSel ? '#ffcc33' : '#7a8290';
+        ctx.font = `${10 / v.scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${f.fixture.name} (aus)`, f.x, f.y - rad - 6 / v.scale);
+        ctx.textAlign = 'start';
+        continue;
+      }
+
       // Footprint drawn at the field angle (10 % isophote) so its edge
       // coincides with the heat-map fade-out.
       const fieldAngle = effectiveFieldAngleDeg(f);

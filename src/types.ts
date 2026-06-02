@@ -135,6 +135,30 @@ export interface PlacedFixture {
   universe?: number;           // DMX universe (1-based)
   dmxAddress?: number;         // DMX start address within the universe (1–512)
   purpose?: string;            // focus / purpose note ("Frontlicht Bühne")
+  // ── Temporarily mute a single lamp without deleting it: it stops
+  //    contributing to the heatmap and is drawn ghosted (still selectable). ──
+  hidden?: boolean;
+}
+
+// ── Scene / Look ─────────────────────────────────────────────────────
+// A saved lighting state. Captures the adjustable per-fixture look (intensity,
+// colour, zoom, gels, barn doors, mute) keyed by fixture id, so it can be
+// recalled later. Focus/position (x, y, aim, height) belongs to the rig, not
+// the look, and is intentionally not stored.
+export interface SceneFixtureState {
+  dimming: number;
+  hidden?: boolean;
+  currentColorTemp?: number;
+  currentBeamAngle?: number;
+  gelFilterIds?: string[];
+  gelPlacement?: 'frame' | 'front';
+  barnDoors?: { top: number; bottom: number; left: number; right: number };
+}
+
+export interface Scene {
+  id: string;
+  name: string;
+  states: Record<string, SceneFixtureState>; // by fixture id
 }
 
 // ── Person on stage ──
@@ -265,6 +289,7 @@ export interface ProjectData {
   trusses?: Truss[];
   walls?: Wall[];
   ceilings?: Ceiling[];
+  scenes?: Scene[];
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
   floorPlan?: Omit<FloorPlan, 'image'>;

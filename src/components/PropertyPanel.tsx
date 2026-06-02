@@ -123,6 +123,15 @@ const PropertyPanel: React.FC<Props> = ({
         <h3>{f.fixture.name}</h3>
         {activeAtt && <div className="prop-attachment-badge">+ {activeAtt.name}</div>}
 
+        <button
+          className={`hide-toggle ${f.hidden ? 'is-hidden' : ''}`}
+          onClick={() => onUpdateFixture(f.id, { hidden: !f.hidden })}
+          title={f.hidden ? 'Leuchte wieder einblenden' : 'Leuchte vorübergehend ausblenden (zählt nicht zur Heatmap)'}
+        >
+          {f.hidden ? '👁 Einblenden' : '🚫 Vorübergehend ausblenden'}
+        </button>
+        {f.hidden && <div className="hide-note">Ausgeblendet – diese Leuchte fließt aktuell nicht in die Heatmap ein. Die Werte unten zeigen ihren Beitrag, sobald sie wieder eingeblendet ist.</div>}
+
         {/* Fixture swap */}
         <div className="prop-section">
           <span className="prop-section-title">Leuchte tauschen</span>
@@ -719,6 +728,12 @@ const PropertyPanel: React.FC<Props> = ({
             Verschieben: Ziehe eine der markierten Leuchten.<br />
             Drehen: Nutze die Toolbar-Buttons zum Rotieren um eine Person.
           </p>
+          {multiFixtures.length > 0 && (
+            <div className="reflectance-presets">
+              <button className="refl-btn" onClick={() => { for (const mf of multiFixtures) onUpdateFixture(mf.id, { hidden: true }); }}>🚫 Ausblenden</button>
+              <button className="refl-btn" onClick={() => { for (const mf of multiFixtures) onUpdateFixture(mf.id, { hidden: undefined }); }}>👁 Einblenden</button>
+            </div>
+          )}
         </div>
         <button className="delete-btn" onClick={() => { for (const sid of selectedIds) onDelete(sid); }}>
           Alle {multiCount} löschen

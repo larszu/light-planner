@@ -534,6 +534,7 @@ export function totalLux(
 ): number {
   let sum = 0;
   for (const f of fixtures) {
+    if (f.hidden) continue; // muted lamp – contributes no light
     sum += luxFromFixture(f, px, py);
   }
   if (wallSamples.length) sum += wallBounceAt(wallSamples, px, py);
@@ -559,14 +560,17 @@ export function computeHeatMap(
   const stepY = heightM / resY;
   let maxLux = 0;
 
+  // Muted lamps contribute no light – drop them up front (also from the bounce).
+  const lit = fixtures.filter((f) => !f.hidden);
+
   // Pre-compute the reflecting surface patches once for the whole grid.
-  const wallSamples = (walls.length || ceilings.length) ? precomputeSurfaceSamples(walls, ceilings, fixtures) : [];
+  const wallSamples = (walls.length || ceilings.length) ? precomputeSurfaceSamples(walls, ceilings, lit) : [];
 
   for (let yi = 0; yi < resY; yi++) {
     const py = originY + (yi + 0.5) * stepY;
     for (let xi = 0; xi < resX; xi++) {
       const px = originX + (xi + 0.5) * stepX;
-      const lux = totalLux(fixtures, px, py, wallSamples);
+      const lux = totalLux(lit, px, py, wallSamples);
       data[yi * resX + xi] = lux;
       if (lux > maxLux) maxLux = lux;
     }
