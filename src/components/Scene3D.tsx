@@ -293,16 +293,43 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       scene.add(mesh);
     }
 
-    // Stage elements (podeste)
+    // Stage elements (podeste) – flat box, or a wedge when it's a ramp.
     if (layers.stage.visible) for (const se of stageElements) {
-      const geo = new THREE.BoxGeometry(se.width, se.height, se.depth);
       const isSel = selectedIds.has(se.id);
-      const mat = new THREE.MeshStandardMaterial({
-        color: isSel ? '#cc8833' : '#8B4513',
-        roughness: 0.7,
-      });
+      const mat = new THREE.MeshStandardMaterial({ color: isSel ? '#cc8833' : '#8B4513', roughness: 0.7 });
+      const w = se.width, d = se.depth;
+      const isRamp = se.height2 != null && Math.abs(se.height2 - se.height) > 0.01;
+      let geo: THREE.BufferGeometry;
+      if (isRamp) {
+        // Top sloped from height (front, −d/2) to height2 (back, +d/2); bottom flat at 0.
+        const hF = Math.max(0.01, se.height), hB = Math.max(0.01, se.height2!);
+        const hw = w / 2, hd = d / 2;
+        // 8 corners: 0-3 bottom (y=0), 4-7 top
+        const v = [
+          [-hw, 0, -hd], [hw, 0, -hd], [hw, 0, hd], [-hw, 0, hd],
+          [-hw, hF, -hd], [hw, hF, -hd], [hw, hB, hd], [-hw, hB, hd],
+        ];
+        const quad = (a: number, b: number, c: number, e: number) => [v[a], v[b], v[c], v[a], v[c], v[e]];
+        const faces = [
+          ...quad(4, 5, 6, 7), // top (sloped)
+          ...quad(1, 0, 3, 2), // bottom
+          ...quad(0, 1, 5, 4), // front
+          ...quad(2, 3, 7, 6), // back
+          ...quad(3, 0, 4, 7), // left
+          ...quad(1, 2, 6, 5), // right
+        ];
+        const pos: number[] = [];
+        for (const p of faces) pos.push(p[0], p[1], p[2]);
+        geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.computeVertexNormals();
+      } else {
+        geo = new THREE.BoxGeometry(w, se.height, d);
+        geo.translate(0, se.height / 2, 0);
+      }
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(se.x + se.width / 2, se.height / 2, se.y + se.depth / 2);
+      mesh.position.set(se.x + w / 2, 0, se.y + d / 2);
+      mesh.rotation.y = -(se.rotation * Math.PI) / 180;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData = { dynamic: true, selectId: se.id };

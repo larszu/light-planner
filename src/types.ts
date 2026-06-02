@@ -180,7 +180,8 @@ export interface StageElement {
   y: number;
   width: number;        // meters
   depth: number;        // meters
-  height: number;       // meters (podest height, e.g. 0.2, 0.4, 0.6, 0.8, 1.0)
+  height: number;       // meters – podest height (front edge for a ramp)
+  height2?: number;     // meters – height at the far (back) edge; ≠ height ⇒ ramp/slope
   rotation: number;     // degrees
   label: string;
 }

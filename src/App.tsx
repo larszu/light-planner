@@ -282,12 +282,14 @@ const App: React.FC = () => {
   }, [pushHistoryThrottled]);
 
   // ── Stage element handlers ──
-  const handleAddStageElement = useCallback((x: number, y: number) => {
+  const handleAddStageElement = useCallback((x: number, y: number, width = 1, depth = 1) => {
     pushHistory();
+    const r = (v: number) => Math.round(v * 10) / 10;
     const se: StageElement = {
-      id: uid('stg'), type: 'podest-1x1',
-      x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
-      width: 1, depth: 1, height: 0.4, rotation: 0, label: '',
+      id: uid('stg'), type: width === 1 && depth === 1 ? 'podest-1x1' : 'custom',
+      x: r(x), y: r(y),
+      width: Math.max(0.2, r(width)), depth: Math.max(0.2, r(depth)),
+      height: 0.4, rotation: 0, label: '',
     };
     setStageElements((prev) => [...prev, se]);
     setSelectedIds(new Set([se.id]));
@@ -1055,6 +1057,7 @@ const App: React.FC = () => {
               onAddStageElement={handleAddStageElement}
               onMovePerson={handleMovePerson}
               onMoveStageElement={handleMoveStageElement}
+              onUpdateStageElement={handleUpdateStageElement}
               onAddTruss={handleAddTruss}
               onMoveTruss={handleMoveTruss}
               onAddWall={handleAddWall}

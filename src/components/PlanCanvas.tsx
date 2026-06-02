@@ -31,9 +31,10 @@ interface Props {
   onMoveShape: (id: string, dx: number, dy: number) => void;
   onAddShape: (shape: Shape) => void;
   onAddPerson: (x: number, y: number) => void;
-  onAddStageElement: (x: number, y: number) => void;
+  onAddStageElement: (x: number, y: number, width?: number, depth?: number) => void;
   onMovePerson: (id: string, x: number, y: number) => void;
   onMoveStageElement: (id: string, x: number, y: number) => void;
+  onUpdateStageElement: (id: string, updates: Partial<StageElement>) => void;
   onAddTruss: (x1: number, y1: number, x2: number, y2: number) => void;
   onMoveTruss: (id: string, dx: number, dy: number) => void;
   onAddWall: (x1: number, y1: number, x2: number, y2: number) => void;
@@ -90,6 +91,7 @@ const PlanCanvas: React.FC<Props> = ({
   onAddStageElement,
   onMovePerson,
   onMoveStageElement,
+  onUpdateStageElement,
   onAddTruss,
   onMoveTruss,
   onAddWall,
@@ -106,7 +108,8 @@ const PlanCanvas: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'calibrate' | 'move-plan' | 'marquee';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'resize-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'draw-stage' | 'calibrate' | 'move-plan' | 'marquee';
+    corner?: 0 | 1 | 2 | 3;
     startScreenX: number;
     startScreenY: number;
     startWorldX: number;
@@ -341,6 +344,34 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.fillText(`${se.depth} m`, 0, 0);
       ctx.restore();
       ctx.textBaseline = 'alphabetic';
+
+      // Ramp / slope indicator (arrow toward the higher edge)
+      if (se.height2 != null && Math.abs(se.height2 - se.height) > 0.01) {
+        const up = se.height2 > se.height ? 1 : -1;
+        const a = (se.depth / 2) * 0.6;
+        ctx.strokeStyle = '#ffb74d';
+        ctx.fillStyle = '#ffb74d';
+        ctx.lineWidth = 1.5 / v.scale;
+        ctx.beginPath();
+        ctx.moveTo(0, -up * a); ctx.lineTo(0, up * a);
+        ctx.moveTo(-0.18, up * a - up * 0.3); ctx.lineTo(0, up * a); ctx.lineTo(0.18, up * a - up * 0.3);
+        ctx.stroke();
+        ctx.font = `${8.5 / v.scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`⤴ ${se.height}→${se.height2} m`, 0, -up * a - 4 / v.scale * up - 2 / v.scale);
+      }
+
+      // Corner resize handles when selected
+      if (isSel) {
+        const hs = 7 / v.scale;
+        ctx.fillStyle = '#ffcc33';
+        ctx.strokeStyle = '#1a1a2e';
+        ctx.lineWidth = 1 / v.scale;
+        for (const [lx, ly] of [[-se.width / 2, -se.depth / 2], [se.width / 2, -se.depth / 2], [se.width / 2, se.depth / 2], [-se.width / 2, se.depth / 2]]) {
+          ctx.fillRect(lx - hs / 2, ly - hs / 2, hs, hs);
+          ctx.strokeRect(lx - hs / 2, ly - hs / 2, hs, hs);
+        }
+      }
 
       ctx.restore();
     }
@@ -792,6 +823,23 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'start';
     }
 
+    // Stage/podest being sized (drag)
+    if (dragRef.current?.type === 'draw-stage' && measureEndRef.current) {
+      const d = dragRef.current; const end = measureEndRef.current;
+      const x0 = Math.min(d.startWorldX, end.x), y0 = Math.min(d.startWorldY, end.y);
+      const w = Math.abs(end.x - d.startWorldX), h = Math.abs(end.y - d.startWorldY);
+      ctx.fillStyle = 'rgba(139,69,19,0.25)';
+      ctx.strokeStyle = '#ffcc33';
+      ctx.lineWidth = 1.5 / v.scale;
+      ctx.fillRect(x0, y0, w, h);
+      ctx.strokeRect(x0, y0, w, h);
+      ctx.fillStyle = '#ffcc33';
+      ctx.font = `bold ${11 / v.scale}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${w.toFixed(1)} × ${h.toFixed(1)} m`, x0 + w / 2, y0 + h / 2);
+      ctx.textAlign = 'start';
+    }
+
     // Wall path tool: rubber-band from the last vertex + length & angle readout.
     if (activeTool === 'wall' && wallPathRef.current.length > 0 && wallCursorRef.current) {
       const path = wallPathRef.current;
@@ -966,7 +1014,12 @@ const PlanCanvas: React.FC<Props> = ({
 
     if (fixtureToPlace) { onPlaceFixture(fixtureToPlace, snap(wx), snap(wy)); return; }
     if (activeTool === 'person') { onAddPerson(snap(wx), snap(wy)); return; }
-    if (activeTool === 'stage') { onAddStageElement(snap(wx), snap(wy)); return; }
+    if (activeTool === 'stage') {
+      // Drag to size a podest/stage frame (a tiny click falls back to 1×1).
+      measureEndRef.current = { x: snap(wx), y: snap(wy) };
+      dragRef.current = { type: 'draw-stage', startScreenX: sx, startScreenY: sy, startWorldX: snap(wx), startWorldY: snap(wy) };
+      return;
+    }
     if (activeTool === 'truss') {
       const s = { x: snap(wx), y: snap(wy) };
       measureEndRef.current = s;
@@ -1068,8 +1121,27 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
+      // Corner handles of the selected stage → resize the frame
       if (pickable('stage')) for (const se of stageElements) {
-        if (wx >= se.x && wx <= se.x + se.width && wy >= se.y && wy <= se.y + se.depth) {
+        if (!selectedIds.has(se.id)) continue;
+        const cx = se.x + se.width / 2, cy = se.y + se.depth / 2;
+        const th = (se.rotation * Math.PI) / 180, c = Math.cos(th), s = Math.sin(th);
+        const local = [[-se.width / 2, -se.depth / 2], [se.width / 2, -se.depth / 2], [se.width / 2, se.depth / 2], [-se.width / 2, se.depth / 2]];
+        for (let i = 0; i < 4; i++) {
+          const hx = cx + local[i][0] * c - local[i][1] * s, hy = cy + local[i][0] * s + local[i][1] * c;
+          if (Math.hypot(wx - hx, wy - hy) < 0.3) {
+            dragRef.current = { type: 'resize-stage', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: se.id, corner: i as 0 | 1 | 2 | 3 };
+            return;
+          }
+        }
+      }
+      // Rotated stages need an inside-the-rotated-rect test, not the AABB.
+      if (pickable('stage')) for (const se of stageElements) {
+        const cx = se.x + se.width / 2, cy = se.y + se.depth / 2;
+        const th = (se.rotation * Math.PI) / 180;
+        const lx = (wx - cx) * Math.cos(th) + (wy - cy) * Math.sin(th);
+        const ly = -(wx - cx) * Math.sin(th) + (wy - cy) * Math.cos(th);
+        if (Math.abs(lx) <= se.width / 2 && Math.abs(ly) <= se.depth / 2) {
           onSelect(se.id, ctrl);
           dragRef.current = { type: 'move-stage', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: se.id };
           return;
@@ -1191,6 +1263,27 @@ const PlanCanvas: React.FC<Props> = ({
       }
       return;
     }
+    if (d.type === 'resize-stage' && d.targetId && d.corner != null) {
+      const se = stageElements.find((s) => s.id === d.targetId);
+      if (se) {
+        // Keep the opposite corner fixed; drag this corner to the cursor.
+        const cx = se.x + se.width / 2, cy = se.y + se.depth / 2;
+        const th = (se.rotation * Math.PI) / 180, c = Math.cos(th), s = Math.sin(th);
+        const local = [[-se.width / 2, -se.depth / 2], [se.width / 2, -se.depth / 2], [se.width / 2, se.depth / 2], [-se.width / 2, se.depth / 2]];
+        const opp = local[(d.corner + 2) % 4];
+        const fixed = { x: cx + opp[0] * c - opp[1] * s, y: cy + opp[0] * s + opp[1] * c };
+        const dragPt = { x: snap(wx), y: snap(wy) };
+        // vector fixed→drag in the stage's un-rotated frame
+        const dx = dragPt.x - fixed.x, dy = dragPt.y - fixed.y;
+        const ux = dx * c + dy * s, uy = -dx * s + dy * c;
+        const nw = Math.max(0.2, Math.abs(ux)), nd = Math.max(0.2, Math.abs(uy));
+        const ncx = (fixed.x + dragPt.x) / 2, ncy = (fixed.y + dragPt.y) / 2;
+        const r = (v: number) => Math.round(v * 10) / 10;
+        onUpdateStageElement(d.targetId, { x: r(ncx - nw / 2), y: r(ncy - nd / 2), width: r(nw), depth: r(nd) });
+      }
+      return;
+    }
+    if (d.type === 'draw-stage') { measureEndRef.current = { x: snap(wx), y: snap(wy) }; return; }
     if (d.type === 'move-truss' && d.targetId) {
       onMoveTruss(d.targetId, wx - d.startWorldX, wy - d.startWorldY);
       d.startWorldX = wx; d.startWorldY = wy;
@@ -1271,6 +1364,14 @@ const PlanCanvas: React.FC<Props> = ({
       if (d.type === 'draw-truss') {
         const len = Math.hypot(ewx - d.startWorldX, ewy - d.startWorldY);
         if (len > 0.3) onAddTruss(d.startWorldX, d.startWorldY, snap(ewx), snap(ewy));
+        measureEndRef.current = null;
+      }
+      if (d.type === 'draw-stage') {
+        const x0 = Math.min(d.startWorldX, snap(ewx)), y0 = Math.min(d.startWorldY, snap(ewy));
+        const w = Math.abs(snap(ewx) - d.startWorldX), h = Math.abs(snap(ewy) - d.startWorldY);
+        // A real drag sizes the frame; a tiny click drops a default 1×1 podest.
+        if (w > 0.3 && h > 0.3) onAddStageElement(x0, y0, w, h);
+        else onAddStageElement(d.startWorldX, d.startWorldY);
         measureEndRef.current = null;
       }
       if (d.type === 'marquee') {
