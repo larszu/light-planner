@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { LightSide, LightArea, AreaLightConfig } from '../utils/autoLighting';
-import { fixtureLibrary } from '../data/fixtureLibrary';
+import type { LightSide, LightArea, AreaLightConfig } from '../core/autoLighting';
+import { fixtureLibrary } from '../core/fixtureLibrary';
 import type { Fixture, Truss } from '../types';
 
 interface Props {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { Fixture, Truss } from '../types';
-import { fixtureLibrary } from '../data/fixtureLibrary';
-import type { ThreePointConfig } from '../utils/autoLighting';
+import { fixtureLibrary } from '../core/fixtureLibrary';
+import type { ThreePointConfig } from '../core/autoLighting';
 
 interface Props {
   targetLux: number; // from heatmap target, 0 = off

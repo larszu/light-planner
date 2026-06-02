@@ -1,5 +1,5 @@
 import type { PlacedFixture } from '../types';
-import { effectiveColorTemp } from '../data/gelLibrary';
+import { effectiveColorTemp } from '../core/gelLibrary';
 
 /**
  * Convert a color temperature (Kelvin) to an [R, G, B] triplet (0–255).

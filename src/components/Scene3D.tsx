@@ -8,9 +8,9 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers, CameraView } from '../types';
-import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../utils/lightCalc';
-import { getBeamColorHex } from '../utils/colorTemp';
-import { sampleWall, isCurved } from '../utils/geometry';
+import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../core/lightCalc';
+import { getBeamColorHex } from '../core/colorTemp';
+import { sampleWall, isCurved } from '../core/geometry';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.

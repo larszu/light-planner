@@ -1,5 +1,5 @@
 import type { Person, PlacedFixture, Fixture, StageElement } from '../types';
-import { fixtureLibrary } from '../data/fixtureLibrary';
+import { fixtureLibrary } from '../core/fixtureLibrary';
 import { luxFromFixture } from './lightCalc';
 
 const DEG2RAD = Math.PI / 180;

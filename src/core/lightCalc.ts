@@ -1,5 +1,5 @@
 import type { PlacedFixture, Attachment, PhotometricData, Wall, Ceiling } from '../types';
-import { combinedTransmission, effectiveBeamAngleWithFrost, frostLevel } from '../data/gelLibrary';
+import { combinedTransmission, effectiveBeamAngleWithFrost, frostLevel } from '../core/gelLibrary';
 import { sampleWall, isCurved, pointInPolygon, polygonBounds } from './geometry';
 
 const DEG2RAD = Math.PI / 180;

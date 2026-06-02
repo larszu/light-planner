@@ -1,11 +1,11 @@
 import React from 'react';
 import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape, CameraView } from '../types';
-import { wallMidHandle, curveControlForMid } from '../utils/geometry';
-import { luxFromFixture, effectiveFieldAngleDeg, explainLux } from '../utils/lightCalc';
+import { wallMidHandle, curveControlForMid } from '../core/geometry';
+import { luxFromFixture, effectiveFieldAngleDeg, explainLux } from '../core/lightCalc';
 import type { FixtureCategory, BeamShape, LensType, MountType } from '../types';
-import { gelLibrary } from '../data/gelLibrary';
-import { fixtureLibrary } from '../data/fixtureLibrary';
-import { getFixtureCCT, cctToRgb } from '../utils/colorTemp';
+import { gelLibrary } from '../core/gelLibrary';
+import { fixtureLibrary } from '../core/fixtureLibrary';
+import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
 
 interface Props {
   fixtures: PlacedFixture[];

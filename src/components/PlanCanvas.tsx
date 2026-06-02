@@ -1,10 +1,10 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling, Layers, CameraView } from '../types';
 import type { PlanMode } from '../App';
-import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../utils/lightCalc';
-import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall, pointInPolygon } from '../utils/geometry';
+import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../core/lightCalc';
+import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall, pointInPolygon } from '../core/geometry';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
-import { getBeamColorRgba } from '../utils/colorTemp';
+import { getBeamColorRgba } from '../core/colorTemp';
 
 interface Props {
   fixtures: PlacedFixture[];
