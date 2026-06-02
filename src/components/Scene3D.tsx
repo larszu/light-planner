@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { PlacedFixture, Person, StageElement, Truss, Wall, FloorPlan } from '../types';
+import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
+import { sampleWall, isCurved } from '../utils/geometry';
 
 export interface Scene3DHandle {
   screenshot: () => string | null;
@@ -16,6 +17,7 @@ interface Props {
   stageElements: StageElement[];
   trusses: Truss[];
   walls: Wall[];
+  ceilings: Ceiling[];
   floorPlan: FloorPlan | null;
   selectedIds: Set<string>;
   showHeatMap: boolean;
@@ -24,7 +26,7 @@ interface Props {
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -191,6 +193,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     for (const se of stageElements) { acc(se.x, se.y); acc(se.x + se.width, se.y + se.depth); }
     for (const t of trusses) { acc(t.x1, t.y1); acc(t.x2, t.y2); }
     for (const w of walls) { acc(w.x1, w.y1); acc(w.x2, w.y2); }
+    for (const c of ceilings) for (const p of c.points) acc(p.x, p.y);
     if (floorPlan) { acc(floorPlan.offsetX, floorPlan.offsetY); acc(floorPlan.offsetX + floorPlan.widthMeters, floorPlan.offsetY + floorPlan.heightMeters); }
     const hasContent = bMinX !== Infinity;
 
@@ -252,21 +255,46 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       scene.add(mesh);
     }
 
-    // Walls (architecture – vertical surfaces that reflect light)
+    // Walls (vertical surfaces, straight or curved, that reflect light)
     for (const w of walls) {
-      const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
-      if (len < 0.05) continue;
+      if (Math.hypot(w.x2 - w.x1, w.y2 - w.y1) < 0.05) continue;
       const isSel = selectedIds.has(w.id);
-      const angle = Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(len, w.height, 0.15),
-        new THREE.MeshStandardMaterial({ color: isSel ? '#ffcc33' : w.color, roughness: 0.85, metalness: 0 }),
-      );
-      mesh.position.set((w.x1 + w.x2) / 2, w.height / 2, (w.y1 + w.y2) / 2);
-      mesh.rotation.y = -angle;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      const pts = sampleWall(w, isCurved(w) ? 18 : 1); // floor polyline
+      const pos: number[] = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        // two triangles forming the vertical quad a→b
+        pos.push(a.x, 0, a.y, b.x, 0, b.y, b.x, w.height, b.y);
+        pos.push(a.x, 0, a.y, b.x, w.height, b.y, a.x, w.height, a.y);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: isSel ? '#ffcc33' : w.color, roughness: 0.85, metalness: 0, side: THREE.DoubleSide,
+      }));
+      mesh.castShadow = true; mesh.receiveShadow = true;
       mesh.userData = { dynamic: true, selectId: w.id };
+      scene.add(mesh);
+    }
+
+    // Ceilings (translucent horizontal polygon at height)
+    for (const c of ceilings) {
+      if (c.points.length < 3) continue;
+      const isSel = selectedIds.has(c.id);
+      const pos: number[] = [];
+      for (let i = 1; i < c.points.length - 1; i++) {
+        const a = c.points[0], b = c.points[i], d = c.points[i + 1];
+        pos.push(a.x, c.height, a.y, b.x, c.height, b.y, d.x, c.height, d.y);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: isSel ? '#ffcc33' : c.color, roughness: 0.9, metalness: 0,
+        side: THREE.DoubleSide, transparent: true, opacity: 0.35,
+      }));
+      mesh.userData = { dynamic: true, selectId: c.id };
       scene.add(mesh);
     }
 
@@ -376,7 +404,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const hw = Math.max(8, (bMaxX - bMinX) + 2 * pad);
       const hd = Math.max(8, (bMaxY - bMinY) + 2 * pad);
       const hmRes = 180;
-      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls);
+      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls, ceilings);
       const scale = heatMapScale > 0 ? heatMapScale : (maxLux || 1000);
 
       const canvas2d = document.createElement('canvas');
@@ -445,7 +473,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {

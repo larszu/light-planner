@@ -1,5 +1,6 @@
-import type { PlacedFixture, Attachment, PhotometricData, Wall } from '../types';
+import type { PlacedFixture, Attachment, PhotometricData, Wall, Ceiling } from '../types';
 import { combinedTransmission, effectiveBeamAngleWithFrost } from '../data/gelLibrary';
+import { sampleWall, isCurved, pointInPolygon, polygonBounds } from './geometry';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -289,51 +290,78 @@ function beamIntensityToward(f: PlacedFixture, px: number, py: number, pz: numbe
   return Ipeak * Math.exp(-(theta * theta) / (2 * sigma * sigma));
 }
 
-// A small reflecting patch on a wall, with its pre-computed reflected exitance.
-export interface WallSample { x: number; y: number; z: number; nx: number; ny: number; m: number; dA: number }
+// A small reflecting surface patch with its pre-computed reflected exitance.
+// Normal (nx,ny,nz); walls are double-sided, ceilings face down.
+export interface WallSample { x: number; y: number; z: number; nx: number; ny: number; nz: number; m: number; dA: number; twoSided: boolean }
+
+// Incident illuminance on a patch at (sx,sy,sz) with unit normal (nx,ny,nz).
+function incidentLux(fixtures: PlacedFixture[], sx: number, sy: number, sz: number, nx: number, ny: number, nz: number, twoSided: boolean): number {
+  let E = 0;
+  for (const f of fixtures) {
+    const I = beamIntensityToward(f, sx, sy, sz);
+    if (I <= 0) continue;
+    const rx = sx - f.x, ry = sy - f.y, rz = sz - f.mountingHeight; // fixture → patch
+    const d2 = rx * rx + ry * ry + rz * rz; const d = Math.sqrt(d2) || 1e-6;
+    const dot = ((rx / d) * nx + (ry / d) * ny + (rz / d) * nz);
+    const cosInc = twoSided ? Math.abs(dot) : Math.max(0, -dot); // light arriving onto the lit face
+    if (cosInc <= 0) continue;
+    E += (I * cosInc) / d2;
+  }
+  return E;
+}
 
 /**
- * Pre-compute reflecting patches for all walls: how much light each wall patch
- * receives (from all fixtures) × its reflectance. One bounce, wall → floor.
+ * Pre-compute reflecting patches for walls (sampled along their curve) and
+ * ceilings (sampled over their polygon). One bounce, surface → floor.
  */
-export function precomputeWallSamples(walls: Wall[], fixtures: PlacedFixture[]): WallSample[] {
+export function precomputeSurfaceSamples(walls: Wall[], ceilings: Ceiling[], fixtures: PlacedFixture[]): WallSample[] {
   const out: WallSample[] = [];
+
   for (const w of walls) {
     if (w.reflectance <= 0 || w.height <= 0) continue;
-    const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
-    const L = Math.hypot(dx, dy);
-    if (L < 0.1) continue;
-    const K = Math.max(2, Math.min(14, Math.ceil(L / 1.5)));
-    const nx = -dy / L, ny = dx / L;   // wall normal (double-sided via abs below)
+    const pts = sampleWall(w, isCurved(w) ? 16 : 1);
     const zc = w.height / 2;
-    const dA = (L / K) * w.height;
-    for (let k = 0; k < K; k++) {
-      const t = (k + 0.5) / K;
-      const sx = w.x1 + dx * t, sy = w.y1 + dy * t;
-      let E = 0;
-      for (const f of fixtures) {
-        const I = beamIntensityToward(f, sx, sy, zc);
-        if (I <= 0) continue;
-        const rx = sx - f.x, ry = sy - f.y, rz = zc - f.mountingHeight;
-        const d2 = rx * rx + ry * ry + rz * rz; const d = Math.sqrt(d2) || 1e-6;
-        const cosInc = Math.abs((rx / d) * nx + (ry / d) * ny); // double-sided
-        E += (I * cosInc) / d2;
-      }
-      out.push({ x: sx, y: sy, z: zc, nx, ny, m: w.reflectance * E, dA });
+    for (let i = 0; i < pts.length - 1; i++) {
+      const ax = pts[i].x, ay = pts[i].y, bx = pts[i + 1].x, by = pts[i + 1].y;
+      const segLen = Math.hypot(bx - ax, by - ay);
+      if (segLen < 0.01) continue;
+      const sx = (ax + bx) / 2, sy = (ay + by) / 2;
+      const nx = -(by - ay) / segLen, ny = (bx - ax) / segLen;
+      const dA = segLen * w.height;
+      const E = incidentLux(fixtures, sx, sy, zc, nx, ny, 0, true);
+      out.push({ x: sx, y: sy, z: zc, nx, ny, nz: 0, m: w.reflectance * E, dA, twoSided: true });
     }
   }
+
+  for (const c of ceilings) {
+    if (c.reflectance <= 0 || c.points.length < 3) continue;
+    const b = polygonBounds(c.points);
+    const w = b.maxX - b.minX, d = b.maxY - b.minY;
+    const step = Math.max(0.8, Math.max(w, d) / 12);
+    const cellA = step * step;
+    for (let yy = b.minY + step / 2; yy < b.maxY; yy += step) {
+      for (let xx = b.minX + step / 2; xx < b.maxX; xx += step) {
+        if (!pointInPolygon(xx, yy, c.points)) continue;
+        const E = incidentLux(fixtures, xx, yy, c.height, 0, 0, -1, false);
+        if (E <= 0) continue;
+        out.push({ x: xx, y: yy, z: c.height, nx: 0, ny: 0, nz: -1, m: c.reflectance * E, dA: cellA, twoSided: false });
+      }
+    }
+  }
+
   return out;
 }
 
-/** Reflected illuminance at a floor point from pre-computed wall patches. */
+/** Reflected illuminance at a floor point from pre-computed surface patches. */
 export function wallBounceAt(samples: WallSample[], px: number, py: number): number {
   let extra = 0;
   for (const s of samples) {
     if (s.m <= 0) continue;
-    const rx = px - s.x, ry = py - s.y, rz = -s.z;
+    const rx = px - s.x, ry = py - s.y, rz = -s.z; // patch → floor point
     const rd2 = rx * rx + ry * ry + rz * rz; const rd = Math.sqrt(rd2) || 1e-6;
-    const cosEmit = Math.abs((rx / rd) * s.nx + (ry / rd) * s.ny); // double-sided
-    const cosRecv = s.z / rd; // floor normal (up) · direction to patch
+    const dot = ((rx / rd) * s.nx + (ry / rd) * s.ny + (rz / rd) * s.nz);
+    const cosEmit = s.twoSided ? Math.abs(dot) : Math.max(0, dot);
+    const cosRecv = s.z / rd; // floor up-normal · (floor → patch) direction
     if (cosEmit <= 0 || cosRecv <= 0) continue;
     extra += (s.m / Math.PI) * ((cosEmit * cosRecv) / rd2) * s.dA;
   }
@@ -369,14 +397,15 @@ export function computeHeatMap(
   resX: number,
   resY: number,
   walls: Wall[] = [],
+  ceilings: Ceiling[] = [],
 ): { data: Float32Array; maxLux: number } {
   const data = new Float32Array(resX * resY);
   const stepX = widthM / resX;
   const stepY = heightM / resY;
   let maxLux = 0;
 
-  // Pre-compute the wall reflecting patches once for the whole grid.
-  const wallSamples = walls.length ? precomputeWallSamples(walls, fixtures) : [];
+  // Pre-compute the reflecting surface patches once for the whole grid.
+  const wallSamples = (walls.length || ceilings.length) ? precomputeSurfaceSamples(walls, ceilings, fixtures) : [];
 
   for (let yi = 0; yi < resY; yi++) {
     const py = originY + (yi + 0.5) * stepY;

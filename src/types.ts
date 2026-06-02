@@ -161,9 +161,21 @@ export interface Wall {
   id: string;
   x1: number; y1: number;   // endpoints on the floor (meters)
   x2: number; y2: number;
+  // Optional quadratic-Bézier control point → curved wall. Absent = straight.
+  cx?: number; cy?: number;
   height: number;           // wall height (meters)
   reflectance: number;      // 0..1 diffuse reflectance (Reflexionsgrad)
   color: string;            // surface colour (hex)
+  label: string;
+}
+
+// ── Ceiling – a horizontal surface at a height that bounces light down ──
+export interface Ceiling {
+  id: string;
+  points: { x: number; y: number }[]; // polygon outline (meters)
+  height: number;           // height above the floor (meters)
+  reflectance: number;      // 0..1 diffuse reflectance
+  color: string;
   label: string;
 }
 
@@ -239,6 +251,7 @@ export interface ProjectData {
   fixtureGroups?: FixtureGroup[];
   trusses?: Truss[];
   walls?: Wall[];
+  ceilings?: Ceiling[];
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
   floorPlan?: Omit<FloorPlan, 'image'>;

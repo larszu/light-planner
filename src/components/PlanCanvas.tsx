@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
-import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall } from '../types';
+import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling } from '../types';
 import type { PlanMode } from '../App';
-import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeWallSamples } from '../utils/lightCalc';
+import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../utils/lightCalc';
+import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall } from '../utils/geometry';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
 import { getBeamColorRgba } from '../utils/colorTemp';
 
@@ -12,6 +13,7 @@ interface Props {
   stageElements: StageElement[];
   trusses: Truss[];
   walls: Wall[];
+  ceilings: Ceiling[];
   floorPlan: FloorPlan | null;
   snapStep: number;
   activeTool: Tool;
@@ -35,6 +37,7 @@ interface Props {
   onMoveTruss: (id: string, dx: number, dy: number) => void;
   onAddWall: (x1: number, y1: number, x2: number, y2: number) => void;
   onMoveWall: (id: string, dx: number, dy: number) => void;
+  onUpdateWall: (id: string, updates: Partial<Wall>) => void;
   onCursorLux: (lux: number | null) => void;
   onToolChange: (tool: Tool) => void;
   onDropFixture: (fixture: Fixture, x: number, y: number) => void;
@@ -65,6 +68,7 @@ const PlanCanvas: React.FC<Props> = ({
   stageElements,
   trusses,
   walls,
+  ceilings,
   floorPlan,
   snapStep,
   activeTool,
@@ -88,6 +92,7 @@ const PlanCanvas: React.FC<Props> = ({
   onMoveTruss,
   onAddWall,
   onMoveWall,
+  onUpdateWall,
   onCursorLux,
   onToolChange,
   onDropFixture,
@@ -99,7 +104,7 @@ const PlanCanvas: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'move-wall' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'calibrate' | 'move-plan' | 'marquee';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'calibrate' | 'move-plan' | 'marquee';
     startScreenX: number;
     startScreenY: number;
     startWorldX: number;
@@ -127,8 +132,8 @@ const PlanCanvas: React.FC<Props> = ({
     return [(sx - v.offsetX) / v.scale, (sy - v.offsetY) / v.scale];
   }, []);
 
-  // Reflecting wall patches (for the cursor lux readout incl. bounce).
-  const wallSamples = useMemo(() => precomputeWallSamples(walls, fixtures), [walls, fixtures]);
+  // Reflecting surface patches (walls + ceilings) for the cursor lux readout.
+  const wallSamples = useMemo(() => precomputeSurfaceSamples(walls, ceilings, fixtures), [walls, ceilings, fixtures]);
 
   // Snap a world coordinate to the grid (if enabled), else to 0.1 m.
   const snap = useCallback(
@@ -335,28 +340,65 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.restore();
     }
 
-    // Walls (architecture – reflect light back into the room)
+    // Ceilings (overhead surface – shown as a dashed outline in plan view)
+    for (const c of ceilings) {
+      if (c.points.length < 3) continue;
+      const isSel = selectedIds.has(c.id);
+      ctx.beginPath();
+      ctx.moveTo(c.points[0].x, c.points[0].y);
+      for (let i = 1; i < c.points.length; i++) ctx.lineTo(c.points[i].x, c.points[i].y);
+      ctx.closePath();
+      ctx.fillStyle = isSel ? 'rgba(255,204,51,0.06)' : 'rgba(216,212,200,0.05)';
+      ctx.fill();
+      ctx.setLineDash([8 / v.scale, 5 / v.scale]);
+      ctx.strokeStyle = isSel ? '#ffcc33' : '#7d8aa0';
+      ctx.lineWidth = 1.2 / v.scale;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      let lx = 0, ly = 0;
+      for (const p of c.points) { lx += p.x; ly += p.y; }
+      lx /= c.points.length; ly /= c.points.length;
+      ctx.fillStyle = isSel ? '#ffcc33' : '#8895a8';
+      ctx.font = `${11 / v.scale}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`⌂ Decke h=${c.height}m · ρ${Math.round(c.reflectance * 100)}%`, lx, ly);
+      ctx.textAlign = 'start';
+    }
+
+    // Walls (architecture – reflect light back into the room; may be curved)
     for (const wall of walls) {
       const isSel = selectedIds.has(wall.id);
-      const wlen = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
+      const curved = isCurved(wall);
       ctx.lineCap = 'round';
       ctx.strokeStyle = isSel ? '#ffcc33' : wall.color;
       ctx.lineWidth = 0.22; // ~0.22 m thick (world units)
       ctx.beginPath();
-      ctx.moveTo(wall.x1, wall.y1); ctx.lineTo(wall.x2, wall.y2);
+      ctx.moveTo(wall.x1, wall.y1);
+      if (curved) ctx.quadraticCurveTo(wall.cx!, wall.cy!, wall.x2, wall.y2);
+      else ctx.lineTo(wall.x2, wall.y2);
       ctx.stroke();
+      if (isSel) { ctx.strokeStyle = '#ffcc33'; ctx.lineWidth = 1.5 / v.scale; ctx.stroke(); }
+      ctx.lineCap = 'butt';
+      // Curve control handle (drag to bend) while selected
       if (isSel) {
+        const hM = wallMidHandle(wall);
+        ctx.beginPath();
+        ctx.arc(hM.x, hM.y, 0.18, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,204,51,0.3)';
+        ctx.fill();
         ctx.strokeStyle = '#ffcc33';
         ctx.lineWidth = 1.5 / v.scale;
         ctx.stroke();
       }
-      ctx.lineCap = 'butt';
+      const pts = sampleWall(wall, curved ? 12 : 1);
+      let wlen = 0;
+      for (let i = 0; i < pts.length - 1; i++) wlen += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
       if (wlen > 0.5) {
-        const mx = (wall.x1 + wall.x2) / 2, my = (wall.y1 + wall.y2) / 2;
+        const mid = wallMidHandle(wall);
         ctx.fillStyle = isSel ? '#ffcc33' : '#b9c2cf';
         ctx.font = `${9 / v.scale}px sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillText(`${wall.label ? wall.label + ' · ' : ''}ρ${Math.round(wall.reflectance * 100)}% · ${wall.height}m`, mx, my - 0.25);
+        ctx.fillText(`${wall.label ? wall.label + ' · ' : ''}ρ${Math.round(wall.reflectance * 100)}% · ${wall.height}m`, mid.x, mid.y - 0.3);
         ctx.textAlign = 'start';
       }
     }
@@ -450,6 +492,14 @@ const PlanCanvas: React.FC<Props> = ({
         planLeft = Math.min(planLeft, f.x, f.aimX); planRight = Math.max(planRight, f.x, f.aimX);
         planTop = Math.min(planTop, f.y, f.aimY); planBottom = Math.max(planBottom, f.y, f.aimY);
       }
+      for (const w of walls) {
+        planLeft = Math.min(planLeft, w.x1, w.x2); planRight = Math.max(planRight, w.x1, w.x2);
+        planTop = Math.min(planTop, w.y1, w.y2); planBottom = Math.max(planBottom, w.y1, w.y2);
+      }
+      for (const c of ceilings) for (const p of c.points) {
+        planLeft = Math.min(planLeft, p.x); planRight = Math.max(planRight, p.x);
+        planTop = Math.min(planTop, p.y); planBottom = Math.max(planBottom, p.y);
+      }
       const pad = 4;
       planLeft -= pad; planTop -= pad; planRight += pad; planBottom += pad;
       if (floorPlan) {
@@ -461,10 +511,10 @@ const PlanCanvas: React.FC<Props> = ({
       const hmWidth = Math.min(right, planRight) - hmLeft;
       const hmHeight = Math.min(bottom, planBottom) - hmTop;
       if (hmWidth > 0 && hmHeight > 0) {
-        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}`).join('|')}|${walls.map((w) => `${w.x1}:${w.y1}:${w.x2}:${w.y2}:${w.height}:${w.reflectance}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
+        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}`).join('|')}|${walls.map((w) => `${w.x1}:${w.y1}:${w.x2}:${w.y2}:${w.cx ?? ''}:${w.cy ?? ''}:${w.height}:${w.reflectance}`).join('|')}|${ceilings.map((c) => `${c.points.map((p) => `${p.x},${p.y}`).join(';')}:${c.height}:${c.reflectance}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
         let imgData = heatMapCacheRef.current.imageData;
         if (heatMapCacheRef.current.key !== cacheKey || !imgData) {
-          const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY, walls);
+          const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY, walls, ceilings);
           imgData = new ImageData(hmResX, hmResY);
           const useTarget = heatMapTarget > 0;
           for (let i = 0; i < data.length; i++) {
@@ -734,7 +784,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -919,12 +969,31 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
+      // Curve handle of the selected wall → bend it
       for (const wall of walls) {
-        if (distToSegment(wx, wy, wall.x1, wall.y1, wall.x2, wall.y2) < 0.3) {
+        if (!selectedIds.has(wall.id)) continue;
+        const hM = wallMidHandle(wall);
+        if (Math.hypot(wx - hM.x, wy - hM.y) < 0.3) {
+          dragRef.current = { type: 'curve-wall', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: wall.id };
+          return;
+        }
+      }
+      for (const wall of walls) {
+        if (distToWall(wall, wx, wy) < 0.3) {
           onSelect(wall.id, ctrl);
           dragRef.current = { type: 'move-wall', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, targetId: wall.id };
           return;
         }
+      }
+      // Ceiling outline → select (for editing height / reflectance / delete)
+      for (const c of ceilings) {
+        if (c.points.length < 3) continue;
+        let near = false;
+        for (let i = 0; i < c.points.length; i++) {
+          const a = c.points[i], b = c.points[(i + 1) % c.points.length];
+          if (distToSegment(wx, wy, a.x, a.y, b.x, b.y) < 0.3) { near = true; break; }
+        }
+        if (near) { onSelect(c.id, ctrl); return; }
       }
       // Lines & measure lines: clicking near the segment selects it (so it
       // can be deleted from the property panel).
@@ -1011,6 +1080,14 @@ const PlanCanvas: React.FC<Props> = ({
     if (d.type === 'move-wall' && d.targetId) {
       onMoveWall(d.targetId, wx - d.startWorldX, wy - d.startWorldY);
       d.startWorldX = wx; d.startWorldY = wy;
+      return;
+    }
+    if (d.type === 'curve-wall' && d.targetId) {
+      const wl = walls.find((w) => w.id === d.targetId);
+      if (wl) {
+        const c = curveControlForMid(wl.x1, wl.y1, wl.x2, wl.y2, wx, wy);
+        onUpdateWall(d.targetId, { cx: Math.round(c.x * 100) / 100, cy: Math.round(c.y * 100) / 100 });
+      }
       return;
     }
     if (d.type === 'move-shape' && d.targetId) {

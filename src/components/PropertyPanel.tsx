@@ -1,5 +1,6 @@
 import React from 'react';
-import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Shape } from '../types';
+import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape } from '../types';
+import { wallMidHandle, curveControlForMid } from '../utils/geometry';
 import { luxFromFixture, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { gelLibrary, effectiveColorTemp } from '../data/gelLibrary';
 import { fixtureLibrary } from '../data/fixtureLibrary';
@@ -11,6 +12,7 @@ interface Props {
   stageElements: StageElement[];
   trusses: Truss[];
   walls: Wall[];
+  ceilings: Ceiling[];
   shapes: Shape[];
   selectedIds: Set<string>;
   cursorLux: number | null;
@@ -20,6 +22,7 @@ interface Props {
   onUpdateStageElement: (id: string, updates: Partial<StageElement>) => void;
   onUpdateTruss: (id: string, updates: Partial<Truss>) => void;
   onUpdateWall: (id: string, updates: Partial<Wall>) => void;
+  onUpdateCeiling: (id: string, updates: Partial<Ceiling>) => void;
   onDelete: (id: string) => void;
   onAutoThreePointForPerson: (personId: string) => void;
   onAreaLight: () => void;
@@ -41,6 +44,7 @@ const PropertyPanel: React.FC<Props> = ({
   stageElements,
   trusses,
   walls,
+  ceilings,
   shapes,
   selectedIds,
   cursorLux,
@@ -50,6 +54,7 @@ const PropertyPanel: React.FC<Props> = ({
   onUpdateStageElement,
   onUpdateTruss,
   onUpdateWall,
+  onUpdateCeiling,
   onDelete,
   onAutoThreePointForPerson,
   onAreaLight,
@@ -60,6 +65,7 @@ const PropertyPanel: React.FC<Props> = ({
   const selStage = stageElements.find((s) => s.id === selectedId);
   const selTruss = trusses.find((t) => t.id === selectedId);
   const selWall = walls.find((w) => w.id === selectedId);
+  const selCeiling = ceilings.find((c) => c.id === selectedId);
   const selShape = shapes.find((s) => s.id === selectedId);
 
   // Multi-selection info
@@ -437,12 +443,29 @@ const PropertyPanel: React.FC<Props> = ({
   if (selWall) {
     const w = selWall;
     const len = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+    const chord = len || 1;
+    const m0x = (w.x1 + w.x2) / 2, m0y = (w.y1 + w.y2) / 2;
+    const ppx = -(w.y2 - w.y1) / chord, ppy = (w.x2 - w.x1) / chord;
+    const mh = wallMidHandle(w);
+    const curveFrac = Math.max(-1, Math.min(1, ((mh.x - m0x) * ppx + (mh.y - m0y) * ppy) / (chord / 2)));
+    const setCurve = (frac: number) => {
+      if (Math.abs(frac) < 0.02) { onUpdateWall(w.id, { cx: undefined, cy: undefined }); return; }
+      const mx = m0x + ppx * frac * (chord / 2), my = m0y + ppy * frac * (chord / 2);
+      const c = curveControlForMid(w.x1, w.y1, w.x2, w.y2, mx, my);
+      onUpdateWall(w.id, { cx: Math.round(c.x * 100) / 100, cy: Math.round(c.y * 100) / 100 });
+    };
     return (
       <div className="property-panel">
         <h3>Wand</h3>
         <div className="prop-section">
           <div className="prop-derived lux-readout">Länge: {len.toFixed(2)} m</div>
           {numField('Höhe (m)', w.height, (v) => onUpdateWall(w.id, { height: v }), 0.1, 0.1, 20)}
+          <label className="prop-field">
+            <span>Krümmung</span>
+            <input type="range" min={-1} max={1} step={0.05} value={curveFrac}
+              onChange={(e) => setCurve(Number(e.target.value))} />
+          </label>
+          <div className="prop-derived">Oder den gelben Griff auf der Wand ziehen, um sie zu biegen.</div>
           <label className="prop-field">
             <span>Reflexion ({Math.round(w.reflectance * 100)}%)</span>
             <input type="range" min={0} max={1} step={0.05} value={w.reflectance}
@@ -464,6 +487,35 @@ const PropertyPanel: React.FC<Props> = ({
           <div className="prop-derived">Reflektiert Licht diffus in den Raum (Ein-Bounce) – fließt in die Heatmap ein.</div>
         </div>
         <button className="delete-btn" onClick={() => onDelete(w.id)}>Wand löschen</button>
+      </div>
+    );
+  }
+
+  if (selCeiling) {
+    const c = selCeiling;
+    return (
+      <div className="property-panel">
+        <h3>Decke</h3>
+        <div className="prop-section">
+          <div className="prop-derived lux-readout">{c.points.length} Eckpunkte</div>
+          {numField('Höhe (m)', c.height, (v) => onUpdateCeiling(c.id, { height: v }), 0.1, 0.5, 30)}
+          <label className="prop-field">
+            <span>Reflexion ({Math.round(c.reflectance * 100)}%)</span>
+            <input type="range" min={0} max={1} step={0.05} value={c.reflectance}
+              onChange={(e) => onUpdateCeiling(c.id, { reflectance: Number(e.target.value) })} />
+          </label>
+          <div className="reflectance-presets">
+            {[['Dunkel', 0.1], ['Beton', 0.4], ['Hell', 0.7], ['Weiß', 0.85]].map(([lbl, v]) => (
+              <button key={lbl as string} className="refl-btn" onClick={() => onUpdateCeiling(c.id, { reflectance: v as number })}>{lbl}</button>
+            ))}
+          </div>
+          <label className="prop-field">
+            <span>Farbe</span>
+            <input type="color" value={c.color} onChange={(e) => onUpdateCeiling(c.id, { color: e.target.value })} />
+          </label>
+          <div className="prop-derived">Reflektiert nach unten in den Raum. Tipp: „Decke" in der Toolbar erzeugt sie neu aus den Wänden.</div>
+        </div>
+        <button className="delete-btn" onClick={() => onDelete(c.id)}>Decke löschen</button>
       </div>
     );
   }

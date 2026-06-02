@@ -30,6 +30,8 @@ interface Props {
   hasPersons: boolean;
   hasStageElements: boolean;
   hasArea: boolean;
+  onGenerateCeiling: () => void;
+  hasWalls: boolean;
   hasSelection: boolean;
   multiSelected: boolean;
   onGroupSelection: () => void;
@@ -66,6 +68,8 @@ const Toolbar: React.FC<Props> = ({
   hasPersons,
   hasStageElements,
   hasArea,
+  onGenerateCeiling,
+  hasWalls,
   hasSelection,
   multiSelected,
   onGroupSelection,
@@ -218,6 +222,15 @@ const Toolbar: React.FC<Props> = ({
         >
           <span className="tool-icon">🔆</span>
           <span className="tool-label">Verteilen</span>
+        </button>
+        <button
+          className="tool-btn"
+          onClick={onGenerateCeiling}
+          disabled={!hasWalls}
+          title="Decke automatisch über alle Wände erzeugen (reflektiert Licht)"
+        >
+          <span className="tool-icon">⬓</span>
+          <span className="tool-label">Decke</span>
         </button>
       </div>
 
