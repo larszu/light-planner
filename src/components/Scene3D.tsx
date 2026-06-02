@@ -26,6 +26,15 @@ function loadPersonModel(): Promise<PersonModel> {
     const url = `${import.meta.env.BASE_URL}models/person.glb`;
     personModelPromise = new GLTFLoader().loadAsync(url).then((g) => {
       const scene = g.scene;
+      // The bind pose is a T-pose; sample the idle clip so the figure stands
+      // naturally (arms down). One mixer.update bakes the pose into the bones,
+      // which the per-person clones then capture.
+      const idle = g.animations.find((a) => /idle|stand|rest/i.test(a.name)) ?? g.animations[0];
+      if (idle) {
+        const mixer = new THREE.AnimationMixer(scene);
+        mixer.clipAction(idle).play();
+        mixer.update(0.4);
+      }
       scene.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(scene);
       return { scene, height: Math.max(0.1, box.max.y - box.min.y), minY: box.min.y };
