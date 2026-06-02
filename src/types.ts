@@ -161,8 +161,20 @@ export interface ViewTransform {
 
 export interface FloorPlan {
   image: HTMLImageElement;
-  widthMeters: number;
-  heightMeters: number;
+  src: string;             // data-URL of the rendered bitmap (for persistence / re-render)
+  name: string;            // source file name
+  widthMeters: number;     // real-world width the bitmap represents
+  heightMeters: number;    // derived from width × aspect ratio
+  naturalWidth: number;    // bitmap pixel width
+  naturalHeight: number;   // bitmap pixel height
+  offsetX: number;         // world position of the top-left corner (m)
+  offsetY: number;
+  opacity: number;         // 0..1
+  locked: boolean;         // ignore pointer interaction when true
+  // ── PDF source (optional) ──
+  kind: 'image' | 'pdf';
+  pageCount?: number;      // total pages for a PDF source
+  pageIndex?: number;      // 0-based page currently shown
 }
 
 // ── Gel Filters (CTO, CTB, Frost) ──

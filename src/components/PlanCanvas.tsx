@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement } from '../types';
+import type { PlanMode } from '../App';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
 import { getBeamColorRgba } from '../utils/colorTemp';
@@ -16,6 +17,7 @@ interface Props {
   showHeatMap: boolean;
   heatMapScale: number;
   heatMapTarget: number;
+  planMode: PlanMode;
   onPlaceFixture: (fixture: Fixture, x: number, y: number) => void;
   onMoveFixture: (id: string, x: number, y: number) => void;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
@@ -28,6 +30,8 @@ interface Props {
   onToolChange: (tool: Tool) => void;
   onDropFixture: (fixture: Fixture, x: number, y: number) => void;
   onMoveAim: (id: string, aimX: number, aimY: number) => void;
+  onUpdateFloorPlan: (updates: Partial<FloorPlan>) => void;
+  onCalibrateSegment: (x1: number, y1: number, x2: number, y2: number) => void;
 }
 
 const GRID_COLOR = '#2a2a3c';
@@ -48,6 +52,7 @@ const PlanCanvas: React.FC<Props> = ({
   showHeatMap,
   heatMapScale,
   heatMapTarget,
+  planMode,
   onPlaceFixture,
   onMoveFixture,
   onSelect,
@@ -60,12 +65,14 @@ const PlanCanvas: React.FC<Props> = ({
   onToolChange,
   onDropFixture,
   onMoveAim,
+  onUpdateFloorPlan,
+  onCalibrateSegment,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
   const dragRef = useRef<{
-    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'draw-rect' | 'draw-line' | 'draw-measure';
+    type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'calibrate' | 'move-plan';
     startScreenX: number;
     startScreenY: number;
     startWorldX: number;
@@ -73,8 +80,11 @@ const PlanCanvas: React.FC<Props> = ({
     targetId?: string;
     origOffsetX?: number;
     origOffsetY?: number;
+    planOrigX?: number;
+    planOrigY?: number;
   } | null>(null);
   const measureEndRef = useRef<{ x: number; y: number } | null>(null);
+  const calibEndRef = useRef<{ x: number; y: number } | null>(null);
   const heatMapCacheRef = useRef<{ imageData: ImageData | null; key: string }>({ imageData: null, key: '' });
   const animFrameRef = useRef<number>(0);
   const spaceDownRef = useRef(false);
@@ -199,11 +209,27 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.moveTo(left, 0); ctx.lineTo(right, 0);
     ctx.stroke();
 
-    // Floor plan
+    // Floor plan (imported building plan)
     if (floorPlan) {
-      ctx.globalAlpha = 0.7;
-      ctx.drawImage(floorPlan.image, 0, 0, floorPlan.widthMeters, floorPlan.heightMeters);
+      const { offsetX: ox, offsetY: oy, widthMeters: fw, heightMeters: fh } = floorPlan;
+      ctx.globalAlpha = floorPlan.opacity;
+      ctx.drawImage(floorPlan.image, ox, oy, fw, fh);
       ctx.globalAlpha = 1;
+      // Outline + handle while the plan is being positioned/calibrated.
+      if ((planMode === 'move' || planMode === 'calibrate') && !floorPlan.locked) {
+        ctx.strokeStyle = '#4fc3f7';
+        ctx.lineWidth = 1.5 / v.scale;
+        ctx.setLineDash([6 / v.scale, 4 / v.scale]);
+        ctx.strokeRect(ox, oy, fw, fh);
+        ctx.setLineDash([]);
+        if (planMode === 'move') {
+          const hs = 7 / v.scale;
+          ctx.fillStyle = '#4fc3f7';
+          for (const [hx, hy] of [[ox, oy], [ox + fw, oy], [ox, oy + fh], [ox + fw, oy + fh]] as const) {
+            ctx.fillRect(hx - hs / 2, hy - hs / 2, hs, hs);
+          }
+        }
+      }
     }
 
     // Stage elements
@@ -308,9 +334,13 @@ const PlanCanvas: React.FC<Props> = ({
     // Heat map
     if (showHeatMap && fixtures.length > 0) {
       const hmResX = 150, hmResY = 150;
-      const hmLeft = Math.max(left, 0), hmTop = Math.max(top, 0);
-      const hmWidth = Math.min(right, floorPlan ? floorPlan.widthMeters : 50) - hmLeft;
-      const hmHeight = Math.min(bottom, floorPlan ? floorPlan.heightMeters : 30) - hmTop;
+      const planLeft = floorPlan ? floorPlan.offsetX : 0;
+      const planTop = floorPlan ? floorPlan.offsetY : 0;
+      const planRight = floorPlan ? floorPlan.offsetX + floorPlan.widthMeters : 50;
+      const planBottom = floorPlan ? floorPlan.offsetY + floorPlan.heightMeters : 30;
+      const hmLeft = Math.max(left, planLeft), hmTop = Math.max(top, planTop);
+      const hmWidth = Math.min(right, planRight) - hmLeft;
+      const hmHeight = Math.min(bottom, planBottom) - hmTop;
       if (hmWidth > 0 && hmHeight > 0) {
         const cacheKey = `${fixtures.map((f) => `${f.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
         let imgData = heatMapCacheRef.current.imageData;
@@ -502,13 +532,36 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'start';
     }
 
+    // Active calibration line (drag a known distance to set the scale)
+    if (dragRef.current?.type === 'calibrate' && calibEndRef.current) {
+      const d = dragRef.current;
+      const end = calibEndRef.current;
+      const dist = Math.sqrt((end.x - d.startWorldX) ** 2 + (end.y - d.startWorldY) ** 2);
+      ctx.beginPath();
+      ctx.moveTo(d.startWorldX, d.startWorldY);
+      ctx.lineTo(end.x, end.y);
+      ctx.strokeStyle = '#4fc3f7';
+      ctx.lineWidth = 2 / v.scale; ctx.stroke();
+      // End ticks
+      for (const [px, py] of [[d.startWorldX, d.startWorldY], [end.x, end.y]] as const) {
+        ctx.beginPath(); ctx.arc(px, py, 4 / v.scale, 0, Math.PI * 2);
+        ctx.fillStyle = '#4fc3f7'; ctx.fill();
+      }
+      const mx = (d.startWorldX + end.x) / 2, my = (d.startWorldY + end.y) / 2;
+      ctx.fillStyle = '#4fc3f7';
+      ctx.font = `bold ${14 / v.scale}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`${dist.toFixed(2)} m`, mx, my - 10 / v.scale);
+      ctx.textAlign = 'start';
+    }
+
     ctx.restore(); ctx.restore();
     drawRulers(ctx, w, h);
 
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, floorPlan, selectedIds, showHeatMap, heatMapScale, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -576,6 +629,18 @@ const PlanCanvas: React.FC<Props> = ({
       return;
     }
     if (e.button !== 0) return;
+
+    // ── Floor-plan edit modes take precedence over tools ──
+    if (floorPlan && planMode === 'calibrate') {
+      calibEndRef.current = { x: wx, y: wy };
+      dragRef.current = { type: 'calibrate', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy };
+      return;
+    }
+    if (floorPlan && planMode === 'move' && !floorPlan.locked) {
+      dragRef.current = { type: 'move-plan', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy,
+        planOrigX: floorPlan.offsetX, planOrigY: floorPlan.offsetY };
+      return;
+    }
 
     if (fixtureToPlace) { onPlaceFixture(fixtureToPlace, wx, wy); return; }
     if (activeTool === 'person') { onAddPerson(wx, wy); return; }
@@ -673,6 +738,14 @@ const PlanCanvas: React.FC<Props> = ({
       return;
     }
     if (d.type === 'draw-measure') measureEndRef.current = { x: wx, y: wy };
+    if (d.type === 'calibrate') { calibEndRef.current = { x: wx, y: wy }; return; }
+    if (d.type === 'move-plan') {
+      onUpdateFloorPlan({
+        offsetX: Math.round((d.planOrigX! + wx - d.startWorldX) * 100) / 100,
+        offsetY: Math.round((d.planOrigY! + wy - d.startWorldY) * 100) / 100,
+      });
+      return;
+    }
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
@@ -707,6 +780,10 @@ const PlanCanvas: React.FC<Props> = ({
         }
         measureEndRef.current = null;
       }
+      if (d.type === 'calibrate') {
+        onCalibrateSegment(d.startWorldX, d.startWorldY, ewx, ewy);
+        calibEndRef.current = null;
+      }
     }
     dragRef.current = null;
   };
@@ -723,7 +800,8 @@ const PlanCanvas: React.FC<Props> = ({
   };
 
   const cursor = activeTool === 'pan' || spaceDownRef.current ? 'grab'
-    : fixtureToPlace || ['person', 'stage', 'rect', 'line', 'measure'].includes(activeTool) ? 'crosshair'
+    : planMode === 'move' ? 'move'
+    : planMode === 'calibrate' || fixtureToPlace || ['person', 'stage', 'rect', 'line', 'measure'].includes(activeTool) ? 'crosshair'
     : 'default';
 
   return (

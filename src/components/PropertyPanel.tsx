@@ -395,8 +395,26 @@ const PropertyPanel: React.FC<Props> = ({
     <div className="property-panel">
       <h3>Eigenschaften</h3>
       <p className="prop-hint">
-        Wähle eine Leuchte, Person oder Bühnen-Element aus, um Eigenschaften zu bearbeiten.
+        Wähle eine Leuchte, Person oder ein Bühnen-Element aus – oder leg direkt los:
       </p>
+      <div className="prop-section">
+        <span className="prop-section-title">Schnellstart</span>
+        <ol className="quickstart-list">
+          <li><span>📐</span> <strong>Grundriss</strong> importieren – JPG, PNG oder PDF</li>
+          <li><span>📏</span> <strong>Maßstab kalibrieren</strong> – Strecke ziehen, echte Länge eingeben</li>
+          <li><span>💡</span> Leuchten aus der Bibliothek auf den Plan ziehen</li>
+        </ol>
+      </div>
+      <div className="prop-section">
+        <span className="prop-section-title">Tastatur</span>
+        <div className="shortcut-grid">
+          <kbd>Leertaste</kbd><span>Ansicht verschieben</span>
+          <kbd>Mausrad</kbd><span>Zoomen</span>
+          <kbd>Strg/⌘&nbsp;Z</kbd><span>Rückgängig</span>
+          <kbd>Entf</kbd><span>Löschen</span>
+          <kbd>Esc</kbd><span>Abbrechen</span>
+        </div>
+      </div>
       {cursorLux !== null && (
         <div className="cursor-lux">
           Cursor: <strong>{cursorLux.toFixed(0)} lux</strong>

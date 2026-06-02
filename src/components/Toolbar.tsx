@@ -111,12 +111,12 @@ const Toolbar: React.FC<Props> = ({
       <div className="toolbar-separator" />
 
       <div className="toolbar-group">
-        <label className="tool-btn upload-btn" title="Grundriss hochladen">
+        <label className="tool-btn upload-btn" title="Gebäudeplan importieren (JPG, PNG oder PDF) – danach Maßstab kalibrieren">
           <span className="tool-icon">📐</span>
           <span className="tool-label">Grundriss</span>
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png"
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];

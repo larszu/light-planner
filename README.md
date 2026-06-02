@@ -36,6 +36,12 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 - Multi-select, group, undo / redo
 - Stick a stage, a podium or a person on the floor for reference
 
+### 📐 Import a building plan
+- Drop in a floor plan as **JPG, PNG or PDF** (multi-page PDFs let you flip between pages)
+- **Calibrate the scale**: drag a line along something you know the length of (a wall, a scale bar), type the real distance, and the whole plan snaps to the right size
+- Nudge it into place, dial the opacity down, and lock it so you don't move it by accident
+- Now everything you draw on top is to scale
+
 ### 🧊 3D preview
 - A simple Three.js view of the room with the cones drawn in
 - Useful to sanity-check angles and heights

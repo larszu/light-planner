@@ -49,7 +49,9 @@ body {
 .toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
+  row-gap: 4px;
   padding: 6px 12px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
@@ -319,6 +321,294 @@ body {
   font-size: 12px;
   color: var(--text);
   pointer-events: none;
+}
+
+.plan-calibrate-hint {
+  background: rgba(79, 195, 247, 0.22);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Floor Plan Panel (floating) ───────────────────────── */
+.floorplan-panel {
+  position: absolute;
+  top: 40px;
+  left: 12px;
+  width: 234px;
+  background: rgba(37, 37, 54, 0.96);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  z-index: 20;
+  overflow: hidden;
+}
+
+.floorplan-panel.collapsed {
+  width: 234px;
+}
+
+.fp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--panel-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.fp-title {
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.fp-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.fp-icon-btn {
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.fp-icon-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.fp-close:hover {
+  background: rgba(239, 83, 80, 0.2);
+  color: var(--danger);
+}
+
+.fp-body {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.fp-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.fp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fp-row > span:first-child {
+  color: var(--text2);
+}
+
+.fp-derived {
+  color: var(--text2);
+  font-size: 11px;
+}
+
+.fp-derived span:last-child {
+  font-family: monospace;
+  color: var(--text);
+}
+
+.fp-calibrate-btn {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: rgba(79, 195, 247, 0.12);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fp-calibrate-btn:hover {
+  background: rgba(79, 195, 247, 0.22);
+}
+
+.fp-calibrate-btn.active {
+  background: var(--accent);
+  color: #111;
+}
+
+.fp-move-btn {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fp-move-btn:hover {
+  border-color: var(--accent);
+  background: var(--panel-alt);
+}
+
+.fp-move-btn.active {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+}
+
+.fp-page-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fp-step-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-alt);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.fp-step-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.fp-step-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.fp-page-label {
+  font-family: monospace;
+  min-width: 42px;
+  text-align: center;
+}
+
+.fp-input-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fp-input-unit input,
+.fp-xy input {
+  width: 64px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-alt);
+  color: var(--text);
+  font-size: 12px;
+  text-align: right;
+  outline: none;
+}
+
+.fp-input-unit input:focus,
+.fp-xy input:focus {
+  border-color: var(--accent);
+}
+
+.fp-xy {
+  display: flex;
+  gap: 4px;
+}
+
+.fp-xy input {
+  width: 58px;
+}
+
+.fp-opacity {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.fp-opacity-val {
+  font-family: monospace;
+  min-width: 34px;
+  text-align: right;
+  color: var(--text);
+}
+
+.fp-lock {
+  cursor: pointer;
+}
+
+.fp-lock input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+}
+
+/* ── Scale Dialog ──────────────────────────────────────── */
+.scale-modal {
+  width: 360px;
+}
+
+.scale-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 4px;
+}
+
+.scale-input-row label {
+  color: var(--text2);
+  font-size: 13px;
+  min-width: 90px;
+}
+
+.scale-input-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-alt);
+  color: var(--text);
+  font-size: 15px;
+  text-align: right;
+  outline: none;
+}
+
+.scale-input-row input:focus {
+  border-color: var(--accent);
+}
+
+.scale-input-row span {
+  color: var(--text2);
+}
+
+.scale-factor-hint {
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: 8px;
 }
 
 /* ── Property Panel ────────────────────────────────────── */
@@ -747,6 +1037,63 @@ kbd {
   flex-wrap: wrap;
   gap: 4px 10px;
   font-size: 10px;
+  color: var(--text2);
+}
+
+.quickstart-list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: qs;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quickstart-list li {
+  counter-increment: qs;
+  position: relative;
+  padding-left: 26px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.quickstart-list li::before {
+  content: counter(qs);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #111;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quickstart-list li span:first-of-type {
+  margin-right: 2px;
+}
+
+.quickstart-list strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  align-items: center;
+}
+
+.shortcut-grid span {
+  font-size: 11px;
   color: var(--text2);
 }
 
