@@ -18,9 +18,11 @@ import type { ThreePointConfig, AreaLightConfig, LightArea } from './utils/autoL
 import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
-import { jpegToPdfBlob, dataUrlToBytes, downloadBlob, downloadDataUrl } from './utils/pdfExport';
+import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
 import MenuBar from './components/MenuBar';
+import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
+import { saveBlobToFile, openTextFile } from './utils/fileSave';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 
@@ -110,6 +112,7 @@ const App: React.FC = () => {
   const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   // Look present just before a scene was switched on, so it can be switched off.
@@ -800,7 +803,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [handleCopy, handlePaste, handleDuplicate, handleNudge, selectedIds, snapStep, viewMode]);
 
-  const handleExport = useCallback((format: 'png' | 'jpg' | 'pdf' = 'png') => {
+  const handleExport = useCallback(async (format: 'png' | 'jpg' | 'pdf' = 'png') => {
     const projName = projectMeta?.name || 'Lichtplan';
     const viewLabel = viewMode === '3d' ? '3D' : '2D';
     const num = exportCounterRef.current++;
@@ -831,15 +834,47 @@ const App: React.FC = () => {
       }
     }
 
+    // Build the file as a Blob, then let the user pick where it goes (with a
+    // download fallback when the File System Access API isn't available).
     if (format === 'pdf') {
       const bytes = dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
-      downloadBlob(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`);
-    } else if (format === 'jpg') {
-      downloadDataUrl(canvas.toDataURL('image/jpeg', 0.92), `${base}.jpg`);
+      await saveBlobToFile(jpegToPdfBlob(bytes, canvas.width, canvas.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
     } else {
-      downloadDataUrl(canvas.toDataURL('image/png'), `${base}.png`);
+      const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob((b) => res(b), mime, 0.92));
+      if (blob) {
+        const accept: Record<string, string[]> = format === 'jpg' ? { 'image/jpeg': ['.jpg', '.jpeg'] } : { 'image/png': ['.png'] };
+        await saveBlobToFile(blob, `${base}.${format}`, accept);
+      }
     }
   }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget]);
+
+  // ── Project save/load to a real file (user picks the location) ──
+  const handleSaveToFile = useCallback(async () => {
+    const now = new Date().toISOString();
+    const meta: ProjectMeta = projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now };
+    const data: ProjectData = {
+      meta: { ...meta, updatedAt: now },
+      fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
+      trusses, walls, ceilings, scenes, layers,
+      floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
+    await saveBlobToFile(blob, `${safe}.lightplan.json`, { 'application/json': ['.json'] });
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, layers, floorPlan]);
+
+  const handleLoadFromFile = useCallback(async () => {
+    const res = await openTextFile({ 'application/json': ['.json'] });
+    if (!res) return;
+    try {
+      const data = JSON.parse(res.text) as ProjectData;
+      if (!data || !Array.isArray(data.fixtures)) throw new Error('Keine gültige Projektdatei.');
+      handleLoadProject(data);
+    } catch (err) {
+      window.alert(`Projektdatei konnte nicht geladen werden:\n${err instanceof Error ? err.message : err}`);
+    }
+  }, [handleLoadProject]);
 
   const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
   const handleMoveShape = useCallback((id: string, dx: number, dy: number) => {
@@ -929,6 +964,8 @@ const App: React.FC = () => {
         snapEnabled={snapStep > 0}
         onSave={() => setProjectDialogMode('save')}
         onLoad={() => setProjectDialogMode('load')}
+        onSaveToFile={handleSaveToFile}
+        onLoadFromFile={handleLoadFromFile}
         onExport={handleExport}
         onUndo={handleUndo}
         onRedo={handleRedo}
@@ -939,6 +976,7 @@ const App: React.FC = () => {
         onViewModeChange={setViewMode}
         onToggleHeatMap={() => setShowHeatMap((v) => !v)}
         onToggleSnap={() => setSnapStep((s) => (s > 0 ? 0 : 0.5))}
+        onAbout={() => setAboutOpen(true)}
       />
       <Toolbar
         activeTool={activeTool}
@@ -1164,6 +1202,7 @@ const App: React.FC = () => {
           onCancel={() => setProjectDialogMode(null)}
         />
       )}
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
     </div>
   );
 };
