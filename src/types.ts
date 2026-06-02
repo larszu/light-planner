@@ -117,6 +117,18 @@ export interface PlacedFixture {
   currentColorTemp?: number;   // current CCT for tunable fixtures
   // ── Gel filters ──
   gelFilterIds?: string[];     // ids of mounted gel filters (from gelLibrary)
+  // ── Barn doors (Flügeltore) – four flaps, closure 0 (open) … 1 (fully closed).
+  //    Each flap cuts one side of the beam in the fixture's own frame. ──
+  barnDoors?: { top: number; bottom: number; left: number; right: number };
+  // ── Where the gels/diffusion physically sit ──
+  //   'frame' – in the colour-frame runners at the lens (behind the doors):
+  //             the barn-door cut stays crisp, but the gel sits closest to the
+  //             lamp and runs hottest (shortest gel life).
+  //   'front' – hung in front of the barn doors: the illuminated diffusion
+  //             becomes the new, larger light source, so the cut is softened
+  //             (with real frost it is largely defeated); the gel runs cooler
+  //             and lasts longer. Defaults to 'frame'.
+  gelPlacement?: 'frame' | 'front';
   // ── Patch / paperwork (instrument schedule, channel hookup) ──
   channel?: number;            // control / dimmer channel number
   unitNumber?: string;         // unit (instrument) number on its position

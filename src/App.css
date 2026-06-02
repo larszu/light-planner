@@ -1553,6 +1553,32 @@ kbd {
 }
 .refl-btn:hover { border-color: var(--accent); color: var(--text); }
 
+/* Gel-placement toggle (Filterrahmen vs. vor den Flügeltoren) */
+.gel-placement-toggle {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+.gp-btn {
+  flex: 1;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-alt);
+  color: var(--text2);
+  font-size: 10.5px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.gp-btn:hover { border-color: var(--accent); color: var(--text); }
+.gp-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.gel-placement-note { margin-top: 2px; }
+
 .prop-field input[type='color'] {
   width: 40px;
   height: 24px;

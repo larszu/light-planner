@@ -75,6 +75,7 @@ const PropertyPanel: React.FC<Props> = ({
   const [beamHelp, setBeamHelp] = React.useState(false);
   const [showCalc, setShowCalc] = React.useState(false);
   const [showSpecs, setShowSpecs] = React.useState(true);
+  const [barnHelp, setBarnHelp] = React.useState(false);
 
   const numField = (label: string, value: number, onChange: (v: number) => void, step = 0.1, min?: number, max?: number) => (
     <label className="prop-field">
@@ -336,6 +337,60 @@ const PropertyPanel: React.FC<Props> = ({
           )}
         </div>
 
+        {/* Barn doors (Flügeltore) + where the gels sit – the two interact */}
+        <div className="prop-section">
+          <span className="prop-section-title">
+            Flügeltore &amp; Folien-Position
+            <button type="button" className="beam-help-toggle" onClick={() => setBarnHelp((v) => !v)} title="Unterschiede erklären">ℹ</button>
+          </span>
+          {(() => {
+            const bd = f.barnDoors ?? { top: 0, bottom: 0, left: 0, right: 0 };
+            const setBarn = (patch: Partial<{ top: number; bottom: number; left: number; right: number }>) =>
+              onUpdateFixture(f.id, { barnDoors: { ...bd, ...patch } });
+            const flapRow = (label: string, value: number, onCh: (v: number) => void) => (
+              <label className="prop-field">
+                <span>{label} ({Math.round(value * 100)} %)</span>
+                <input type="range" min={0} max={1} step={0.05} value={value}
+                  onChange={(e) => onCh(Number(e.target.value))} />
+              </label>
+            );
+            return (
+              <>
+                {flapRow('Oben', bd.top, (v) => setBarn({ top: v }))}
+                {flapRow('Unten', bd.bottom, (v) => setBarn({ bottom: v }))}
+                {flapRow('Links', bd.left, (v) => setBarn({ left: v }))}
+                {flapRow('Rechts', bd.right, (v) => setBarn({ right: v }))}
+                <div className="reflectance-presets">
+                  <button className="refl-btn" onClick={() => onUpdateFixture(f.id, { barnDoors: undefined })}>Alle öffnen</button>
+                  <button className="refl-btn" onClick={() => setBarn({ top: 0.6, bottom: 0.6 })}>Ober/Unter ½</button>
+                  <button className="refl-btn" onClick={() => setBarn({ left: 0.6, right: 0.6 })}>Seiten ½</button>
+                </div>
+                <div className="prop-derived">Schneiden den Strahl seitlich ab (im Bezugsrahmen der Leuchte, mit Rotation gedreht) – fließt direkt in die Heatmap ein.</div>
+              </>
+            );
+          })()}
+          <div className="prop-field-sub">Folien-Position (Filterrahmen vs. vor den Toren):</div>
+          <div className="gel-placement-toggle">
+            {([['frame', 'Im Rahmen (an Linse)'], ['front', 'Vor den Flügeltoren']] as const).map(([val, lbl]) => (
+              <button key={val} type="button"
+                className={`gp-btn${(f.gelPlacement ?? 'frame') === val ? ' active' : ''}`}
+                onClick={() => onUpdateFixture(f.id, { gelPlacement: val })}>{lbl}</button>
+            ))}
+          </div>
+          <div className="prop-derived gel-placement-note">
+            {(f.gelPlacement ?? 'frame') === 'frame'
+              ? <>Folie im Farbrahmen direkt an der Linse → <strong>scharfer Flügeltor-Schnitt</strong>. Sie steht aber am heißesten, kräftige Farben (Dunkelblau/Grün) brennen am schnellsten aus.</>
+              : <>Folie hängt vor den Toren → die beleuchtete Folie wird zur neuen, größeren Quelle, der Schnitt wird <strong>weicher</strong>. Mit echtem Frost werden die Tore praktisch wirkungslos. Dafür bleibt die Folie kühler und hält länger.</>}
+          </div>
+          {barnHelp && (
+            <div className="beam-help">
+              <p><strong>Reihenfolge im Scheinwerfer:</strong> Lampe → Linse → Farbrahmen (Runner) → Flügeltore (mit eigenem Folienschlitz davor).</p>
+              <p><strong>Wärme &amp; Lebensdauer:</strong> Je näher an der Linse, desto heißer. Folie im Rahmen verblasst/verbrennt am schnellsten (IR-Absorption); vor den Toren läuft sie kühler und hält länger.</p>
+              <p><strong>Optik:</strong> Diffusion weiter weg = weicher (die beleuchtete Folie wird zur Quelle). Vor die Tore gehängt hebt sie deren Schnitt auf – für einen sauberen Schnitt gehört die Folie in den Rahmen <em>hinter</em> die Tore.</p>
+            </div>
+          )}
+        </div>
+
         <div className="prop-section">
           <span className="prop-section-title">Patch / Paperwork</span>
           {patchConflicts.has(f.id) && <div className="patch-conflict">⚠ DMX-Adresse überschneidet sich</div>}
@@ -457,6 +512,7 @@ const PropertyPanel: React.FC<Props> = ({
                     <tr><td>Dimmer</td><td>×{(b.dimming * 100).toFixed(0)} %</td><td>{b.dimming.toFixed(2)}</td></tr>
                     {b.gel < 1 && <tr><td>Gel</td><td>×{(b.gel * 100).toFixed(0)} %</td><td>{b.gel.toFixed(2)}</td></tr>}
                     <tr><td>Gauss</td><td>×{b.gauss.toFixed(3)}</td><td>θ = {b.offAxisDeg.toFixed(1)}°</td></tr>
+                    {f.barnDoors && <tr><td>Flügeltore</td><td>×{b.barnDoor.toFixed(3)}</td><td>{b.barnDoor > 0.999 ? 'Zielpunkt nicht geschnitten' : (f.gelPlacement ?? 'frame') === 'front' ? 'weich (vor Toren)' : 'scharf (im Rahmen)'}</td></tr>}
                     <tr><td>cos θ<sub>einf.</sub></td><td>×{b.cosIncidence.toFixed(3)}</td><td>h = {f.mountingHeight} m</td></tr>
                     <tr><td>÷ d²</td><td>d = {b.distance.toFixed(2)} m</td><td>d² = {fmt(b.distance * b.distance, 1)}</td></tr>
                     <tr className="calc-result"><td>= E</td><td colSpan={2}><b>{fmt(b.lux)} lx</b></td></tr>
