@@ -583,6 +583,44 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
           spot.shadow.camera.near = 0.5;
           spot.shadow.camera.far = Math.max(20, coneHeight * 2 + 10);
           spot.shadow.focus = 1;
+
+          // Flügeltore: invisible shadow-casting flaps 1 m in front of the lens
+          // cut the beam for real, at the same angle the heat-map uses
+          // ((1−closure)·fieldHalf), oriented in the fixture's own frame.
+          if (f.barnDoors) {
+            const bd = f.barnDoors;
+            const aN = aimPos.clone().sub(fixturePos).normalize();
+            let right = new THREE.Vector3().crossVectors(aN, new THREE.Vector3(0, 1, 0));
+            if (right.lengthSq() < 1e-6) right.set(1, 0, 0); else right.normalize();
+            const up = new THREE.Vector3().crossVectors(right, aN).normalize();
+            const br = (f.bodyRotation || 0) * Math.PI / 180;
+            const cb = Math.cos(br), sb = Math.sin(br);
+            const R = right.clone().multiplyScalar(cb).add(up.clone().multiplyScalar(sb));
+            const U = right.clone().multiplyScalar(-sb).add(up.clone().multiplyScalar(cb));
+            const L = 1.0;
+            const fieldHalf = (fieldAngle / 2) * Math.PI / 180;
+            const apR = Math.tan(fieldHalf) * L;
+            const base = fixturePos.clone().add(aN.clone().multiplyScalar(L));
+            const zAxis = new THREE.Vector3().crossVectors(R, U).normalize();
+            const flapQuat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(R, U, zAxis));
+            const flapMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, transparent: true, opacity: 0 });
+            const addFlap = (closure: number, dir: THREE.Vector3, wide: boolean) => {
+              if (closure <= 0) return;
+              const cut = Math.tan((1 - closure) * fieldHalf) * L;
+              const ext = apR * 2.5, width = apR * 6;
+              const center = base.clone().add(dir.clone().multiplyScalar(cut + ext / 2));
+              const m = new THREE.Mesh(new THREE.PlaneGeometry(wide ? width : ext, wide ? ext : width), flapMat);
+              m.castShadow = true;
+              m.quaternion.copy(flapQuat);
+              m.position.copy(center);
+              m.userData = { dynamic: true };
+              group.add(m);
+            };
+            addFlap(bd.top || 0, U, true);
+            addFlap(bd.bottom || 0, U.clone().negate(), true);
+            addFlap(bd.right || 0, R, false);
+            addFlap(bd.left || 0, R.clone().negate(), false);
+          }
         }
         group.add(spot);
         group.add(spot.target);
