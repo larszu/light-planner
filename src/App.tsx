@@ -297,8 +297,28 @@ const App: React.FC = () => {
 
   const handleMoveStageElement = useCallback((id: string, x: number, y: number) => {
     pushHistoryThrottled();
-    setStageElements((prev) => prev.map((s) => (s.id === id ? { ...s, x, y } : s)));
+    setStageElements((prev) => prev.map((s) => {
+      if (s.id !== id) return s;
+      // A polygon stage shifts all its outline points with the bounding box.
+      if (s.points) { const dx = x - s.x, dy = y - s.y; return { ...s, x, y, points: s.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) }; }
+      return { ...s, x, y };
+    }));
   }, [pushHistoryThrottled]);
+
+  const handleAddStagePolygon = useCallback((points: { x: number; y: number }[]) => {
+    if (points.length < 3) return;
+    pushHistory();
+    const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const r = (v: number) => Math.round(v * 10) / 10;
+    const se: StageElement = {
+      id: uid('stg'), type: 'custom',
+      x: r(minX), y: r(minY), width: Math.max(0.1, r(maxX - minX)), depth: Math.max(0.1, r(maxY - minY)),
+      height: 0.4, rotation: 0, points: points.map((p) => ({ x: r(p.x), y: r(p.y) })), label: '',
+    };
+    setStageElements((prev) => [...prev, se]);
+    setSelectedIds(new Set([se.id]));
+  }, [pushHistory]);
 
   const handleUpdateStageElement = useCallback((id: string, updates: Partial<StageElement>) => {
     pushHistoryThrottled();
@@ -1058,6 +1078,7 @@ const App: React.FC = () => {
               onMovePerson={handleMovePerson}
               onMoveStageElement={handleMoveStageElement}
               onUpdateStageElement={handleUpdateStageElement}
+              onAddStagePolygon={handleAddStagePolygon}
               onAddTruss={handleAddTruss}
               onMoveTruss={handleMoveTruss}
               onAddWall={handleAddWall}
@@ -1104,6 +1125,11 @@ const App: React.FC = () => {
           {activeTool === 'wall' && viewMode === '2d' && (
             <div className="placing-hint">
               🧱 <strong>Wand-Pfad</strong>: Punkte nacheinander klicken · Startpunkt klicken schließt den Raum · <kbd>Shift</kbd> = 15°-Winkel · Doppelklick/<kbd>ESC</kbd> beendet
+            </div>
+          )}
+          {activeTool === 'stagepoly' && viewMode === '2d' && (
+            <div className="placing-hint">
+              ⬠ <strong>Bühne (Polygon)</strong>: Eckpunkte klicken · Startpunkt klicken oder Doppelklick/<kbd>Enter</kbd> schließt die Fläche · <kbd>ESC</kbd> bricht ab
             </div>
           )}
           {planMode === 'calibrate' && viewMode === '2d' && (

@@ -327,10 +327,35 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       scene.add(mesh);
     }
 
-    // Stage elements (podeste) – flat box, or a wedge when it's a ramp.
+    // Stage elements (podeste) – flat box, a wedge when it's a ramp, or an
+    // extruded prism for a free polygon stage.
     if (layers.stage.visible) for (const se of stageElements) {
       const isSel = selectedIds.has(se.id);
       const mat = new THREE.MeshStandardMaterial({ color: isSel ? '#cc8833' : '#8B4513', roughness: 0.7 });
+
+      if (se.points && se.points.length >= 3) {
+        const pts = se.points, h = Math.max(0.01, se.height);
+        const pos: number[] = [];
+        for (let i = 1; i < pts.length - 1; i++) {
+          const a = pts[0], b = pts[i], c = pts[i + 1];
+          pos.push(a.x, 0, a.y, b.x, 0, b.y, c.x, 0, c.y);   // bottom
+          pos.push(a.x, h, a.y, c.x, h, c.y, b.x, h, b.y);   // top
+        }
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i], b = pts[(i + 1) % pts.length];
+          pos.push(a.x, 0, a.y, b.x, 0, b.y, b.x, h, b.y);   // side
+          pos.push(a.x, 0, a.y, b.x, h, b.y, a.x, h, a.y);
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.userData = { dynamic: true, selectId: se.id };
+        scene.add(mesh);
+        continue;
+      }
+
       const w = se.width, d = se.depth;
       const isRamp = se.height2 != null && Math.abs(se.height2 - se.height) > 0.01;
       let geo: THREE.BufferGeometry;

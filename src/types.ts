@@ -183,6 +183,9 @@ export interface StageElement {
   height: number;       // meters – podest height (front edge for a ramp)
   height2?: number;     // meters – height at the far (back) edge; ≠ height ⇒ ramp/slope
   rotation: number;     // degrees
+  // Free polygon stage: world-space outline. When present the element is drawn
+  // as this polygon (x/y/width/depth are kept as its bounding box for picking).
+  points?: { x: number; y: number }[];
   label: string;
 }
 
@@ -228,7 +231,7 @@ export interface Truss {
   label: string;
 }
 
-export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'truss' | 'wall';
+export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'stagepoly' | 'truss' | 'wall';
 export type ViewMode = '2d' | '3d';
 
 export interface ViewTransform {

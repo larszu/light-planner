@@ -562,6 +562,25 @@ const PropertyPanel: React.FC<Props> = ({
 
   if (selStage) {
     const se = selStage;
+    if (se.points && se.points.length >= 3) {
+      const xs = se.points.map((p) => p.x), ys = se.points.map((p) => p.y);
+      const bw = Math.max(...xs) - Math.min(...xs), bd = Math.max(...ys) - Math.min(...ys);
+      return (
+        <div className="property-panel">
+          <h3>Bühne (Polygon)</h3>
+          <div className="prop-section">
+            <div className="prop-derived lux-readout">{se.points.length} Eckpunkte · Hüllе {bw.toFixed(1)} × {bd.toFixed(1)} m</div>
+            {numField('Höhe (m)', se.height, (v) => onUpdateStageElement(se.id, { height: v }), 0.1, 0, 5)}
+            <label className="prop-field">
+              <span>Bezeichnung</span>
+              <input type="text" value={se.label || ''} onChange={(e) => onUpdateStageElement(se.id, { label: e.target.value })} />
+            </label>
+            <div className="prop-derived">Frei gezeichnete Bühne. Ziehen verschiebt sie samt Umriss.</div>
+          </div>
+          <button className="delete-btn" onClick={() => onDelete(se.id)}>Bühne löschen</button>
+        </div>
+      );
+    }
     return (
       <div className="property-panel">
         <h3>Bühnen-Element</h3>
