@@ -181,6 +181,111 @@ export function generate3PointLighting(
 // combined contribution at the area centre hits the target.
 // ─────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────
+// AREA LIGHTING WITH CHOSEN DIRECTION(S)
+// ─────────────────────────────────────────────────────────
+//
+// Lights a rectangular area to a uniform target illuminance from the
+// side(s) the user picks. This unifies the common stage techniques:
+//   • one side          → e.g. front wash only
+//   • two opposite sides → "über Kreuz" / cross-light (beams cross,
+//                          each side fills the other's shadows)
+//   • all four sides     → fully even wrap-around wash
+//
+// Fixtures sit on a truss along each chosen side (offset by the 45° throw)
+// and aim into the area. Dimming is solved so the MEAN illuminance across
+// the area equals targetLux — independent of how many sides are used, so
+// switching direction keeps the same brightness.
+// ─────────────────────────────────────────────────────────
+
+export type LightSide = 'N' | 'E' | 'S' | 'W';
+
+export interface LightArea { minX: number; minY: number; maxX: number; maxY: number }
+
+export interface AreaLightConfig {
+  sides: LightSide[];
+  targetLux?: number;
+  fixture?: Fixture;
+  mountingHeight?: number;
+}
+
+function mkFixture(fixture: Fixture, x: number, y: number, mh: number, aimX: number, aimY: number, dim = 80): PlacedFixture {
+  return {
+    id: nextId(), fixture,
+    x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
+    mountingHeight: mh,
+    aimX: Math.round(aimX * 10) / 10, aimY: Math.round(aimY * 10) / 10,
+    bodyRotation: 0, dimming: dim,
+  };
+}
+
+export function generateAreaLighting(area: LightArea, config: AreaLightConfig): PlacedFixture[] {
+  const fixture = config.fixture ?? defaultFresnel();
+  const targetLux = config.targetLux ?? 0;
+  const mh = config.mountingHeight ?? 5;
+  const sides = config.sides.length ? config.sides : (['N', 'S'] as LightSide[]);
+  const { minX, minY, maxX, maxY } = area;
+  const w = Math.max(0.1, maxX - minX), d = Math.max(0.1, maxY - minY);
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const results: PlacedFixture[] = [];
+
+  const beamAngle = fixture.zoomRange ? fixture.zoomRange[1] : fixture.beamAngle;
+  const beamR = Math.tan((beamAngle / 2) * DEG2RAD) * mh;
+  const throwDist = mh; // tan(45°) = 1
+
+  // Build one truss row per chosen side at the given spacing (fixtures at 100 %).
+  const build = (spacing: number): PlacedFixture[] => {
+    const out: PlacedFixture[] = [];
+    for (const side of sides) {
+      if (side === 'N' || side === 'S') {
+        const count = Math.max(2, Math.ceil(w / spacing) + 1);
+        const startX = cx - ((count - 1) * spacing) / 2;
+        const ty = side === 'N' ? minY - throwDist : maxY + throwDist;
+        for (let i = 0; i < count; i++) out.push(mkFixture(fixture, startX + i * spacing, ty, mh, startX + i * spacing, cy, 100));
+      } else {
+        const count = Math.max(2, Math.ceil(d / spacing) + 1);
+        const startY = cy - ((count - 1) * spacing) / 2;
+        const tx = side === 'W' ? minX - throwDist : maxX + throwDist;
+        for (let i = 0; i < count; i++) out.push(mkFixture(fixture, tx, startY + i * spacing, mh, cx, startY + i * spacing, 100));
+      }
+    }
+    return out;
+  };
+
+  const meanLux = (fx: PlacedFixture[]): number => {
+    const gx = 6, gy = 6;
+    let sum = 0;
+    for (let i = 0; i < gx; i++) for (let j = 0; j < gy; j++) {
+      const sxw = minX + ((i + 0.5) / gx) * w;
+      const syw = minY + ((j + 0.5) / gy) * d;
+      sum += fx.reduce((s, f) => s + luxFromFixture(f, sxw, syw), 0);
+    }
+    return sum / (gx * gy);
+  };
+
+  let spacing = Math.max(beamR * 1.2, 1.2); // ~40 % overlap
+  let built = build(spacing);
+
+  if (targetLux > 0) {
+    // Densify (more fixtures = more flux) until the target is reachable within
+    // 100 % dimming — so one side reaches the same lux as four, just with more
+    // fixtures. Capped so it can't run away on huge areas / unreachable targets.
+    for (let iter = 0; iter < 6 && built.length <= 70; iter++) {
+      if (meanLux(built) >= targetLux) break;
+      spacing *= 0.72;
+      built = build(spacing);
+    }
+    const avg = meanLux(built);
+    const dim = avg > 0 ? Math.max(1, Math.min(100, Math.round((targetLux / avg) * 100))) : 80;
+    for (const f of built) f.dimming = dim;
+  } else {
+    for (const f of built) f.dimming = 80;
+  }
+
+  results.push(...built);
+  return results;
+}
+
 export interface EvenDistConfig {
   /** Target illuminance in the area centre. 0 = use default 80% dimming. */
   targetLux?: number;

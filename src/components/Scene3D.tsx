@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { PlacedFixture, Person, StageElement, Truss, FloorPlan } from '../types';
+import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan } from '../types';
 import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg } from '../utils/lightCalc';
 import { getBeamColorHex } from '../utils/colorTemp';
+import { sampleWall, isCurved } from '../utils/geometry';
 
 export interface Scene3DHandle {
   screenshot: () => string | null;
@@ -15,6 +16,8 @@ interface Props {
   persons: Person[];
   stageElements: StageElement[];
   trusses: Truss[];
+  walls: Wall[];
+  ceilings: Ceiling[];
   floorPlan: FloorPlan | null;
   selectedIds: Set<string>;
   showHeatMap: boolean;
@@ -23,7 +26,7 @@ interface Props {
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget, onSelect }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -32,10 +35,14 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     controls: OrbitControls;
     animId: number;
   } | null>(null);
+  // Whether the camera has been framed to the content yet (once per mount).
+  const framedRef = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    framedRef.current = false; // a fresh scene/camera needs framing again
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#1a1a2e');
@@ -85,6 +92,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       // Only handle when no input/textarea is focused
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Space would otherwise scroll / trigger focused buttons
+      if (e.key === ' ') e.preventDefault();
       keys[e.key.toLowerCase()] = true;
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -108,8 +117,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       if (keys['s'] || keys['arrowdown'])  { dx -= _forward.x; dz -= _forward.z; }
       if (keys['a'] || keys['arrowleft'])  { dx -= _right.x;   dz -= _right.z; }
       if (keys['d'] || keys['arrowright']) { dx += _right.x;   dz += _right.z; }
-      if (keys['q'] || keys['pagedown'])   { dy -= 1; }
-      if (keys['e'] || keys['pageup'])     { dy += 1; }
+      if (keys['q'] || keys['pagedown'] || keys['shift']) { dy -= 1; } // runter
+      if (keys['e'] || keys['pageup']   || keys[' '])     { dy += 1; } // hoch (Leertaste)
 
       if (dx !== 0 || dz !== 0 || dy !== 0) {
         const move = new THREE.Vector3(dx, dy, dz).normalize().multiplyScalar(MOVE_SPEED);
@@ -175,6 +184,19 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     if (!s) return;
     const { scene } = s;
 
+    // ── Bounding box of all content (used to frame the camera and to size
+    //    the heat-map so both always cover the actual rig, wherever it sits) ──
+    let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+    const acc = (x: number, y: number) => { if (x < bMinX) bMinX = x; if (x > bMaxX) bMaxX = x; if (y < bMinY) bMinY = y; if (y > bMaxY) bMaxY = y; };
+    for (const f of fixtures) { acc(f.x, f.y); acc(f.aimX, f.aimY); }
+    for (const p of persons) acc(p.x, p.y);
+    for (const se of stageElements) { acc(se.x, se.y); acc(se.x + se.width, se.y + se.depth); }
+    for (const t of trusses) { acc(t.x1, t.y1); acc(t.x2, t.y2); }
+    for (const w of walls) { acc(w.x1, w.y1); acc(w.x2, w.y2); }
+    for (const c of ceilings) for (const p of c.points) acc(p.x, p.y);
+    if (floorPlan) { acc(floorPlan.offsetX, floorPlan.offsetY); acc(floorPlan.offsetX + floorPlan.widthMeters, floorPlan.offsetY + floorPlan.heightMeters); }
+    const hasContent = bMinX !== Infinity;
+
     // Remove old dynamic objects
     const toRemove = scene.children.filter((c) => c.userData?.dynamic);
     toRemove.forEach((c) => {
@@ -230,6 +252,49 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       mesh.rotation.y = -angle;
       mesh.castShadow = true;
       mesh.userData = { dynamic: true, selectId: t.id };
+      scene.add(mesh);
+    }
+
+    // Walls (vertical surfaces, straight or curved, that reflect light)
+    for (const w of walls) {
+      if (Math.hypot(w.x2 - w.x1, w.y2 - w.y1) < 0.05) continue;
+      const isSel = selectedIds.has(w.id);
+      const pts = sampleWall(w, isCurved(w) ? 18 : 1); // floor polyline
+      const pos: number[] = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        // two triangles forming the vertical quad a→b
+        pos.push(a.x, 0, a.y, b.x, 0, b.y, b.x, w.height, b.y);
+        pos.push(a.x, 0, a.y, b.x, w.height, b.y, a.x, w.height, a.y);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: isSel ? '#ffcc33' : w.color, roughness: 0.85, metalness: 0, side: THREE.DoubleSide,
+      }));
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.userData = { dynamic: true, selectId: w.id };
+      scene.add(mesh);
+    }
+
+    // Ceilings (translucent horizontal polygon at height)
+    for (const c of ceilings) {
+      if (c.points.length < 3) continue;
+      const isSel = selectedIds.has(c.id);
+      const pos: number[] = [];
+      for (let i = 1; i < c.points.length - 1; i++) {
+        const a = c.points[0], b = c.points[i], d = c.points[i + 1];
+        pos.push(a.x, c.height, a.y, b.x, c.height, b.y, d.x, c.height, d.y);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: isSel ? '#ffcc33' : c.color, roughness: 0.9, metalness: 0,
+        side: THREE.DoubleSide, transparent: true, opacity: 0.35,
+      }));
+      mesh.userData = { dynamic: true, selectId: c.id };
       scene.add(mesh);
     }
 
@@ -294,7 +359,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const coneVec = aimPos.clone().sub(fixturePos);
       const coneHeight = coneVec.length();
       const beamRadAtBase = Math.tan((fieldAngle / 2) * (Math.PI / 180)) * coneHeight;
-      const dimOpacity = 0.04 * (f.dimming / 100);
+      const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
       if (coneHeight > 0.1) {
         const coneGeo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
@@ -332,11 +397,14 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       scene.add(group);
     }
 
-    // ── 3D Heatmap on ground plane ──
-    if (showHeatMap && fixtures.length > 0) {
-      const hmSize = 60;
-      const hmRes = 128;
-      const { data, maxLux } = computeHeatMap(fixtures, -hmSize / 2, -hmSize / 2, hmSize, hmSize, hmRes, hmRes);
+    // ── 3D Heatmap on the ground, sized to cover the actual rig ──
+    if (showHeatMap && fixtures.length > 0 && hasContent) {
+      const pad = 4;
+      const hx0 = bMinX - pad, hz0 = bMinY - pad;
+      const hw = Math.max(8, (bMaxX - bMinX) + 2 * pad);
+      const hd = Math.max(8, (bMaxY - bMinY) + 2 * pad);
+      const hmRes = 180;
+      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls, ceilings);
       const scale = heatMapScale > 0 ? heatMapScale : (maxLux || 1000);
 
       const canvas2d = document.createElement('canvas');
@@ -344,15 +412,12 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       canvas2d.height = hmRes;
       const ctx = canvas2d.getContext('2d')!;
       const imgData = ctx.createImageData(hmRes, hmRes);
-
       for (let i = 0; i < hmRes * hmRes; i++) {
         const [r, g, b, a] = heatMapTarget > 0
           ? luxToColorTarget(data[i], heatMapTarget)
           : luxToColor(data[i], scale);
-        imgData.data[i * 4] = r;
-        imgData.data[i * 4 + 1] = g;
-        imgData.data[i * 4 + 2] = b;
-        imgData.data[i * 4 + 3] = a;
+        imgData.data[i * 4] = r; imgData.data[i * 4 + 1] = g;
+        imgData.data[i * 4 + 2] = b; imgData.data[i * 4 + 3] = a;
       }
       ctx.putImageData(imgData, 0, 0);
 
@@ -360,16 +425,14 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       hmTexture.minFilter = THREE.LinearFilter;
       hmTexture.magFilter = THREE.LinearFilter;
 
-      const hmGeo = new THREE.PlaneGeometry(hmSize, hmSize);
-      const hmMat = new THREE.MeshBasicMaterial({
-        map: hmTexture,
-        transparent: true,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      const hmMesh = new THREE.Mesh(hmGeo, hmMat);
+      const hmMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(hw, hd),
+        new THREE.MeshBasicMaterial({ map: hmTexture, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+      );
       hmMesh.rotation.x = -Math.PI / 2;
-      hmMesh.position.y = 0.01; // slightly above ground
+      // data row 0 = world y = hz0 (north); plane local +Y maps to world -Z
+      // after the −90° X-rotation, so the texture lines up with the grid.
+      hmMesh.position.set(hx0 + hw / 2, 0.012, hz0 + hd / 2);
       hmMesh.userData = { dynamic: true };
       scene.add(hmMesh);
     }
@@ -398,7 +461,19 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       sprite.userData = { dynamic: true };
       scene.add(sprite);
     }
-  }, [fixtures, persons, stageElements, trusses, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
+
+    // ── Frame the camera to the content once per mount, so entering the 3D
+    //    view always shows the rig (instead of a fixed faraway viewpoint) ──
+    if (hasContent && !framedRef.current) {
+      const cx = (bMinX + bMaxX) / 2, cz = (bMinY + bMaxY) / 2;
+      const span = Math.max(bMaxX - bMinX, bMaxY - bMinY, 6);
+      const dist = span * 1.1 + 10;
+      s.camera.position.set(cx + dist * 0.6, dist * 0.7 + 4, cz + dist * 0.85);
+      s.controls.target.set(cx, 1, cz);
+      s.controls.update();
+      framedRef.current = true;
+    }
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, selectedIds, showHeatMap, heatMapScale, heatMapTarget]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {

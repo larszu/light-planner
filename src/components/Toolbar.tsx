@@ -17,8 +17,9 @@ interface Props {
   onAutoThreePoint: () => void;
   onAutoThreePointConfig: () => void;
   onAutoDistribute: () => void;
-  onAlignH: () => void;
-  onAlignV: () => void;
+  onAlignX: () => void;
+  onAlignY: () => void;
+  onAlignZ: () => void;
   onDistributeH: () => void;
   onDistributeV: () => void;
   onSaveProject: () => void;
@@ -28,6 +29,9 @@ interface Props {
   onToggleSnap: () => void;
   hasPersons: boolean;
   hasStageElements: boolean;
+  hasArea: boolean;
+  onGenerateCeiling: () => void;
+  hasWalls: boolean;
   hasSelection: boolean;
   multiSelected: boolean;
   onGroupSelection: () => void;
@@ -51,8 +55,9 @@ const Toolbar: React.FC<Props> = ({
   onAutoThreePoint,
   onAutoThreePointConfig,
   onAutoDistribute,
-  onAlignH,
-  onAlignV,
+  onAlignX,
+  onAlignY,
+  onAlignZ,
   onDistributeH,
   onDistributeV,
   onSaveProject,
@@ -62,6 +67,9 @@ const Toolbar: React.FC<Props> = ({
   onToggleSnap,
   hasPersons,
   hasStageElements,
+  hasArea,
+  onGenerateCeiling,
+  hasWalls,
   hasSelection,
   multiSelected,
   onGroupSelection,
@@ -77,6 +85,7 @@ const Toolbar: React.FC<Props> = ({
     { id: 'person', label: 'Person', icon: '🧑' },
     { id: 'stage', label: 'Podest', icon: '⬜' },
     { id: 'truss', label: 'Traverse', icon: '▤' },
+    { id: 'wall', label: 'Wand', icon: '▬' },
   ];
 
   return (
@@ -208,31 +217,44 @@ const Toolbar: React.FC<Props> = ({
         <button
           className="tool-btn auto-btn"
           onClick={onAutoDistribute}
-          disabled={!hasPersons && !hasStageElements}
-          title="Gleichmäßige Flächenausleuchtung (Front/Back 45°)"
+          disabled={!hasArea}
+          title="Fläche ausleuchten – Seiten (N/O/S/W) & Ziel-Lux wählbar. Markierte Fläche: gezeichnetes Rechteck, Podest oder Personen."
         >
           <span className="tool-icon">🔆</span>
           <span className="tool-label">Verteilen</span>
+        </button>
+        <button
+          className="tool-btn"
+          onClick={onGenerateCeiling}
+          disabled={!hasWalls}
+          title="Decke automatisch über alle Wände erzeugen (reflektiert Licht)"
+        >
+          <span className="tool-icon">⬓</span>
+          <span className="tool-label">Decke</span>
         </button>
       </div>
 
       <div className="toolbar-separator" />
 
-      {/* Align / Distribute */}
+      {/* Align (multi-select) on X / Y / Z + distribute */}
       <div className="toolbar-group">
-        <button className="tool-btn" onClick={onAlignH} disabled={!hasSelection} title="Horizontal ausrichten (gleiche Y)">
-          <span className="tool-icon">⫶</span>
-          <span className="tool-label">H-Align</span>
-        </button>
-        <button className="tool-btn" onClick={onAlignV} disabled={!hasSelection} title="Vertikal ausrichten (gleiche X)">
+        <button className="tool-btn" onClick={onAlignX} disabled={!multiSelected} title="Auf gleiche X-Position ausrichten (senkrechte Linie)">
           <span className="tool-icon">⫴</span>
-          <span className="tool-label">V-Align</span>
+          <span className="tool-label">X-Align</span>
         </button>
-        <button className="tool-btn" onClick={onDistributeH} title="Horizontal verteilen">
+        <button className="tool-btn" onClick={onAlignY} disabled={!multiSelected} title="Auf gleiche Y-Position ausrichten (waagerechte Linie)">
+          <span className="tool-icon">⫶</span>
+          <span className="tool-label">Y-Align</span>
+        </button>
+        <button className="tool-btn" onClick={onAlignZ} disabled={!multiSelected} title="Auf gleiche Höhe (Z) ausrichten">
+          <span className="tool-icon">⭥</span>
+          <span className="tool-label">Z-Höhe</span>
+        </button>
+        <button className="tool-btn" onClick={onDistributeH} disabled={!multiSelected} title="Markierte waagerecht gleichmäßig verteilen">
           <span className="tool-icon">⋯</span>
           <span className="tool-label">H-Dist</span>
         </button>
-        <button className="tool-btn" onClick={onDistributeV} title="Vertikal verteilen">
+        <button className="tool-btn" onClick={onDistributeV} disabled={!multiSelected} title="Markierte senkrecht gleichmäßig verteilen">
           <span className="tool-icon">⋮</span>
           <span className="tool-label">V-Dist</span>
         </button>

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling } from './types';
+import { convexHull } from './utils/geometry';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import PlanCanvas from './components/PlanCanvas';
@@ -10,8 +11,9 @@ import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
 import { autoPatch, findPatchConflicts } from './utils/patch';
-import { generate3PointLighting, generateEvenDistribution } from './utils/autoLighting';
-import type { ThreePointConfig } from './utils/autoLighting';
+import { generate3PointLighting, generateAreaLighting } from './utils/autoLighting';
+import type { ThreePointConfig, AreaLightConfig, LightArea } from './utils/autoLighting';
+import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
 import { jpegToPdfBlob, dataUrlToBytes, downloadBlob, downloadDataUrl } from './utils/pdfExport';
@@ -71,10 +73,13 @@ const App: React.FC = () => {
   const [projectId, setProjectId] = useState<string>('proj-' + Date.now());
   const [fixtureGroups, setFixtureGroups] = useState<FixtureGroup[]>([]);
   const [trusses, setTrusses] = useState<Truss[]>([]);
+  const [walls, setWalls] = useState<Wall[]>([]);
+  const [ceilings, setCeilings] = useState<Ceiling[]>([]);
   const [planMode, setPlanMode] = useState<PlanMode>('none');
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
   const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [areaLightOpen, setAreaLightOpen] = useState(false);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const clipboardRef = useRef<PlacedFixture[]>([]);
   const scene3DRef = useRef<Scene3DHandle>(null);
@@ -82,12 +87,12 @@ const App: React.FC = () => {
   const defaultMountingHeight = 6;
 
   // ── Undo / Redo ──
-  interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[]; trusses: Truss[] }
+  interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[]; trusses: Truss[]; walls: Wall[]; ceilings: Ceiling[] }
   const historyRef = useRef<Snapshot[]>([]);
   const futureRef = useRef<Snapshot[]>([]);
   const lastPushRef = useRef(0);
-  const stateRef = useRef<Snapshot>({ fixtures, persons, stageElements, shapes, fixtureGroups, trusses });
-  stateRef.current = { fixtures, persons, stageElements, shapes, fixtureGroups, trusses };
+  const stateRef = useRef<Snapshot>({ fixtures, persons, stageElements, shapes, fixtureGroups, trusses, walls, ceilings });
+  stateRef.current = { fixtures, persons, stageElements, shapes, fixtureGroups, trusses, walls, ceilings };
 
   const pushHistory = useCallback(() => {
     if (historyRef.current.length >= 50) historyRef.current.shift();
@@ -107,6 +112,8 @@ const App: React.FC = () => {
     setShapes(snap.shapes);
     setFixtureGroups(snap.fixtureGroups);
     setTrusses(snap.trusses);
+    setWalls(snap.walls);
+    setCeilings(snap.ceilings);
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -279,6 +286,51 @@ const App: React.FC = () => {
     setTrusses((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
   }, [pushHistoryThrottled]);
 
+  // ── Wall handlers (architecture with reflectance / colour) ──
+  const handleAddWall = useCallback((x1: number, y1: number, x2: number, y2: number) => {
+    pushHistory();
+    const w: Wall = { id: uid('wall'), x1, y1, x2, y2, height: 3, reflectance: 0.5, color: '#c9c4b8', label: '' };
+    setWalls((prev) => [...prev, w]);
+    setSelectedIds(new Set([w.id]));
+  }, []);
+
+  const handleMoveWall = useCallback((id: string, dx: number, dy: number) => {
+    pushHistoryThrottled();
+    const r = (v: number) => Math.round(v * 10) / 10;
+    setWalls((prev) => prev.map((w) => (w.id === id
+      ? { ...w, x1: r(w.x1 + dx), y1: r(w.y1 + dy), x2: r(w.x2 + dx), y2: r(w.y2 + dy),
+          cx: w.cx != null ? r(w.cx + dx) : undefined, cy: w.cy != null ? r(w.cy + dy) : undefined }
+      : w)));
+  }, [pushHistoryThrottled]);
+
+  const handleUpdateWall = useCallback((id: string, updates: Partial<Wall>) => {
+    pushHistoryThrottled();
+    setWalls((prev) => prev.map((w) => (w.id === id ? { ...w, ...updates } : w)));
+  }, [pushHistoryThrottled]);
+
+  // ── Ceilings ──
+  const handleUpdateCeiling = useCallback((id: string, updates: Partial<Ceiling>) => {
+    pushHistoryThrottled();
+    setCeilings((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+  }, [pushHistoryThrottled]);
+
+  // Auto-generate a ceiling that spans all walls (convex hull of wall points).
+  const handleGenerateCeiling = useCallback(() => {
+    if (walls.length === 0) return;
+    const pts = walls.flatMap((w) => [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]);
+    const hull = convexHull(pts);
+    if (hull.length < 3) return;
+    const h = Math.max(3, ...walls.map((w) => w.height));
+    pushHistory();
+    const ceiling: Ceiling = {
+      id: uid('ceil'), points: hull, height: Math.round(h * 10) / 10,
+      reflectance: 0.6, color: '#d8d4c8', label: 'Decke',
+    };
+    // Replace any existing auto-ceiling rather than stacking duplicates.
+    setCeilings([ceiling]);
+    setSelectedIds(new Set([ceiling.id]));
+  }, [walls, pushHistory]);
+
   // ── Delete any element ──
   const handleDelete = useCallback((id: string) => {
     pushHistory();
@@ -287,6 +339,8 @@ const App: React.FC = () => {
     setStageElements((prev) => prev.filter((s) => s.id !== id));
     setShapes((prev) => prev.filter((s) => s.id !== id));
     setTrusses((prev) => prev.filter((t) => t.id !== id));
+    setWalls((prev) => prev.filter((w) => w.id !== id));
+    setCeilings((prev) => prev.filter((c) => c.id !== id));
     setFixtureGroups((prev) => prev.map((g) => ({ ...g, fixtureIds: g.fixtureIds.filter((fid) => fid !== id) })).filter((g) => g.fixtureIds.length > 0));
     setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
   }, []);
@@ -329,14 +383,38 @@ const App: React.FC = () => {
     setShowThreePointDialog(false);
   }, [persons, selectedId, defaultMountingHeight, pushHistory]);
 
-  const handleAutoDistribute = useCallback(() => {
-    if (persons.length === 0 && stageElements.length === 0) return;
+  // Pick the area to light: selected rectangle > selected stage > all stage > persons.
+  const computeLightArea = useCallback((): LightArea | null => {
+    const selRect = shapes.find((s) => s.type === 'rect' && selectedIds.has(s.id) && s.points.length === 2);
+    if (selRect) {
+      const [a, b] = selRect.points;
+      return { minX: Math.min(a.x, b.x), maxX: Math.max(a.x, b.x), minY: Math.min(a.y, b.y), maxY: Math.max(a.y, b.y) };
+    }
+    const selS = stageElements.filter((s) => selectedIds.has(s.id));
+    const useS = selS.length ? selS : stageElements;
+    if (useS.length) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const s of useS) { minX = Math.min(minX, s.x); minY = Math.min(minY, s.y); maxX = Math.max(maxX, s.x + s.width); maxY = Math.max(maxY, s.y + s.depth); }
+      return { minX, minY, maxX, maxY };
+    }
+    if (persons.length) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of persons) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+      return { minX: minX - 2, minY: minY - 2, maxX: maxX + 2, maxY: maxY + 2 };
+    }
+    return null;
+  }, [shapes, stageElements, persons, selectedIds]);
+
+  const lightArea = computeLightArea();
+
+  const handleAreaLight = useCallback((cfg: AreaLightConfig) => {
+    const area = computeLightArea();
+    if (!area) return;
     pushHistory();
-    const newFixtures = generateEvenDistribution(persons, defaultMountingHeight, {
-      targetLux: heatMapTarget,
-    }, stageElements);
+    const newFixtures = generateAreaLighting(area, { ...cfg, mountingHeight: defaultMountingHeight });
     setFixtures((prev) => [...prev, ...newFixtures]);
-  }, [persons, stageElements, defaultMountingHeight, heatMapTarget]);
+    setAreaLightOpen(false);
+  }, [computeLightArea, defaultMountingHeight, pushHistory]);
 
   // ── Group / Ungroup / Rotate ──
   const handleGroupSelection = useCallback(() => {
@@ -395,79 +473,58 @@ const App: React.FC = () => {
   }, [fixtureGroups, handleSelect]);
 
   // ── Auto-align / distribute ──
-  const handleAlignH = useCallback(() => {
-    pushHistory();
-    const selF = fixtures.find((f) => f.id === selectedId);
-    const selSe = stageElements.find((s) => s.id === selectedId);
-    if (selF) {
-      const targetY = selF.y;
-      setFixtures((prev) => prev.map((f) => ({ ...f, y: targetY, aimY: f.aimY + (targetY - f.y) })));
-    } else if (selSe) {
-      const targetY = selSe.y;
-      setStageElements((prev) => prev.map((s) => ({ ...s, y: targetY })));
-    }
-  }, [fixtures, stageElements, selectedId]);
+  // Select a set of ids at once (box / marquee selection from the canvas).
+  const handleSelectMany = useCallback((ids: string[], additive: boolean) => {
+    setSelectedIds((prev) => {
+      if (additive) { const next = new Set(prev); ids.forEach((id) => next.add(id)); return next; }
+      return new Set(ids);
+    });
+  }, []);
 
-  const handleAlignV = useCallback(() => {
-    pushHistory();
-    const selF = fixtures.find((f) => f.id === selectedId);
-    const selSe = stageElements.find((s) => s.id === selectedId);
-    if (selF) {
-      const targetX = selF.x;
-      setFixtures((prev) => prev.map((f) => ({ ...f, x: targetX, aimX: f.aimX + (targetX - f.x) })));
-    } else if (selSe) {
-      const targetX = selSe.x;
-      setStageElements((prev) => prev.map((s) => ({ ...s, x: targetX })));
+  // ── Align selected elements on an axis (X / Y / Z=mounting height) ──
+  const handleAlign = useCallback((axis: 'x' | 'y' | 'z') => {
+    const selF = fixtures.filter((f) => selectedIds.has(f.id));
+    if (axis === 'z') {
+      if (selF.length < 2) return;
+      pushHistory();
+      const z = Math.round((selF.reduce((s, f) => s + f.mountingHeight, 0) / selF.length) * 10) / 10;
+      setFixtures((prev) => prev.map((f) => (selectedIds.has(f.id) ? { ...f, mountingHeight: z } : f)));
+      return;
     }
-  }, [fixtures, stageElements, selectedId]);
+    const selP = persons.filter((p) => selectedIds.has(p.id));
+    const selS = stageElements.filter((s) => selectedIds.has(s.id));
+    const vals = [...selF.map((f) => f[axis]), ...selP.map((p) => p[axis]), ...selS.map((s) => s[axis])];
+    if (vals.length < 2) return;
+    pushHistory();
+    const target = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+    if (selF.length) setFixtures((prev) => prev.map((f) => {
+      if (!selectedIds.has(f.id)) return f;
+      const d = target - f[axis];
+      return axis === 'x' ? { ...f, x: target, aimX: f.aimX + d } : { ...f, y: target, aimY: f.aimY + d };
+    }));
+    if (selP.length) setPersons((prev) => prev.map((p) => (selectedIds.has(p.id) ? { ...p, [axis]: target } : p)));
+    if (selS.length) setStageElements((prev) => prev.map((s) => (selectedIds.has(s.id) ? { ...s, [axis]: target } : s)));
+  }, [fixtures, persons, stageElements, selectedIds, pushHistory]);
 
-  const handleDistributeH = useCallback(() => {
-    if (fixtures.length < 2 && stageElements.length < 2) return;
+  // ── Evenly distribute the selected fixtures (or all, if none multi-picked) ──
+  const distributeFixtures = useCallback((axis: 'x' | 'y') => {
+    const sel = fixtures.filter((f) => selectedIds.has(f.id));
+    const target = sel.length >= 2 ? sel : fixtures;
+    if (target.length < 2) return;
     pushHistory();
-    if (fixtures.length >= 2) {
-      const sorted = [...fixtures].sort((a, b) => a.x - b.x);
-      const minX = sorted[0].x, maxX = sorted[sorted.length - 1].x;
-      const step = (maxX - minX) / (sorted.length - 1);
-      const idMap = new Map(sorted.map((f, i) => [f.id, minX + i * step]));
-      setFixtures((prev) => prev.map((f) => {
-        const newX = idMap.get(f.id);
-        return newX !== undefined ? { ...f, x: Math.round(newX * 10) / 10, aimX: f.aimX + (Math.round(newX * 10) / 10 - f.x) } : f;
-      }));
-    } else {
-      const sorted = [...stageElements].sort((a, b) => a.x - b.x);
-      const minX = sorted[0].x, maxX = sorted[sorted.length - 1].x;
-      const step = (maxX - minX) / (sorted.length - 1);
-      const idMap = new Map(sorted.map((s, i) => [s.id, minX + i * step]));
-      setStageElements((prev) => prev.map((s) => {
-        const newX = idMap.get(s.id);
-        return newX !== undefined ? { ...s, x: Math.round(newX * 10) / 10 } : s;
-      }));
-    }
-  }, [fixtures, stageElements]);
-
-  const handleDistributeV = useCallback(() => {
-    if (fixtures.length < 2 && stageElements.length < 2) return;
-    pushHistory();
-    if (fixtures.length >= 2) {
-      const sorted = [...fixtures].sort((a, b) => a.y - b.y);
-      const minY = sorted[0].y, maxY = sorted[sorted.length - 1].y;
-      const step = (maxY - minY) / (sorted.length - 1);
-      const idMap = new Map(sorted.map((f, i) => [f.id, minY + i * step]));
-      setFixtures((prev) => prev.map((f) => {
-        const newY = idMap.get(f.id);
-        return newY !== undefined ? { ...f, y: Math.round(newY * 10) / 10, aimY: f.aimY + (Math.round(newY * 10) / 10 - f.y) } : f;
-      }));
-    } else {
-      const sorted = [...stageElements].sort((a, b) => a.y - b.y);
-      const minY = sorted[0].y, maxY = sorted[sorted.length - 1].y;
-      const step = (maxY - minY) / (sorted.length - 1);
-      const idMap = new Map(sorted.map((s, i) => [s.id, minY + i * step]));
-      setStageElements((prev) => prev.map((s) => {
-        const newY = idMap.get(s.id);
-        return newY !== undefined ? { ...s, y: Math.round(newY * 10) / 10 } : s;
-      }));
-    }
-  }, [fixtures, stageElements]);
+    const sorted = [...target].sort((a, b) => a[axis] - b[axis]);
+    const min = sorted[0][axis], max = sorted[sorted.length - 1][axis];
+    const step = (max - min) / (sorted.length - 1);
+    const idMap = new Map(sorted.map((f, i) => [f.id, Math.round((min + i * step) * 10) / 10]));
+    setFixtures((prev) => prev.map((f) => {
+      const v = idMap.get(f.id);
+      if (v === undefined) return f;
+      const d = v - f[axis];
+      return axis === 'x' ? { ...f, x: v, aimX: f.aimX + d } : { ...f, y: v, aimY: f.aimY + d };
+    }));
+  }, [fixtures, selectedIds, pushHistory]);
+  const handleDistributeH = useCallback(() => distributeFixtures('x'), [distributeFixtures]);
+  const handleDistributeV = useCallback(() => distributeFixtures('y'), [distributeFixtures]);
 
   // ── Project save/load ──
   const handleSaveProject = useCallback((meta: ProjectMeta) => {
@@ -480,6 +537,8 @@ const App: React.FC = () => {
       customFixtures,
       fixtureGroups,
       trusses,
+      walls,
+      ceilings,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     try {
@@ -489,7 +548,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -501,6 +560,8 @@ const App: React.FC = () => {
     setCustomFixtures(data.customFixtures);
     setFixtureGroups(data.fixtureGroups ?? []);
     setTrusses(data.trusses ?? []);
+    setWalls(data.walls ?? []);
+    setCeilings(data.ceilings ?? []);
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
     if (data.floorPlan) {
@@ -673,6 +734,8 @@ const App: React.FC = () => {
     setStageElements((prev) => prev.map((s) => (selectedIds.has(s.id) ? { ...s, x: round1(s.x + dx), y: round1(s.y + dy) } : s)));
     setTrusses((prev) => prev.map((t) => (selectedIds.has(t.id)
       ? { ...t, x1: round1(t.x1 + dx), y1: round1(t.y1 + dy), x2: round1(t.x2 + dx), y2: round1(t.y2 + dy) } : t)));
+    setWalls((prev) => prev.map((w) => (selectedIds.has(w.id)
+      ? { ...w, x1: round1(w.x1 + dx), y1: round1(w.y1 + dy), x2: round1(w.x2 + dx), y2: round1(w.y2 + dy) } : w)));
   }, [selectedIds, pushHistoryThrottled]);
 
   useEffect(() => {
@@ -719,6 +782,12 @@ const App: React.FC = () => {
   }, [viewMode, projectMeta]);
 
   const handleAddShape = useCallback((shape: Shape) => { pushHistory(); setShapes((prev) => [...prev, shape]); }, [pushHistory]);
+  const handleMoveShape = useCallback((id: string, dx: number, dy: number) => {
+    pushHistoryThrottled();
+    setShapes((prev) => prev.map((s) => (s.id === id
+      ? { ...s, points: s.points.map((p) => ({ x: Math.round((p.x + dx) * 10) / 10, y: Math.round((p.y + dy) * 10) / 10 })) }
+      : s)));
+  }, [pushHistoryThrottled]);
   const handleAddCustomFixture = useCallback((f: Fixture) => { setCustomFixtures((prev) => [...prev, f]); }, []);
 
   return (
@@ -755,9 +824,13 @@ const App: React.FC = () => {
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
         onAutoThreePointConfig={() => setShowThreePointDialog(true)}
-        onAutoDistribute={handleAutoDistribute}
-        onAlignH={handleAlignH}
-        onAlignV={handleAlignV}
+        onAutoDistribute={() => setAreaLightOpen(true)}
+        hasArea={lightArea !== null}
+        onGenerateCeiling={handleGenerateCeiling}
+        hasWalls={walls.length > 0}
+        onAlignX={() => handleAlign('x')}
+        onAlignY={() => handleAlign('y')}
+        onAlignZ={() => handleAlign('z')}
         onDistributeH={handleDistributeH}
         onDistributeV={handleDistributeV}
         onSaveProject={() => setProjectDialogMode('save')}
@@ -788,6 +861,8 @@ const App: React.FC = () => {
               persons={persons}
               stageElements={stageElements}
               trusses={trusses}
+              walls={walls}
+              ceilings={ceilings}
               floorPlan={floorPlan}
               snapStep={snapStep}
               activeTool={activeTool}
@@ -799,6 +874,8 @@ const App: React.FC = () => {
               onPlaceFixture={handlePlaceFixture}
               onMoveFixture={handleMoveFixture}
               onSelect={handleSelectWithGroups}
+              onSelectMany={handleSelectMany}
+              onMoveShape={handleMoveShape}
               onAddShape={handleAddShape}
               onAddPerson={handleAddPerson}
               onAddStageElement={handleAddStageElement}
@@ -806,6 +883,9 @@ const App: React.FC = () => {
               onMoveStageElement={handleMoveStageElement}
               onAddTruss={handleAddTruss}
               onMoveTruss={handleMoveTruss}
+              onAddWall={handleAddWall}
+              onMoveWall={handleMoveWall}
+              onUpdateWall={handleUpdateWall}
               onCursorLux={setCursorLux}
               onToolChange={handleToolChange}
               onDropFixture={handleDropFixture}
@@ -822,6 +902,8 @@ const App: React.FC = () => {
                 persons={persons}
                 stageElements={stageElements}
                 trusses={trusses}
+                walls={walls}
+                ceilings={ceilings}
                 floorPlan={floorPlan}
                 selectedIds={selectedIds}
                 showHeatMap={showHeatMap}
@@ -866,6 +948,9 @@ const App: React.FC = () => {
           persons={persons}
           stageElements={stageElements}
           trusses={trusses}
+          walls={walls}
+          ceilings={ceilings}
+          shapes={shapes}
           selectedIds={selectedIds}
           cursorLux={cursorLux}
           patchConflicts={patchConflicts}
@@ -873,8 +958,11 @@ const App: React.FC = () => {
           onUpdatePerson={handleUpdatePerson}
           onUpdateStageElement={handleUpdateStageElement}
           onUpdateTruss={handleUpdateTruss}
+          onUpdateWall={handleUpdateWall}
+          onUpdateCeiling={handleUpdateCeiling}
           onDelete={handleDelete}
           onAutoThreePointForPerson={handleAutoThreePointForPerson}
+          onAreaLight={() => setAreaLightOpen(true)}
         />
       </div>
       {showThreePointDialog && (
@@ -889,6 +977,14 @@ const App: React.FC = () => {
           measuredMeters={pendingCalibration.meters}
           onApply={handleApplyScale}
           onCancel={() => setPendingCalibration(null)}
+        />
+      )}
+      {areaLightOpen && lightArea && (
+        <AreaLightDialog
+          area={lightArea}
+          defaultTargetLux={heatMapTarget}
+          onGenerate={handleAreaLight}
+          onCancel={() => setAreaLightOpen(false)}
         />
       )}
       {scheduleOpen && (
