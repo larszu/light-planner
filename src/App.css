@@ -611,6 +611,128 @@ body {
   margin-top: 8px;
 }
 
+/* ── Schedule / Geräteliste Dialog ─────────────────────── */
+.schedule-modal {
+  width: 720px;
+  max-width: 95vw;
+  max-height: 88vh;
+}
+
+.schedule-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.schedule-head h3 {
+  margin: 0;
+}
+
+.schedule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.schedule-actions-spacer {
+  flex: 1;
+}
+
+.schedule-warning {
+  background: rgba(239, 83, 80, 0.15);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.schedule-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.schedule-card {
+  flex: 1;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.sc-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: monospace;
+}
+
+.sc-label {
+  font-size: 10px;
+  color: var(--text2);
+  text-align: center;
+}
+
+.schedule-subhead {
+  font-size: 12px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 14px 0 6px;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.schedule-table th {
+  text-align: left;
+  color: var(--text2);
+  font-weight: 600;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
+
+.schedule-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(58, 58, 80, 0.4);
+  color: var(--text);
+}
+
+.schedule-table tr:hover td {
+  background: var(--panel-alt);
+}
+
+.schedule-table .row-conflict td {
+  background: rgba(239, 83, 80, 0.12);
+}
+
+.patch-conflict {
+  background: rgba(239, 83, 80, 0.15);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
 /* ── Property Panel ────────────────────────────────────── */
 .property-panel {
   width: 240px;

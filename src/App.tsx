@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss } from './types';
 import Toolbar from './components/Toolbar';
 import Sidebar from './components/Sidebar';
 import PlanCanvas from './components/PlanCanvas';
@@ -8,6 +8,8 @@ import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
+import ScheduleDialog from './components/ScheduleDialog';
+import { autoPatch, findPatchConflicts } from './utils/patch';
 import { generate3PointLighting, generateEvenDistribution } from './utils/autoLighting';
 import type { ThreePointConfig } from './utils/autoLighting';
 import type { Scene3DHandle } from './components/Scene3D';
@@ -21,6 +23,30 @@ const Scene3D = lazy(() => import('./components/Scene3D'));
 
 let nextId = 1;
 function uid(prefix: string) { return `${prefix}-${Date.now()}-${nextId++}`; }
+
+// Make a floor plan persistable: drop the live <img> and re-encode the bitmap
+// as a size-capped JPEG so the calibration survives a save without blowing the
+// localStorage quota. The scale/position fields are tiny and kept verbatim.
+function serializeFloorPlan(fp: FloorPlan): Omit<FloorPlan, 'image'> {
+  const MAX_EDGE = 1600;
+  const scale = Math.min(1, MAX_EDGE / Math.max(fp.naturalWidth, fp.naturalHeight));
+  const w = Math.max(1, Math.round(fp.naturalWidth * scale));
+  const h = Math.max(1, Math.round(fp.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(fp.image, 0, 0, w, h);
+  const { image: _omit, ...rest } = fp;
+  return {
+    ...rest,
+    src: canvas.toDataURL('image/jpeg', 0.72),
+    naturalWidth: w,
+    naturalHeight: h,
+    pageCount: undefined, // PDF source isn't persisted → no page switching after reload
+  };
+}
 
 const App: React.FC = () => {
   const [fixtures, setFixtures] = useState<PlacedFixture[]>([]);
@@ -42,20 +68,24 @@ const App: React.FC = () => {
   const [projectMeta, setProjectMeta] = useState<ProjectMeta | undefined>(undefined);
   const [projectId, setProjectId] = useState<string>('proj-' + Date.now());
   const [fixtureGroups, setFixtureGroups] = useState<FixtureGroup[]>([]);
+  const [trusses, setTrusses] = useState<Truss[]>([]);
   const [planMode, setPlanMode] = useState<PlanMode>('none');
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
+  const [snapStep, setSnapStep] = useState(0); // 0 = off; otherwise grid step in metres
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const clipboardRef = useRef<PlacedFixture[]>([]);
   const scene3DRef = useRef<Scene3DHandle>(null);
   const exportCounterRef = useRef(1);
   const defaultMountingHeight = 6;
 
   // ── Undo / Redo ──
-  interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[] }
+  interface Snapshot { fixtures: PlacedFixture[]; persons: Person[]; stageElements: StageElement[]; shapes: Shape[]; fixtureGroups: FixtureGroup[]; trusses: Truss[] }
   const historyRef = useRef<Snapshot[]>([]);
   const futureRef = useRef<Snapshot[]>([]);
   const lastPushRef = useRef(0);
-  const stateRef = useRef<Snapshot>({ fixtures, persons, stageElements, shapes, fixtureGroups });
-  stateRef.current = { fixtures, persons, stageElements, shapes, fixtureGroups };
+  const stateRef = useRef<Snapshot>({ fixtures, persons, stageElements, shapes, fixtureGroups, trusses });
+  stateRef.current = { fixtures, persons, stageElements, shapes, fixtureGroups, trusses };
 
   const pushHistory = useCallback(() => {
     if (historyRef.current.length >= 50) historyRef.current.shift();
@@ -74,6 +104,7 @@ const App: React.FC = () => {
     setStageElements(snap.stageElements);
     setShapes(snap.shapes);
     setFixtureGroups(snap.fixtureGroups);
+    setTrusses(snap.trusses);
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -98,13 +129,20 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, [handleUndo, handleRedo]);
 
-  // Leave plan-edit modes on Escape, and whenever we drop into the 3D view.
+  // Escape cancels a pending placement and leaves plan-edit modes.
   useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setPlanMode('none'); };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setPlanMode('none'); setFixtureToPlace(null); } };
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
   }, []);
   useEffect(() => { if (viewMode === '3d') setPlanMode('none'); }, [viewMode]);
+
+  // Switching to any drawing/placement tool cancels a pending fixture drop,
+  // so the tool isn't swallowed by the place-on-click handler.
+  const handleToolChange = useCallback((t: Tool) => {
+    setActiveTool(t);
+    if (t !== 'select') { setFixtureToPlace(null); setPlanMode('none'); }
+  }, []);
 
   // ── Selection helpers ──
   const selectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
@@ -219,6 +257,26 @@ const App: React.FC = () => {
     setStageElements((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
   }, [pushHistoryThrottled]);
 
+  // ── Truss / hanging position handlers ──
+  const handleAddTruss = useCallback((x1: number, y1: number, x2: number, y2: number) => {
+    pushHistory();
+    const t: Truss = { id: uid('trs'), x1, y1, x2, y2, height: defaultMountingHeight, label: '' };
+    setTrusses((prev) => [...prev, t]);
+    setSelectedIds(new Set([t.id]));
+  }, [defaultMountingHeight]);
+
+  const handleMoveTruss = useCallback((id: string, dx: number, dy: number) => {
+    pushHistoryThrottled();
+    setTrusses((prev) => prev.map((t) => (t.id === id
+      ? { ...t, x1: Math.round((t.x1 + dx) * 10) / 10, y1: Math.round((t.y1 + dy) * 10) / 10, x2: Math.round((t.x2 + dx) * 10) / 10, y2: Math.round((t.y2 + dy) * 10) / 10 }
+      : t)));
+  }, [pushHistoryThrottled]);
+
+  const handleUpdateTruss = useCallback((id: string, updates: Partial<Truss>) => {
+    pushHistoryThrottled();
+    setTrusses((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+  }, [pushHistoryThrottled]);
+
   // ── Delete any element ──
   const handleDelete = useCallback((id: string) => {
     pushHistory();
@@ -226,6 +284,7 @@ const App: React.FC = () => {
     setPersons((prev) => prev.filter((p) => p.id !== id));
     setStageElements((prev) => prev.filter((s) => s.id !== id));
     setShapes((prev) => prev.filter((s) => s.id !== id));
+    setTrusses((prev) => prev.filter((t) => t.id !== id));
     setFixtureGroups((prev) => prev.map((g) => ({ ...g, fixtureIds: g.fixtureIds.filter((fid) => fid !== id) })).filter((g) => g.fixtureIds.length > 0));
     setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
   }, []);
@@ -418,11 +477,17 @@ const App: React.FC = () => {
       stageElements,
       customFixtures,
       fixtureGroups,
+      trusses,
+      floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
-    saveProjectToStorage(projectId, meta, data);
-    setProjectMeta(meta);
-    setProjectDialogMode(null);
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, projectId]);
+    try {
+      saveProjectToStorage(projectId, meta, data);
+      setProjectMeta(meta);
+      setProjectDialogMode(null);
+    } catch (err) {
+      window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
+    }
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -433,6 +498,18 @@ const App: React.FC = () => {
     setStageElements(data.stageElements);
     setCustomFixtures(data.customFixtures);
     setFixtureGroups(data.fixtureGroups ?? []);
+    setTrusses(data.trusses ?? []);
+    // Restore the building plan + its calibration (rebuild the live image).
+    pdfDocRef.current = null;
+    if (data.floorPlan) {
+      const stored = data.floorPlan;
+      const img = new Image();
+      img.onload = () => setFloorPlan({ ...stored, image: img });
+      img.src = stored.src;
+    } else {
+      setFloorPlan(null);
+    }
+    setPlanMode('none');
     setProjectMeta(data.meta);
     const newId = 'proj-' + Date.now();
     setProjectId(newId);
@@ -542,6 +619,81 @@ const App: React.FC = () => {
     setPendingCalibration(null);
   }, [pendingCalibration]);
 
+  // ── Patch & numbering (instrument schedule) ──
+  const handleAutoNumber = useCallback(() => {
+    pushHistory();
+    setFixtures((prev) => autoPatch(prev, { startUniverse: 1, startAddress: 1, number: true, patch: false }));
+  }, [pushHistory]);
+
+  const handleAutoPatch = useCallback(() => {
+    pushHistory();
+    setFixtures((prev) => autoPatch(prev, { startUniverse: 1, startAddress: 1, number: false, patch: true }));
+  }, [pushHistory]);
+
+  const patchConflicts = React.useMemo(() => findPatchConflicts(fixtures), [fixtures]);
+
+  // ── Copy / paste / duplicate / nudge ──
+  const round1 = (v: number) => Math.round(v * 10) / 10;
+  const cloneFixtures = useCallback((src: PlacedFixture[]): PlacedFixture[] =>
+    src.map((f) => ({
+      ...f, id: uid('pf'),
+      x: round1(f.x + 0.5), y: round1(f.y + 0.5), aimX: round1(f.aimX + 0.5), aimY: round1(f.aimY + 0.5),
+      channel: undefined, unitNumber: undefined, universe: undefined, dmxAddress: undefined,
+    })), []);
+
+  const handleCopy = useCallback(() => {
+    const sel = fixtures.filter((f) => selectedIds.has(f.id));
+    if (sel.length) clipboardRef.current = sel;
+  }, [fixtures, selectedIds]);
+
+  const handlePaste = useCallback(() => {
+    if (!clipboardRef.current.length) return;
+    pushHistory();
+    const pasted = cloneFixtures(clipboardRef.current);
+    setFixtures((prev) => [...prev, ...pasted]);
+    setSelectedIds(new Set(pasted.map((f) => f.id)));
+  }, [cloneFixtures, pushHistory]);
+
+  const handleDuplicate = useCallback(() => {
+    const sel = fixtures.filter((f) => selectedIds.has(f.id));
+    if (!sel.length) return;
+    pushHistory();
+    const dup = cloneFixtures(sel);
+    setFixtures((prev) => [...prev, ...dup]);
+    setSelectedIds(new Set(dup.map((f) => f.id)));
+  }, [fixtures, selectedIds, cloneFixtures, pushHistory]);
+
+  const handleNudge = useCallback((dx: number, dy: number) => {
+    pushHistoryThrottled();
+    setFixtures((prev) => prev.map((f) => (selectedIds.has(f.id)
+      ? { ...f, x: round1(f.x + dx), y: round1(f.y + dy), aimX: round1(f.aimX + dx), aimY: round1(f.aimY + dy) } : f)));
+    setPersons((prev) => prev.map((p) => (selectedIds.has(p.id) ? { ...p, x: round1(p.x + dx), y: round1(p.y + dy) } : p)));
+    setStageElements((prev) => prev.map((s) => (selectedIds.has(s.id) ? { ...s, x: round1(s.x + dx), y: round1(s.y + dy) } : s)));
+    setTrusses((prev) => prev.map((t) => (selectedIds.has(t.id)
+      ? { ...t, x1: round1(t.x1 + dx), y1: round1(t.y1 + dy), x2: round1(t.x2 + dx), y2: round1(t.y2 + dy) } : t)));
+  }, [selectedIds, pushHistoryThrottled]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && (e.key === 'c' || e.key === 'C')) { handleCopy(); }
+      else if (mod && (e.key === 'v' || e.key === 'V')) { e.preventDefault(); handlePaste(); }
+      else if (mod && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); handleDuplicate(); }
+      else if (viewMode === '2d' && selectedIds.size > 0 && e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const step = e.shiftKey ? 1 : (snapStep || 0.1);
+        if (e.key === 'ArrowUp') handleNudge(0, -step);
+        else if (e.key === 'ArrowDown') handleNudge(0, step);
+        else if (e.key === 'ArrowLeft') handleNudge(-step, 0);
+        else if (e.key === 'ArrowRight') handleNudge(step, 0);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleCopy, handlePaste, handleDuplicate, handleNudge, selectedIds, snapStep, viewMode]);
+
   const handleExport = useCallback(() => {
     const projName = projectMeta?.name || 'Lichtplan';
     const viewLabel = viewMode === '3d' ? '3D' : '2D';
@@ -578,7 +730,7 @@ const App: React.FC = () => {
         viewMode={viewMode}
         showHeatMap={showHeatMap}
         heatMapScale={heatMapScale}
-        onToolChange={setActiveTool}
+        onToolChange={handleToolChange}
         onViewModeChange={setViewMode}
         onToggleHeatMap={() => setShowHeatMap((v) => !v)}
         heatMapTarget={heatMapTarget}
@@ -595,6 +747,9 @@ const App: React.FC = () => {
         onDistributeV={handleDistributeV}
         onSaveProject={() => setProjectDialogMode('save')}
         onLoadProject={() => setProjectDialogMode('load')}
+        onOpenSchedule={() => setScheduleOpen(true)}
+        snapEnabled={snapStep > 0}
+        onToggleSnap={() => setSnapStep((s) => (s > 0 ? 0 : 0.5))}
         hasPersons={persons.length > 0}
         hasStageElements={stageElements.length > 0}
         hasSelection={selectedIds.size > 0}
@@ -617,7 +772,9 @@ const App: React.FC = () => {
               shapes={shapes}
               persons={persons}
               stageElements={stageElements}
+              trusses={trusses}
               floorPlan={floorPlan}
+              snapStep={snapStep}
               activeTool={activeTool}
               fixtureToPlace={fixtureToPlace}
               selectedIds={selectedIds}
@@ -632,8 +789,10 @@ const App: React.FC = () => {
               onAddStageElement={handleAddStageElement}
               onMovePerson={handleMovePerson}
               onMoveStageElement={handleMoveStageElement}
+              onAddTruss={handleAddTruss}
+              onMoveTruss={handleMoveTruss}
               onCursorLux={setCursorLux}
-              onToolChange={setActiveTool}
+              onToolChange={handleToolChange}
               onDropFixture={handleDropFixture}
               onMoveAim={handleMoveAim}
               planMode={planMode}
@@ -647,6 +806,8 @@ const App: React.FC = () => {
                 fixtures={fixtures}
                 persons={persons}
                 stageElements={stageElements}
+                trusses={trusses}
+                floorPlan={floorPlan}
                 selectedIds={selectedIds}
                 showHeatMap={showHeatMap}
                 heatMapScale={heatMapScale}
@@ -689,11 +850,14 @@ const App: React.FC = () => {
           fixtures={fixtures}
           persons={persons}
           stageElements={stageElements}
+          trusses={trusses}
           selectedIds={selectedIds}
           cursorLux={cursorLux}
+          patchConflicts={patchConflicts}
           onUpdateFixture={handleUpdateFixture}
           onUpdatePerson={handleUpdatePerson}
           onUpdateStageElement={handleUpdateStageElement}
+          onUpdateTruss={handleUpdateTruss}
           onDelete={handleDelete}
           onAutoThreePointForPerson={handleAutoThreePointForPerson}
         />
@@ -710,6 +874,16 @@ const App: React.FC = () => {
           measuredMeters={pendingCalibration.meters}
           onApply={handleApplyScale}
           onCancel={() => setPendingCalibration(null)}
+        />
+      )}
+      {scheduleOpen && (
+        <ScheduleDialog
+          fixtures={fixtures}
+          trussCount={trusses.length}
+          conflicts={patchConflicts}
+          onAutoNumber={handleAutoNumber}
+          onAutoPatch={handleAutoPatch}
+          onClose={() => setScheduleOpen(false)}
         />
       )}
       {projectDialogMode && (

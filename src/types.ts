@@ -116,6 +116,12 @@ export interface PlacedFixture {
   currentColorTemp?: number;   // current CCT for tunable fixtures
   // ── Gel filters ──
   gelFilterIds?: string[];     // ids of mounted gel filters (from gelLibrary)
+  // ── Patch / paperwork (instrument schedule, channel hookup) ──
+  channel?: number;            // control / dimmer channel number
+  unitNumber?: string;         // unit (instrument) number on its position
+  universe?: number;           // DMX universe (1-based)
+  dmxAddress?: number;         // DMX start address within the universe (1–512)
+  purpose?: string;            // focus / purpose note ("Frontlicht Bühne")
 }
 
 // ── Person on stage ──
@@ -150,7 +156,18 @@ export interface Shape {
   color: string;
 }
 
-export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage';
+// ── Truss / hanging position (rigging) ──
+export interface Truss {
+  id: string;
+  x1: number;           // start point (meters)
+  y1: number;
+  x2: number;           // end point (meters)
+  y2: number;
+  height: number;       // trim height above floor (meters)
+  label: string;
+}
+
+export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'truss';
 export type ViewMode = '2d' | '3d';
 
 export interface ViewTransform {
@@ -209,6 +226,10 @@ export interface ProjectData {
   stageElements: StageElement[];
   customFixtures: Fixture[];
   fixtureGroups?: FixtureGroup[];
+  trusses?: Truss[];
+  // Imported building plan incl. its calibration; the bitmap is stored as a
+  // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
+  floorPlan?: Omit<FloorPlan, 'image'>;
 }
 
 export interface FixtureGroup {
