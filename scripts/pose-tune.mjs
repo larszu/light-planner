@@ -16,21 +16,18 @@ const L = (up, leg, foot = 0) => ({
   LeftUpLeg: [up, 0, 0.1], LeftLeg: [leg], LeftFoot: [foot],
   RightUpLeg: [up, 0, -0.1], RightLeg: [leg], RightFoot: [foot],
 });
+// Full seated map parameterised by thigh/knee/foot X so we can test the signs
+// against real anatomy (knees bend forward-down, feet point the way the chest faces).
+const sit = (uX, kX, fX, splay = 0.12) => ({
+  LeftUpLeg: [uX, 0, splay], RightUpLeg: [uX, 0, -splay],
+  LeftLeg: [kX], RightLeg: [kX], LeftFoot: [fX], RightFoot: [fX],
+  Spine: [0.06], Spine1: [0.04], LeftArm: [0.45, 0, 0.1], RightArm: [0.45, 0, -0.1],
+});
 const POSES = [
-  { name: 'sitFinal', map: {
-    LeftUpLeg: [1.5, 0, 0.1], RightUpLeg: [1.5, 0, -0.1],
-    LeftLeg: [1.5], RightLeg: [1.5],
-    LeftFoot: [0.15], RightFoot: [0.15],
-    Spine: [0.08],
-    LeftArm: [0.35], RightArm: [0.35],
-  } },
-  { name: 'sitFinal2', map: {
-    LeftUpLeg: [1.45, 0, 0.12], RightUpLeg: [1.45, 0, -0.12],
-    LeftLeg: [1.55], RightLeg: [1.55],
-    LeftFoot: [0.2], RightFoot: [0.2],
-    Spine: [0.06], Spine1: [0.04],
-    LeftArm: [0.45, 0, 0.1], RightArm: [0.45, 0, -0.1],
-  } },
+  { name: 'v0-current', map: sit(1.45, 1.55, 0.2) },
+  { name: 'v1-flipknee', map: sit(1.45, -1.55, 0.2) },
+  { name: 'v2-flipthigh', map: sit(-1.45, 1.55, 0.2) },
+  { name: 'v3-flipboth', map: sit(-1.45, -1.55, 0.2) },
 ];
 
 const browser = await puppeteer.launch({
@@ -48,10 +45,10 @@ console.log('bones:', (await page.evaluate(() => window.__pose.bones())).join(',
 
 for (const p of POSES) {
   await page.evaluate((m) => window.__pose.set(m), p.map);
-  await page.evaluate(() => window.__pose.view(0, 0.9, 3.2, 0, 0.55, 0)); // front
+  await page.evaluate(() => window.__pose.view(2.7, 1.0, 2.8, 0, 0.5, 0)); // 3/4 front
   await sleep(500);
-  await page.screenshot({ path: `${OUT}/${p.name}-front.png` });
-  await page.evaluate(() => window.__pose.view(3.2, 0.9, 0.01, 0, 0.55, 0)); // side
+  await page.screenshot({ path: `${OUT}/${p.name}-34.png` });
+  await page.evaluate(() => window.__pose.view(3.3, 0.9, 0.01, 0, 0.5, 0)); // side
   await sleep(400);
   await page.screenshot({ path: `${OUT}/${p.name}-side.png` });
   console.log('posed', p.name);

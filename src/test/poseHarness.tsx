@@ -53,6 +53,8 @@ function posedMinY(o: THREE.Object3D): number {
   const g = await new GLTFLoader().parseAsync(buf, '');
   model = g.scene;
   model.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { const mats = Array.isArray(m.material) ? m.material : [m.material]; mats.forEach((mm) => { const s = mm as THREE.MeshStandardMaterial; if (s.emissive) s.emissiveIntensity = 0; }); } });
+  // Drop the novelty "Reindeer Glasses" accessory (glasses + red nose + antlers).
+  model.traverse((o) => { if (/glasses/i.test(o.name)) o.visible = false; });
   model.updateMatrixWorld(true);
   model.traverse((o) => { if ((o as THREE.Bone).isBone) bind.set(o.name, o.rotation.clone()); });
   // normalize height to ~1.7 m
