@@ -11,6 +11,7 @@ interface Props {
   exposure: number;
   haze: number;
   showBeams: boolean;
+  ambience: number;
   heatMapScale: number;
   heatMapTarget: number;
   snapStep: number;
@@ -20,6 +21,7 @@ interface Props {
   onExposureChange: (v: number) => void;
   onHazeChange: (v: number) => void;
   onToggleBeams: () => void;
+  onAmbienceChange: (v: number) => void;
   onHeatMapScaleChange: (v: number) => void;
   onHeatMapTargetChange: (v: number) => void;
   onToggleSnap: () => void;
@@ -107,6 +109,9 @@ const TopBar: React.FC<Props> = (p) => {
                   <label className="tb-slider"><span>Belichtung</span>
                     <input type="range" min={0.2} max={3} step={0.05} value={p.exposure} onChange={(e) => p.onExposureChange(+e.target.value)} />
                     <em>{p.exposure.toFixed(2)}</em></label>
+                  <label className="tb-slider"><span>Ambiente</span>
+                    <input type="range" min={0} max={1.5} step={0.05} value={p.ambience} onChange={(e) => p.onAmbienceChange(+e.target.value)} />
+                    <em>{Math.round(p.ambience * 100)}%</em></label>
                   <label className="tb-slider"><span>Dunst / Haze</span>
                     <input type="range" min={0} max={1} step={0.02} value={p.haze} onChange={(e) => p.onHazeChange(+e.target.value)} />
                     <em>{Math.round(p.haze * 100)}%</em></label>

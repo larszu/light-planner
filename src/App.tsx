@@ -109,6 +109,8 @@ const App: React.FC = () => {
   const setHaze = useUiStore((s) => s.setHaze);
   const showBeams = useUiStore((s) => s.showBeams);
   const toggleBeams = useUiStore((s) => s.toggleBeams);
+  const ambience = useUiStore((s) => s.ambience);
+  const setAmbience = useUiStore((s) => s.setAmbience);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [cameras, setCameras] = useState<CameraView[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
@@ -1088,6 +1090,7 @@ const App: React.FC = () => {
         exposure={exposure}
         haze={haze}
         showBeams={showBeams}
+        ambience={ambience}
         heatMapScale={heatMapScale}
         heatMapTarget={heatMapTarget}
         snapStep={snapStep}
@@ -1096,6 +1099,7 @@ const App: React.FC = () => {
         onExposureChange={setExposure}
         onHazeChange={setHaze}
         onToggleBeams={toggleBeams}
+        onAmbienceChange={setAmbience}
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
         onToggleSnap={toggleSnap}
@@ -1202,6 +1206,7 @@ const App: React.FC = () => {
                 exposure={exposure}
                 haze={haze}
                 showBeams={showBeams}
+                ambience={ambience}
                 onSelect={handleSelectWithGroups}
                 onHoverLux={setCursorLux}
               />

@@ -54,15 +54,17 @@ function Harness() {
   const [exposure, setExposure] = useState(1.3);
   const [haze, setHaze] = useState(0.3);
   const [showBeams, setBeams] = useState(true);
+  const [ambience, setAmb] = useState(0.55);
 
   useEffect(() => {
     const api = {
-      setMode: (m: { photo?: boolean; heatmap?: boolean; exposure?: number; haze?: number; beams?: boolean }) => {
+      setMode: (m: { photo?: boolean; heatmap?: boolean; exposure?: number; haze?: number; beams?: boolean; ambience?: number }) => {
         if ('photo' in m) setPhoto(!!m.photo);
         if ('heatmap' in m) setHeat(!!m.heatmap);
         if (typeof m.exposure === 'number') setExposure(m.exposure);
         if (typeof m.haze === 'number') setHaze(m.haze);
         if (typeof m.beams === 'boolean') setBeams(m.beams);
+        if (typeof m.ambience === 'number') setAmb(m.ambience);
       },
       // Point the camera in front of the people, looking at their faces.
       look: () => ref.current?.lookThroughCamera({ x: 6, y: 0.2, height: 1.55, aimX: 6, aimY: 6.3, fov: 52 }),
@@ -94,6 +96,7 @@ function Harness() {
         exposure={exposure}
         haze={haze}
         showBeams={showBeams}
+        ambience={ambience}
         onSelect={() => {}}
         onHoverLux={(lx) => { (window as Window & typeof globalThis & { __lpLux?: number | null }).__lpLux = lx; }}
       />

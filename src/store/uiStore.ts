@@ -15,6 +15,7 @@ interface UiState {
   exposure: number;
   haze: number;
   showBeams: boolean; // global on/off for the volumetric light shafts (photo view)
+  ambience: number;   // global fill / ambient light level in the render view (0..1)
   snapStep: number; // 0 = off, else grid step (m)
   language: Language;
 
@@ -27,6 +28,7 @@ interface UiState {
   setExposure: (v: number) => void;
   setHaze: (v: number) => void;
   toggleBeams: () => void;
+  setAmbience: (v: number) => void;
   toggleSnap: () => void;
   setLanguage: (l: Language) => void;
 }
@@ -40,6 +42,7 @@ export const useUiStore = create<UiState>((set) => ({
   exposure: 1.2,
   haze: 0.15,
   showBeams: true,
+  ambience: 0.55,
   snapStep: 0,
   language: (typeof localStorage !== 'undefined' && localStorage.getItem('lp-lang') === 'en' ? 'en' : 'de'),
 
@@ -52,6 +55,7 @@ export const useUiStore = create<UiState>((set) => ({
   setExposure: (exposure) => set({ exposure }),
   setHaze: (haze) => set({ haze }),
   toggleBeams: () => set((s) => ({ showBeams: !s.showBeams })),
+  setAmbience: (ambience) => set({ ambience }),
   toggleSnap: () => set((s) => ({ snapStep: s.snapStep > 0 ? 0 : 0.5 })),
   setLanguage: (language) => { try { localStorage.setItem('lp-lang', language); } catch { /* ignore */ } set({ language }); },
 }));

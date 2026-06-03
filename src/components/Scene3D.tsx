@@ -213,11 +213,12 @@ interface Props {
   exposure: number;
   haze: number;
   showBeams: boolean;
+  ambience: number;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
   onHoverLux?: (lux: number | null) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, onSelect, onHoverLux }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, onSelect, onHoverLux }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -240,6 +241,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
   // Photo-realism flags read by the animation loop without re-creating it.
   const photoModeRef = useRef(photoMode);
   const exposureRef = useRef(exposure);
+  const ambienceRef = useRef(ambience);
+  ambienceRef.current = ambience;
   // Current lit fixtures + hover callback, read by the (once-built) pointer
   // handler so the live lux readout always uses fresh data.
   const litRef = useRef<PlacedFixture[]>([]);
@@ -285,7 +288,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
 
     // Ground plane – large so it always reads as a real floor; receives shadows.
     const groundGeo = new THREE.PlaneGeometry(400, 400);
-    const groundMat = new THREE.MeshStandardMaterial({ color: photoModeRef.current ? '#313139' : '#222238', roughness: 0.9, metalness: 0 });
+    const groundMat = new THREE.MeshStandardMaterial({ color: photoModeRef.current ? '#4a4d57' : '#222238', roughness: 0.92, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -300,17 +303,17 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     pmrem.compileEquirectangularShader();
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = env;
-    scene.environmentIntensity = photoModeRef.current ? 0.18 : 0;
+    const amb0 = ambienceRef.current;
+    scene.environmentIntensity = photoModeRef.current ? amb0 * 0.45 : 0;
 
-    // Lighting. Photo mode keeps a low sky/ground hemisphere fill plus a little
-    // IBL so unlit faces aren't pure black — but kept dim on purpose so the
-    // fixtures dominate, the floor pools read with real brightness falloff and
-    // the cast shadows stay visible (high contrast = lit vs not).
-    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? 0.07 : 0.5);
+    // Lighting. In the render view the fill (hemisphere + ambient + IBL) scales
+    // with the user's global "Ambiente" setting, so the floor/scene can be made
+    // as bright or as moody as wanted while the fixtures still carry the look.
+    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? amb0 * 0.18 : 0.5);
     scene.add(ambient);
-    const hemi = new THREE.HemisphereLight('#556688', '#14141c', photoModeRef.current ? 0.40 : 0.0);
+    const hemi = new THREE.HemisphereLight('#7d8aa0', '#1b1f2a', photoModeRef.current ? amb0 * 1.0 : 0.0);
     scene.add(hemi);
-    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.07 : 0.3);
+    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? amb0 * 0.18 : 0.3);
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
@@ -477,12 +480,12 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     if (!s) return;
     s.renderer.toneMapping = photoMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     s.renderer.toneMappingExposure = exposure;
-    s.ambient.intensity = photoMode ? 0.07 : 0.5;
-    s.hemi.intensity = photoMode ? 0.40 : 0.0;
-    s.dir.intensity = photoMode ? 0.07 : 0.3;
-    s.scene.environmentIntensity = photoMode ? 0.18 : 0;
+    s.ambient.intensity = photoMode ? ambience * 0.18 : 0.5;
+    s.hemi.intensity = photoMode ? ambience * 1.0 : 0.0;
+    s.dir.intensity = photoMode ? ambience * 0.18 : 0.3;
+    s.scene.environmentIntensity = photoMode ? ambience * 0.45 : 0;
     s.grid.visible = !photoMode;
-    (s.ground.material as THREE.MeshStandardMaterial).color.set(photoMode ? '#313139' : '#222238');
+    (s.ground.material as THREE.MeshStandardMaterial).color.set(photoMode ? '#4a4d57' : '#222238');
     const bg = photoMode ? '#15151c' : '#1a1a2e';
     s.scene.background = new THREE.Color(bg);
     if (s.scene.fog) (s.scene.fog as THREE.Fog).color.set(bg);
@@ -491,7 +494,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const m = (o as THREE.Mesh).material;
       if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { mm.needsUpdate = true; });
     });
-  }, [photoMode, exposure]);
+  }, [photoMode, exposure, ambience]);
 
   // Update scene objects when data changes
   useEffect(() => {
