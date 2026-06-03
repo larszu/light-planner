@@ -7,10 +7,11 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers, CameraView } from '../types';
-import { computeHeatMap, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../core/lightCalc';
+import { computeHeatMap, surfaceLux, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../core/lightCalc';
 import { getBeamColorHex } from '../core/colorTemp';
-import { sampleWall, isCurved } from '../core/geometry';
+import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
@@ -53,6 +54,22 @@ function loadPersonModel(): Promise<PersonModel> {
         mixer.clipAction(idle).play();
         mixer.update(0.4);
       }
+      // Tame the avatar's materials so it reads as a real, lit person rather
+      // than a glowing mask: kill any baked emissive (the cause of the "creepy"
+      // self-lit face under bloom) and let it pick up the environment (IBL) so
+      // skin/clothing show real colour instead of a black silhouette.
+      scene.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach((mm) => {
+          const m = mm as THREE.MeshStandardMaterial;
+          if (m.emissive) { m.emissive.setRGB(0, 0, 0); m.emissiveIntensity = 0; }
+          if ('envMapIntensity' in m) m.envMapIntensity = 1.15;
+          m.toneMapped = true;
+          m.needsUpdate = true;
+        });
+      });
       scene.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(scene);
       return { scene, height: Math.max(0.1, box.max.y - box.min.y), minY: box.min.y };
@@ -102,6 +119,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     dir: THREE.DirectionalLight;
     grid: THREE.GridHelper;
     ground: THREE.Mesh;
+    env: THREE.Texture;
+    pmrem: THREE.PMREMGenerator;
   } | null>(null);
   // Whether the camera has been framed to the content yet (once per mount).
   const framedRef = useRef(false);
@@ -152,14 +171,25 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Lighting. Photo mode keeps a gentle sky/ground hemisphere fill so the
-    // floor and shadows stay readable, while the fixtures dominate and cast the
-    // real shadows; the flat ambient/key are dimmed right down.
-    const ambient = new THREE.AmbientLight('#666680', photoModeRef.current ? 0.06 : 0.5);
+    // Image-based ambient light (the "ambience" the photo view was missing).
+    // A pre-filtered RoomEnvironment gives every PBR surface a soft, directional
+    // fill so people/objects read with real colour and form instead of turning
+    // into black silhouettes outside the spotlight cones. Kept subtle (low
+    // environmentIntensity) so the fixtures still dominate and cast the mood.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    scene.environmentIntensity = photoModeRef.current ? 0.32 : 0;
+
+    // Lighting. Photo mode keeps a gentle sky/ground hemisphere fill plus the
+    // IBL above so the scene has believable ambience, while the fixtures
+    // dominate and cast the real shadows; the flat ambient/key stay low.
+    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? 0.12 : 0.5);
     scene.add(ambient);
-    const hemi = new THREE.HemisphereLight('#44506e', '#11111a', photoModeRef.current ? 0.6 : 0.0);
+    const hemi = new THREE.HemisphereLight('#556688', '#14141c', photoModeRef.current ? 0.85 : 0.0);
     scene.add(hemi);
-    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.05 : 0.3);
+    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.12 : 0.3);
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
@@ -170,9 +200,9 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     composer.addPass(new RenderPass(scene, camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(container.clientWidth, container.clientHeight),
-      0.5,  // strength (subtle – just a halo on the brightest bits)
-      0.5,  // radius
-      0.8,  // threshold (only the bright bits bloom)
+      0.32, // strength (subtle – just a halo on the brightest bits)
+      0.4,  // radius
+      0.85, // threshold (raised so lit faces/skin don't bloom into a glow)
     );
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
@@ -181,7 +211,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     renderer.toneMappingExposure = exposureRef.current;
 
     const animId = 0;
-    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, grid, ground };
+    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, grid, ground, env, pmrem };
 
     // ── WASD keyboard movement ──
     const keys: Record<string, boolean> = {};
@@ -277,6 +307,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       window.removeEventListener('keyup', handleKeyUp);
       obs.disconnect();
       composer.dispose();
+      env.dispose();
+      pmrem.dispose();
       renderer.dispose();
       container.removeChild(renderer.domElement);
     };
@@ -292,12 +324,13 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     if (!s) return;
     s.renderer.toneMapping = photoMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     s.renderer.toneMappingExposure = exposure;
-    s.ambient.intensity = photoMode ? 0.06 : 0.5;
-    s.hemi.intensity = photoMode ? 0.6 : 0.0;
-    s.dir.intensity = photoMode ? 0.05 : 0.3;
+    s.ambient.intensity = photoMode ? 0.12 : 0.5;
+    s.hemi.intensity = photoMode ? 0.85 : 0.0;
+    s.dir.intensity = photoMode ? 0.12 : 0.3;
+    s.scene.environmentIntensity = photoMode ? 0.32 : 0;
     s.grid.visible = !photoMode;
     (s.ground.material as THREE.MeshStandardMaterial).color.set(photoMode ? '#313139' : '#222238');
-    const bg = photoMode ? '#0e0e16' : '#1a1a2e';
+    const bg = photoMode ? '#15151c' : '#1a1a2e';
     s.scene.background = new THREE.Color(bg);
     if (s.scene.fog) (s.scene.fog as THREE.Fog).color.set(bg);
     // Tone-mapping change requires existing materials to recompile.
@@ -342,6 +375,174 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       });
     });
 
+    // ── Heat-map foundation ──────────────────────────────────────────────
+    // Lit lamps drive both the floor map and the surface drape. Compute the
+    // floor grid (and its scale) up front so podiums, walls, ceilings and
+    // people can be draped on the *same* scale as the floor legend.
+    const lit = fixtures.filter((f) => !f.hidden);
+    const heatOn = showHeatMap && lit.length > 0 && hasContent;
+    let heatScale = 1000;
+
+    // Three.js world (x, yUp, z) + normal → palette RGBA (0..1), via the plan-
+    // space engine (plan x = world x, plan y = world z, plan height = world y).
+    const heatColorAt = (
+      wx: number, wy: number, wz: number,
+      nx: number, ny: number, nz: number,
+      twoSided: boolean,
+    ): [number, number, number, number] => {
+      const lux = surfaceLux(lit, wx, wz, wy, nx, nz, ny, twoSided);
+      const [r, g, b, a] = heatMapTarget > 0 ? luxToColorTarget(lux, heatMapTarget) : luxToColor(lux, heatScale);
+      return [r / 255, g / 255, b / 255, a / 255];
+    };
+
+    // Transparent vertex-coloured overlay from a triangle soup (world coords) +
+    // per-vertex normals — drapes heat values onto a surface, see-through where
+    // the surface is dark so the real object shows underneath.
+    const addHeatOverlay = (positions: number[], normals: number[], twoSided: boolean) => {
+      const n = positions.length / 3;
+      if (n === 0) return;
+      const colors = new Float32Array(n * 4);
+      let anyLit = false;
+      for (let i = 0; i < n; i++) {
+        const [r, g, b, a] = heatColorAt(
+          positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2],
+          normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2], twoSided,
+        );
+        colors[i * 4] = r; colors[i * 4 + 1] = g; colors[i * 4 + 2] = b; colors[i * 4 + 3] = a;
+        if (a > 0.004) anyLit = true;
+      }
+      if (!anyLit) return;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        vertexColors: true, transparent: true, depthWrite: false, toneMapped: false,
+        side: twoSided ? THREE.DoubleSide : THREE.FrontSide,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      }));
+      mesh.renderOrder = 2;
+      mesh.userData = { dynamic: true };
+      scene.add(mesh);
+    };
+
+    // Subdivide an (optionally rotated, optionally sloped) rectangular top into a
+    // grid and drape it. hFront/hBack let ramps slope from front (−d/2) to back.
+    const addRectTopHeat = (cx: number, cz: number, w: number, d: number, hFront: number, hBack: number, rotY: number) => {
+      const ni = Math.min(48, Math.max(1, Math.ceil(w / 0.3)));
+      const nj = Math.min(48, Math.max(1, Math.ceil(d / 0.3)));
+      const cosR = Math.cos(rotY), sinR = Math.sin(rotY);
+      const slope = (hBack - hFront) / Math.max(d, 1e-6);
+      const wx = (lx: number, lz: number) => cx + lx * cosR + lz * sinR;
+      const wz = (lx: number, lz: number) => cz - lx * sinR + lz * cosR;
+      const nlen = Math.hypot(1, slope);
+      const lnx = 0, lny = 1 / nlen, lnz = -slope / nlen; // local top normal
+      const nwx = lnx * cosR + lnz * sinR, nwz = -lnx * sinR + lnz * cosR;
+      const yAt = (lz: number) => hFront + (lz + d / 2) * slope;
+      const pos: number[] = [], nor: number[] = [];
+      const push = (lx: number, lz: number) => { pos.push(wx(lx, lz), yAt(lz), wz(lx, lz)); nor.push(nwx, lny, nwz); };
+      for (let i = 0; i < ni; i++) for (let j = 0; j < nj; j++) {
+        const x0 = -w / 2 + (w * i) / ni, x1 = -w / 2 + (w * (i + 1)) / ni;
+        const z0 = -d / 2 + (d * j) / nj, z1 = -d / 2 + (d * (j + 1)) / nj;
+        push(x0, z0); push(x1, z0); push(x1, z1);
+        push(x0, z0); push(x1, z1); push(x0, z1);
+      }
+      addHeatOverlay(pos, nor, false);
+    };
+
+    // Drape a horizontal polygon (free stage outline / ceiling) at a height.
+    const addPolyHeat = (points: { x: number; y: number }[], h: number, faceDown: boolean) => {
+      let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+      for (const p of points) { if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y < minZ) minZ = p.y; if (p.y > maxZ) maxZ = p.y; }
+      const ni = Math.min(64, Math.max(1, Math.ceil((maxX - minX) / 0.3)));
+      const nj = Math.min(64, Math.max(1, Math.ceil((maxZ - minZ) / 0.3)));
+      const ny = faceDown ? -1 : 1;
+      const pos: number[] = [], nor: number[] = [];
+      for (let i = 0; i < ni; i++) for (let j = 0; j < nj; j++) {
+        const x0 = minX + ((maxX - minX) * i) / ni, x1 = minX + ((maxX - minX) * (i + 1)) / ni;
+        const z0 = minZ + ((maxZ - minZ) * j) / nj, z1 = minZ + ((maxZ - minZ) * (j + 1)) / nj;
+        if (!pointInPolygon((x0 + x1) / 2, (z0 + z1) / 2, points)) continue;
+        pos.push(x0, h, z0, x1, h, z0, x1, h, z1, x0, h, z0, x1, h, z1, x0, h, z1);
+        for (let k = 0; k < 6; k++) nor.push(0, ny, 0);
+      }
+      addHeatOverlay(pos, nor, false);
+    };
+
+    // Drape a wall: subdivide along its (possibly curved) run × its height.
+    const addWallHeat = (w: Wall) => {
+      const pts = sampleWall(w, isCurved(w) ? 18 : 1);
+      const vj = Math.min(40, Math.max(1, Math.ceil(w.height / 0.3)));
+      const pos: number[] = [], nor: number[] = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+        if (segLen < 0.01) continue;
+        const nx = -(b.y - a.y) / segLen, nz = (b.x - a.x) / segLen; // horizontal normal
+        const ui = Math.min(40, Math.max(1, Math.ceil(segLen / 0.3)));
+        for (let s = 0; s < ui; s++) for (let t = 0; t < vj; t++) {
+          const sa = s / ui, sb = (s + 1) / ui;
+          const ya = (t * w.height) / vj, yb = ((t + 1) * w.height) / vj;
+          const ax = a.x + (b.x - a.x) * sa, az = a.y + (b.y - a.y) * sa;
+          const bx = a.x + (b.x - a.x) * sb, bz = a.y + (b.y - a.y) * sb;
+          pos.push(ax, ya, az, bx, ya, bz, bx, yb, bz, ax, ya, az, bx, yb, bz, ax, yb, az);
+          for (let k = 0; k < 6; k++) nor.push(nx, 0, nz);
+        }
+      }
+      addHeatOverlay(pos, nor, true);
+    };
+
+    // Paint a person's tessellated body (geometry already in world coords) with
+    // heat values per vertex — the head, closer to the lamp, reads a different
+    // value than the feet. Opaque with a dark fallback so the figure stays solid.
+    const paintFigureHeat = (geo: THREE.BufferGeometry, selId: string) => {
+      const posAttr = geo.getAttribute('position');
+      const normAttr = geo.getAttribute('normal');
+      const colors = new Float32Array(posAttr.count * 3);
+      for (let i = 0; i < posAttr.count; i++) {
+        const [r, g, b, a] = heatColorAt(
+          posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i),
+          normAttr.getX(i), normAttr.getY(i), normAttr.getZ(i), false,
+        );
+        if (a > 0.004) { colors[i * 3] = r; colors[i * 3 + 1] = g; colors[i * 3 + 2] = b; }
+        else { colors[i * 3] = 0.05; colors[i * 3 + 1] = 0.06; colors[i * 3 + 2] = 0.09; }
+      }
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
+      mesh.userData = { dynamic: true, selectId: selId };
+      scene.add(mesh);
+    };
+
+    // Floor heat-map (textured plane), sized to cover the whole rig.
+    if (heatOn) {
+      const pad = 4;
+      const hx0 = bMinX - pad, hz0 = bMinY - pad;
+      const hw = Math.max(8, (bMaxX - bMinX) + 2 * pad);
+      const hd = Math.max(8, (bMaxY - bMinY) + 2 * pad);
+      const hmRes = 180;
+      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls, ceilings);
+      heatScale = heatMapScale > 0 ? heatMapScale : (maxLux || 1000);
+
+      const canvas2d = document.createElement('canvas');
+      canvas2d.width = hmRes; canvas2d.height = hmRes;
+      const ctx = canvas2d.getContext('2d')!;
+      const imgData = ctx.createImageData(hmRes, hmRes);
+      for (let i = 0; i < hmRes * hmRes; i++) {
+        const [r, g, b, a] = heatMapTarget > 0 ? luxToColorTarget(data[i], heatMapTarget) : luxToColor(data[i], heatScale);
+        imgData.data[i * 4] = r; imgData.data[i * 4 + 1] = g; imgData.data[i * 4 + 2] = b; imgData.data[i * 4 + 3] = a;
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const hmTexture = new THREE.CanvasTexture(canvas2d);
+      hmTexture.minFilter = THREE.LinearFilter; hmTexture.magFilter = THREE.LinearFilter;
+      const hmMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(hw, hd),
+        new THREE.MeshBasicMaterial({ map: hmTexture, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+      );
+      hmMesh.rotation.x = -Math.PI / 2;
+      hmMesh.position.set(hx0 + hw / 2, 0.012, hz0 + hd / 2);
+      hmMesh.userData = { dynamic: true };
+      scene.add(hmMesh);
+    }
+
     // Imported building plan textured onto the floor (matches 2D placement)
     if (floorPlan && layers.floorPlan.visible) {
       const { offsetX, offsetY, widthMeters, heightMeters } = floorPlan;
@@ -383,6 +584,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         mesh.castShadow = true; mesh.receiveShadow = true;
         mesh.userData = { dynamic: true, selectId: se.id };
         scene.add(mesh);
+        if (heatOn) addPolyHeat(se.points, h, false);
         continue;
       }
 
@@ -423,6 +625,11 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       mesh.receiveShadow = true;
       mesh.userData = { dynamic: true, selectId: se.id };
       scene.add(mesh);
+      if (heatOn) {
+        const hF = Math.max(0.01, se.height);
+        const hB = isRamp ? Math.max(0.01, se.height2!) : hF;
+        addRectTopHeat(se.x + w / 2, se.y + d / 2, w, d, hF, hB, -(se.rotation * Math.PI) / 180);
+      }
     }
 
     // Trusses (rigging / hanging positions)
@@ -462,6 +669,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       mesh.castShadow = true; mesh.receiveShadow = true;
       mesh.userData = { dynamic: true, selectId: w.id };
       scene.add(mesh);
+      if (heatOn) addWallHeat(w);
     }
 
     // Ceilings (translucent horizontal polygon at height)
@@ -482,6 +690,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       }));
       mesh.userData = { dynamic: true, selectId: c.id };
       scene.add(mesh);
+      if (heatOn) addPolyHeat(c.points, c.height, true);
     }
 
     // Persons (cylinder body + sphere head)
@@ -496,6 +705,21 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         if (p.x >= se.x && p.x <= se.x + se.width && p.y >= se.y && p.y <= se.y + se.depth) {
           floorH = Math.max(floorH, se.height);
         }
+      }
+
+      // Heat-map drape: a tessellated figure coloured by the lux actually
+      // reaching each part of the body — the head, closer to the lamp, reads a
+      // different value than the feet. Takes precedence over the photo model so
+      // the values stay readable as data.
+      if (heatOn) {
+        const bodyH = p.height * 0.75, headR = p.height * 0.1;
+        const cyl = new THREE.CylinderGeometry(0.18, 0.2, bodyH, 16, 18);
+        cyl.translate(p.x, floorH + bodyH / 2, p.y);
+        paintFigureHeat(cyl, p.id);
+        const sph = new THREE.SphereGeometry(headR, 16, 14);
+        sph.translate(p.x, floorH + bodyH + headR, p.y);
+        paintFigureHeat(sph, p.id);
+        continue;
       }
 
       // Photo view: a real, photo-scanned casual human (its own PBR textures)
@@ -714,45 +938,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       scene.add(g);
     }
 
-    // ── 3D Heatmap on the ground, sized to cover the actual rig ──
-    if (showHeatMap && fixtures.length > 0 && hasContent) {
-      const pad = 4;
-      const hx0 = bMinX - pad, hz0 = bMinY - pad;
-      const hw = Math.max(8, (bMaxX - bMinX) + 2 * pad);
-      const hd = Math.max(8, (bMaxY - bMinY) + 2 * pad);
-      const hmRes = 180;
-      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls, ceilings);
-      const scale = heatMapScale > 0 ? heatMapScale : (maxLux || 1000);
-
-      const canvas2d = document.createElement('canvas');
-      canvas2d.width = hmRes;
-      canvas2d.height = hmRes;
-      const ctx = canvas2d.getContext('2d')!;
-      const imgData = ctx.createImageData(hmRes, hmRes);
-      for (let i = 0; i < hmRes * hmRes; i++) {
-        const [r, g, b, a] = heatMapTarget > 0
-          ? luxToColorTarget(data[i], heatMapTarget)
-          : luxToColor(data[i], scale);
-        imgData.data[i * 4] = r; imgData.data[i * 4 + 1] = g;
-        imgData.data[i * 4 + 2] = b; imgData.data[i * 4 + 3] = a;
-      }
-      ctx.putImageData(imgData, 0, 0);
-
-      const hmTexture = new THREE.CanvasTexture(canvas2d);
-      hmTexture.minFilter = THREE.LinearFilter;
-      hmTexture.magFilter = THREE.LinearFilter;
-
-      const hmMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(hw, hd),
-        new THREE.MeshBasicMaterial({ map: hmTexture, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
-      );
-      hmMesh.rotation.x = -Math.PI / 2;
-      // data row 0 = world y = hz0 (north); plane local +Y maps to world -Z
-      // after the −90° X-rotation, so the texture lines up with the grid.
-      hmMesh.position.set(hx0 + hw / 2, 0.012, hz0 + hd / 2);
-      hmMesh.userData = { dynamic: true };
-      scene.add(hmMesh);
-    }
+    // (The floor heat-map plane is built up front in the "Heat-map foundation"
+    //  block so the surface drape can share its lux scale.)
 
     // ── Dimension annotations (Maßlinien) ──
     // Add size labels for stage elements

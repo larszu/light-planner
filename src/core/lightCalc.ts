@@ -397,6 +397,42 @@ function beamIntensityToward(f: PlacedFixture, px: number, py: number, pz: numbe
   return I;
 }
 
+/**
+ * Direct illuminance (lux) on an oriented surface patch at an arbitrary 3D
+ * point — the same beam model (Gaussian + barn doors + gel + inverse-square +
+ * cosine of incidence) the floor heat-map uses, but for surfaces that are NOT
+ * the floor: a podium top at its real height, a vertical wall, a person's body.
+ *
+ * This lets the heat-map be draped over the actual 3D geometry with physically
+ * correct values — a head closer to the lamp reads brighter than the floor, a
+ * wall standing in the beam shows the beam at the height it actually hits, etc.
+ *
+ * Coordinates are the lighting engine's plan space: (x, y) on the floor plan
+ * and z = height above the floor. (nx,ny,nz) is the surface unit normal;
+ * `twoSided` lights the patch from either face (walls). Muted lamps are skipped.
+ * Bounce/ambient is not included here (that's a floor-only refinement).
+ */
+export function surfaceLux(
+  fixtures: PlacedFixture[],
+  x: number, y: number, z: number,
+  nx: number, ny: number, nz: number,
+  twoSided = false,
+): number {
+  let E = 0;
+  for (const f of fixtures) {
+    if (f.hidden) continue;
+    const I = beamIntensityToward(f, x, y, z);
+    if (I <= 0) continue;
+    const rx = x - f.x, ry = y - f.y, rz = z - f.mountingHeight; // fixture → point
+    const d2 = rx * rx + ry * ry + rz * rz; const d = Math.sqrt(d2) || 1e-6;
+    const dot = (rx / d) * nx + (ry / d) * ny + (rz / d) * nz;
+    const cosInc = twoSided ? Math.abs(dot) : Math.max(0, -dot); // light onto the lit face
+    if (cosInc <= 0) continue;
+    E += (I * cosInc) / d2;
+  }
+  return E;
+}
+
 // A small reflecting surface patch with its pre-computed reflected exitance.
 // Normal (nx,ny,nz); walls are double-sided, ceilings face down.
 export interface WallSample { x: number; y: number; z: number; nx: number; ny: number; nz: number; m: number; dA: number; twoSided: boolean }

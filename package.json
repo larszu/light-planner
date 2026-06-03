@@ -47,6 +47,9 @@
       ],
       "icon": "build/icon.png"
     },
+    "portable": {
+      "artifactName": "Light-Planner-Portable-${version}.${ext}"
+    },
     "mac": {
       "target": [
         {
@@ -58,13 +61,15 @@
         }
       ],
       "category": "public.app-category.graphics-design",
-      "identity": null
+      "identity": null,
+      "artifactName": "Light-Planner-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": true,
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "Light-Planner-Setup-${version}.${ext}"
     }
   }
 }
