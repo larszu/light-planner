@@ -24,13 +24,14 @@ function applySitPose(root: THREE.Object3D) {
     const b = root.getObjectByName(name);
     if (b) { b.rotation.x += x; b.rotation.y += y; b.rotation.z += z; }
   };
-  // Hip flexion forward to ~horizontal (+X), knees drop the shins down, feet flat,
-  // gentle forward lean + relaxed arms. Verified against the bundled avatar in
-  // the pose harness (scripts/pose-tune.mjs).
-  rot('LeftUpLeg', 1.45, 0, 0.12);
-  rot('RightUpLeg', 1.45, 0, -0.12);
-  rot('LeftLeg', 1.55);
-  rot('RightLeg', 1.55);
+  // Anatomically: hips flex the thighs forward (toward where the chest/face
+  // point) and the knees drop the shins straight down — both on this rig need a
+  // negative X (a positive X sat the figure on backwards, legs trailing behind).
+  // Feet flat, gentle lean, hands resting. Verified in the pose harness.
+  rot('LeftUpLeg', -1.45, 0, 0.12);
+  rot('RightUpLeg', -1.45, 0, -0.12);
+  rot('LeftLeg', -1.55);
+  rot('RightLeg', -1.55);
   rot('LeftFoot', 0.2);
   rot('RightFoot', 0.2);
   rot('Spine', 0.06);
@@ -110,6 +111,12 @@ function loadPersonModel(): Promise<PersonModel> {
           m.needsUpdate = true;
         });
       });
+      // Strip the bundled avatar's novelty "Reindeer Glasses" accessory — a
+      // single mesh that carries the glasses, the red nose and the antlers.
+      // Removed before measuring height so the antlers don't inflate it.
+      const accessories: THREE.Object3D[] = [];
+      scene.traverse((o) => { if (/glasses/i.test(o.name)) accessories.push(o); });
+      accessories.forEach((o) => o.parent?.remove(o));
       scene.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(scene);
       return { scene, height: Math.max(0.1, box.max.y - box.min.y), minY: box.min.y };
