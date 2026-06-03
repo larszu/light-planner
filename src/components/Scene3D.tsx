@@ -15,7 +15,7 @@ import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
-const LIGHT_K = 0.0016;
+const LIGHT_K = 0.005;
 
 // Bend the standard (Mixamo/RPM) skeleton into a seated pose: thighs forward,
 // knees bent, slight forward lean + arms resting. Tuned for the bundled avatar.
@@ -235,16 +235,17 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     pmrem.compileEquirectangularShader();
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = env;
-    scene.environmentIntensity = photoModeRef.current ? 0.32 : 0;
+    scene.environmentIntensity = photoModeRef.current ? 0.18 : 0;
 
-    // Lighting. Photo mode keeps a gentle sky/ground hemisphere fill plus the
-    // IBL above so the scene has believable ambience, while the fixtures
-    // dominate and cast the real shadows; the flat ambient/key stay low.
-    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? 0.12 : 0.5);
+    // Lighting. Photo mode keeps a low sky/ground hemisphere fill plus a little
+    // IBL so unlit faces aren't pure black — but kept dim on purpose so the
+    // fixtures dominate, the floor pools read with real brightness falloff and
+    // the cast shadows stay visible (high contrast = lit vs not).
+    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? 0.07 : 0.5);
     scene.add(ambient);
-    const hemi = new THREE.HemisphereLight('#556688', '#14141c', photoModeRef.current ? 0.85 : 0.0);
+    const hemi = new THREE.HemisphereLight('#556688', '#14141c', photoModeRef.current ? 0.40 : 0.0);
     scene.add(hemi);
-    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.12 : 0.3);
+    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.07 : 0.3);
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
@@ -411,10 +412,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     if (!s) return;
     s.renderer.toneMapping = photoMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     s.renderer.toneMappingExposure = exposure;
-    s.ambient.intensity = photoMode ? 0.12 : 0.5;
-    s.hemi.intensity = photoMode ? 0.85 : 0.0;
-    s.dir.intensity = photoMode ? 0.12 : 0.3;
-    s.scene.environmentIntensity = photoMode ? 0.32 : 0;
+    s.ambient.intensity = photoMode ? 0.07 : 0.5;
+    s.hemi.intensity = photoMode ? 0.40 : 0.0;
+    s.dir.intensity = photoMode ? 0.07 : 0.3;
+    s.scene.environmentIntensity = photoMode ? 0.18 : 0;
     s.grid.visible = !photoMode;
     (s.ground.material as THREE.MeshStandardMaterial).color.set(photoMode ? '#313139' : '#222238');
     const bg = photoMode ? '#15151c' : '#1a1a2e';
