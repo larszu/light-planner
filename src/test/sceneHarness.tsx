@@ -92,6 +92,7 @@ function Harness() {
         exposure={exposure}
         haze={haze}
         onSelect={() => {}}
+        onHoverLux={(lx) => { (window as Window & typeof globalThis & { __lpLux?: number | null }).__lpLux = lx; }}
       />
     </div>
   );

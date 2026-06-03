@@ -90,6 +90,38 @@ await sleep(2500);
 await page.screenshot({ path: `${OUT}/05-heatmap-top.png` });
 console.log('shot 05-heatmap-top');
 
+// Close-ups of the SITTING person (p2 at 7.4,6.6, facing −y) to check the pose.
+await page.evaluate(() => window.__lp.setMode({ photo: true, heatmap: false }));
+await sleep(500);
+await page.evaluate(() => window.__lp.lookAt({ x: 7.4, y: 4.3, height: 1.0, aimX: 7.4, aimY: 6.6, fov: 38 }));
+await sleep(3500);
+await page.screenshot({ path: `${OUT}/06-sit-front.png` });
+console.log('shot 06-sit-front');
+await page.evaluate(() => window.__lp.lookAt({ x: 9.6, y: 6.6, height: 1.0, aimX: 7.4, aimY: 6.6, fov: 38 }));
+await sleep(1500);
+await page.screenshot({ path: `${OUT}/07-sit-side.png` });
+console.log('shot 07-sit-side');
+
+// ── Live lux readout test: dispatch pointermove over a few screen points in
+//    heat-map mode and read back the value Scene3D reports via onHoverLux. ──
+await page.evaluate(() => window.__lp.setMode({ photo: false, heatmap: true }));
+await sleep(300);
+await page.evaluate(() => window.__lp.lookAt({ x: 6, y: 6.4, height: 13, aimX: 6, aimY: 6.401, fov: 55 }));
+await sleep(1500);
+async function luxAt(px, py) {
+  await page.evaluate(({ x, y }) => {
+    const cv = document.querySelector('canvas');
+    const r = cv.getBoundingClientRect();
+    cv.dispatchEvent(new PointerEvent('pointermove', { clientX: r.left + x, clientY: r.top + y, bubbles: true }));
+  }, { x: px, y: py });
+  await sleep(120);
+  return page.evaluate(() => window.__lpLux ?? null);
+}
+const cx = 640, cy = 400;
+console.log('lux@center(floor/podium):', await luxAt(cx, cy));
+console.log('lux@floor-edge:', await luxAt(cx, cy + 230));
+console.log('lux@offstage(dark):', await luxAt(40, 60));
+
 writeFileSync(`${OUT}/console.log`, logs.join('\n'));
 console.log('\n--- page console (tail) ---');
 console.log(logs.slice(-40).join('\n'));

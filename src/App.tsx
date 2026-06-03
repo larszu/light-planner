@@ -195,7 +195,7 @@ const App: React.FC = () => {
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
   }, []);
-  useEffect(() => { if (viewMode === '3d') setPlanMode('none'); }, [viewMode]);
+  useEffect(() => { if (viewMode === '3d') setPlanMode('none'); setCursorLux(null); }, [viewMode]);
 
   // Switching to any drawing/placement tool cancels a pending fixture drop,
   // so the tool isn't swallowed by the place-on-click handler.
@@ -1208,10 +1208,11 @@ const App: React.FC = () => {
                 exposure={exposure}
                 haze={haze}
                 onSelect={handleSelectWithGroups}
+                onHoverLux={setCursorLux}
               />
             </Suspense>
           )}
-          {cursorLux !== null && viewMode === '2d' && (
+          {cursorLux !== null && (
             <div className="cursor-lux-display">{Math.round(cursorLux)} lx</div>
           )}
           {fixtureToPlace && viewMode === '2d' && (
