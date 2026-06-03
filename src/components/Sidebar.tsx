@@ -41,7 +41,7 @@ const Sidebar: React.FC<Props> = ({
   onSelectFixtureToPlace,
 }) => {
   const [search, setSearch] = useState('');
-  const [expandedCat, setExpandedCat] = useState<FixtureCategory | null>('profile');
+  const [expandedCat, setExpandedCat] = useState<FixtureCategory | null>(null); // all categories collapsed by default
   const [showEditor, setShowEditor] = useState(false);
 
   const allFixtures = [...fixtureLibrary, ...customFixtures];
