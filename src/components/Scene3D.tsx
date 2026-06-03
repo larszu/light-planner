@@ -17,34 +17,33 @@ import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
 const LIGHT_K = 0.005;
 
-// ── Volumetric haze-beam shader (photo view) ─────────────────────────────────
-// A real light "cone" isn't a solid shape — you only see light *scattered by
-// haze in the air*. So instead of a flat translucent cone we additively render
-// the cone shell with: a grazing/Fresnel term (only the silhouette of the shaft
-// glows; looking straight through it, it's nearly invisible — just like reality),
-// an axial falloff (denser near the lamp, fading toward the floor), a soft tip,
-// and an overall density driven entirely by the haze slider (haze 0 ⇒ nothing).
+// ── Volumetric haze-beam billboard (photo view) ──────────────────────────────
+// A real beam in haze reads as a *smooth, filled* shaft: bright core, soft edges,
+// denser near the lamp. We render one camera-facing quad per beam (oriented along
+// the beam axis, rolled to face the camera each frame) and evaluate the beam's
+// own Gaussian cross-section procedurally in the fragment — a continuous gradient,
+// so no shells/rings. Density is driven entirely by the haze slider (0 ⇒ none).
 const BEAM_VERT = /* glsl */`
-  varying vec3 vView; varying vec3 vNrm; varying float vT;
-  uniform float uHeight;
+  varying vec2 vUv;
   void main() {
-    vec4 wp = modelMatrix * vec4(position, 1.0);
-    vView = cameraPosition - wp.xyz;
-    vNrm = mat3(modelMatrix) * normal;
-    vT = clamp(-position.y / uHeight, 0.0, 1.0); // 0 at apex (lamp) → 1 at floor
-    gl_Position = projectionMatrix * viewMatrix * wp;
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }`;
 const BEAM_FRAG = /* glsl */`
   precision mediump float;
-  varying vec3 vView; varying vec3 vNrm; varying float vT;
-  uniform vec3 uColor; uniform float uHaze; uniform float uIntensity; uniform float uTipFade;
+  varying vec2 vUv;
+  uniform vec3 uColor; uniform float uHaze; uniform float uIntensity;
+  uniform float uHeight; uniform float uHalfWidth; uniform float uSigma; uniform float uTipFade;
   void main() {
-    float graze = 1.0 - abs(dot(normalize(vView), normalize(vNrm)));
-    graze = pow(clamp(graze, 0.0, 1.0), 3.0);          // hollow shaft: mainly the silhouette glows
-    float tip = smoothstep(0.0, uTipFade, vT);          // soft fade-in at the lens
-    float axial = tip / (1.0 + 5.0 * vT * vT);          // ~1/d² scatter, brightest near the lamp
-    float a = graze * axial * uIntensity * uHaze * 2.3; // haze drives overall density
-    if (a < 0.0025) discard;
+    float v = vUv.y;                                    // 0 at apex (lamp) → 1 at floor
+    float off = abs(vUv.x - 0.5) * 2.0 * uHalfWidth;    // off-axis distance (world)
+    float axialDist = max(v * uHeight, 0.03);
+    float theta = atan(off / axialDist);                // off-axis angle → narrows toward the lamp
+    float g = exp(-(theta * theta) / (2.0 * uSigma * uSigma));
+    float tip = smoothstep(0.0, uTipFade, v);           // soft fade-in at the lens
+    float axs = 1.0 / (1.0 + 5.0 * v * v);              // ~1/d² scatter, brightest near the lamp
+    float a = g * tip * axs * uHaze * uIntensity;
+    if (a < 0.003) discard;
     gl_FragColor = vec4(uColor, a);
   }`;
 
@@ -246,6 +245,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
   const litRef = useRef<PlacedFixture[]>([]);
   const onHoverLuxRef = useRef(onHoverLux);
   onHoverLuxRef.current = onHoverLux;
+  // Camera-facing haze-beam billboards, re-rolled toward the camera each frame.
+  const beamBillboardsRef = useRef<THREE.Mesh[]>([]);
   // Real human model for the photo view (lazy-loaded on first use).
   const [personModel, setPersonModel] = React.useState<PersonModel | null>(null);
   useEffect(() => {
@@ -377,10 +378,30 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       }
     };
 
+    // Roll each haze-beam billboard around its beam axis so its flat face points
+    // at the camera (cylindrical billboard) — keeps the shaft readable from any
+    // orbit while the smooth Gaussian cross-section does the volumetric look.
+    const _bv = new THREE.Vector3(), _bn = new THREE.Vector3(), _br = new THREE.Vector3(), _bm = new THREE.Matrix4();
+    const updateBeamBillboards = () => {
+      const arr = beamBillboardsRef.current;
+      for (let i = 0; i < arr.length; i++) {
+        const b = arr[i];
+        const center = b.userData.beamCenter as THREE.Vector3;
+        const axis = b.userData.beamAxis as THREE.Vector3;
+        _bv.copy(camera.position).sub(center);
+        _bn.copy(_bv).addScaledVector(axis, -_bv.dot(axis)); // view dir ⟂ to the axis
+        if (_bn.lengthSq() < 1e-6) _bn.set(1, 0, 0); else _bn.normalize();
+        _br.crossVectors(axis, _bn).normalize();
+        _bm.makeBasis(_br, axis, _bn); // local x=right, y=beam axis, z=face normal
+        b.quaternion.setFromRotationMatrix(_bm);
+      }
+    };
+
     const animate = () => {
       sceneRef.current!.animId = requestAnimationFrame(animate);
       applyWASD();
       controls.update();
+      updateBeamBillboards();
       if (photoModeRef.current) {
         renderer.toneMappingExposure = exposureRef.current;
         composer.render();
@@ -535,6 +556,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     // people can be draped on the *same* scale as the floor legend.
     const lit = fixtures.filter((f) => !f.hidden);
     litRef.current = lit; // keep the pointer handler's lux readout fresh
+    beamBillboardsRef.current = []; // rebuilt below; old quads die with their groups
     const heatOn = showHeatMap && lit.length > 0 && hasContent;
     let heatScale = 1000;
 
@@ -1092,21 +1114,28 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       // In the photo view a beam is only visible where there's haze in the air
       // (just like reality) – the shaft fades out as haze → 0.
       if (!hidden && coneHeight > 0.1 && (!photoMode || haze > 0.01)) {
-        const coneGeo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
-        // Shift geometry so tip is at local origin (tip at y=+h/2, base at y=-h/2)
-        coneGeo.translate(0, -coneHeight / 2, 0);
+        const coneDirNorm = coneVec.clone().normalize();
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), coneDirNorm);
+        const beamColor = isSel ? new THREE.Color('#ffcc33') : new THREE.Color(getBeamColorHex(f));
 
-        // Photo view: a physically-motivated haze shaft (only scattered light is
-        // visible — see BEAM_FRAG). Otherwise (technical 3D) a faint solid cone as
-        // a beam-coverage indicator.
-        const coneMat: THREE.Material = photoMode
-          ? new THREE.ShaderMaterial({
+        if (photoMode) {
+          // One camera-facing billboard with a smooth Gaussian cross-section
+          // (see BEAM_FRAG): bright core, soft edge, denser near the lamp — no
+          // shells/rings. Rolled toward the camera each frame in the animate loop.
+          const fieldHalfRad = (fieldAngle / 2) * (Math.PI / 180);
+          const halfWidth = Math.tan(Math.min(Math.PI / 2.1, fieldHalfRad)) * coneHeight * 1.15; // incl. a little soft tail
+          const center = fixturePos.clone().add(coneDirNorm.clone().multiplyScalar(coneHeight / 2));
+          const quad = new THREE.Mesh(
+            new THREE.PlaneGeometry(1, 1),
+            new THREE.ShaderMaterial({
               uniforms: {
-                uColor: { value: isSel ? new THREE.Color('#ffcc33') : new THREE.Color(getBeamColorHex(f)) },
+                uColor: { value: beamColor },
                 uHaze: { value: haze },
-                uIntensity: { value: 0.4 + 0.6 * (f.dimming / 100) },
-                uTipFade: { value: 0.08 },
+                uIntensity: { value: 1.4 + 1.4 * (f.dimming / 100) },
                 uHeight: { value: coneHeight },
+                uHalfWidth: { value: halfWidth },
+                uSigma: { value: fieldHalfRad / Math.sqrt(2 * Math.LN10) },
+                uTipFade: { value: 0.06 },
               },
               vertexShader: BEAM_VERT,
               fragmentShader: BEAM_FRAG,
@@ -1114,27 +1143,30 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
               depthWrite: false,
               side: THREE.DoubleSide,
               blending: THREE.AdditiveBlending,
-            })
-          : new THREE.MeshBasicMaterial({
-              color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
-              transparent: true,
-              opacity: isSel ? Math.max(dimOpacity, 0.02) : dimOpacity,
-              side: THREE.DoubleSide,
-              depthWrite: false,
-              blending: THREE.NormalBlending,
-            });
-        const cone = new THREE.Mesh(coneGeo, coneMat);
-        cone.userData = { noPick: true }; // don't let the beam shaft swallow the lux pick
-        cone.position.copy(fixturePos);
-
-        // Orient: local -Y (base direction) should point toward aim
-        const coneDirNorm = coneVec.clone().normalize();
-        const quat = new THREE.Quaternion().setFromUnitVectors(
-          new THREE.Vector3(0, -1, 0),
-          coneDirNorm,
-        );
-        cone.setRotationFromQuaternion(quat);
-        group.add(cone);
+            }),
+          );
+          quad.scale.set(2 * halfWidth, coneHeight, 1);
+          quad.position.copy(center);
+          quad.userData = { noPick: true, beamCenter: center.clone(), beamAxis: coneDirNorm.clone() };
+          group.add(quad);
+          beamBillboardsRef.current.push(quad);
+        } else {
+          // Technical 3D: a faint solid cone as a beam-coverage indicator.
+          const geo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
+          geo.translate(0, -coneHeight / 2, 0);
+          const cone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            color: beamColor,
+            transparent: true,
+            opacity: isSel ? Math.max(dimOpacity, 0.02) : dimOpacity,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.NormalBlending,
+          }));
+          cone.userData = { noPick: true };
+          cone.position.copy(fixturePos);
+          cone.setRotationFromQuaternion(quat);
+          group.add(cone);
+        }
       }
 
       // Photo mode: a real spotlight from this fixture → genuine shadows on
