@@ -17,32 +17,53 @@ import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
 const LIGHT_K = 0.005;
 
-// ── Volumetric haze-beam billboard (photo view) ──────────────────────────────
-// A real beam in haze reads as a *smooth, filled* shaft: bright core, soft edges,
-// denser near the lamp. We render one camera-facing quad per beam (oriented along
-// the beam axis, rolled to face the camera each frame) and evaluate the beam's
-// own Gaussian cross-section procedurally in the fragment — a continuous gradient,
-// so no shells/rings. Density is driven entirely by the haze slider (0 ⇒ none).
+// ── Volumetric haze-beam shader (photo view, raymarched) ─────────────────────
+// A real beam in haze is light scattered through the beam *volume*, so the eye
+// integrates a bright core with soft edges. We render the bounding cone's near
+// wall and raymarch the view ray forward through the cone, integrating the beam's
+// own Gaussian radial profile (10 % at the field angle — the σ the heat-map uses)
+// with a ~1/d² scatter that's denser near the lamp. A per-pixel jitter hides the
+// step count. Density is driven entirely by the haze slider (haze 0 ⇒ nothing).
 const BEAM_VERT = /* glsl */`
-  varying vec2 vUv;
+  varying vec3 vWorldPos;
   void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
   }`;
 const BEAM_FRAG = /* glsl */`
-  precision mediump float;
-  varying vec2 vUv;
-  uniform vec3 uColor; uniform float uHaze; uniform float uIntensity;
-  uniform float uHeight; uniform float uHalfWidth; uniform float uSigma; uniform float uTipFade;
+  precision highp float;
+  varying vec3 vWorldPos;
+  uniform vec3 uApex;     // lamp position (world)
+  uniform vec3 uDir;      // unit axis apex→aim (world)
+  uniform float uHeight;  // apex→floor distance
+  uniform float uSigma;   // Gaussian σ (rad), anchored on the field angle
+  uniform vec3 uColor; uniform float uHaze; uniform float uIntensity; uniform float uTipFade; uniform float uGain;
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(41.31, 289.07))) * 43758.5453); }
   void main() {
-    float v = vUv.y;                                    // 0 at apex (lamp) → 1 at floor
-    float off = abs(vUv.x - 0.5) * 2.0 * uHalfWidth;    // off-axis distance (world)
-    float axialDist = max(v * uHeight, 0.03);
-    float theta = atan(off / axialDist);                // off-axis angle → narrows toward the lamp
-    float g = exp(-(theta * theta) / (2.0 * uSigma * uSigma));
-    float tip = smoothstep(0.0, uTipFade, v);           // soft fade-in at the lens
-    float axs = 1.0 / (1.0 + 5.0 * v * v);              // ~1/d² scatter, brightest near the lamp
-    float a = g * tip * axs * uHaze * uIntensity;
+    vec3 ro = cameraPosition;
+    vec3 rd = normalize(vWorldPos - ro);
+    float entry = length(vWorldPos - ro);     // near wall (FrontSide)
+    const int STEPS = 22;
+    float step = uHeight / float(STEPS);
+    float jitter = hash(gl_FragCoord.xy) * step;
+    float acc = 0.0;
+    for (int i = 0; i < STEPS; i++) {
+      vec3 P = ro + rd * (entry + jitter + float(i) * step);
+      vec3 toP = P - uApex;
+      float axial = dot(toP, uDir);            // along the beam axis
+      if (axial < 0.0 || axial > uHeight) continue;
+      float radial = length(toP - uDir * axial);
+      float theta = atan(radial / max(axial, 0.03));
+      float g = exp(-(theta * theta) / (2.0 * uSigma * uSigma));
+      float tip = smoothstep(0.0, uTipFade * uHeight, axial);
+      float t = axial / uHeight;
+      acc += g * tip / (1.0 + 5.0 * t * t);     // ~1/d² scatter, brightest near the lamp
+    }
+    // Beer–Lambert saturation: keeps a side view visible while a near-axial view
+    // (long path through the core) saturates softly instead of blowing out.
+    float dens = acc * step * uHaze * uIntensity * uGain;
+    float a = (1.0 - exp(-dens)) * 0.85;
     if (a < 0.003) discard;
     gl_FragColor = vec4(uColor, a);
   }`;
@@ -245,8 +266,6 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
   const litRef = useRef<PlacedFixture[]>([]);
   const onHoverLuxRef = useRef(onHoverLux);
   onHoverLuxRef.current = onHoverLux;
-  // Camera-facing haze-beam billboards, re-rolled toward the camera each frame.
-  const beamBillboardsRef = useRef<THREE.Mesh[]>([]);
   // Real human model for the photo view (lazy-loaded on first use).
   const [personModel, setPersonModel] = React.useState<PersonModel | null>(null);
   useEffect(() => {
@@ -378,30 +397,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       }
     };
 
-    // Roll each haze-beam billboard around its beam axis so its flat face points
-    // at the camera (cylindrical billboard) — keeps the shaft readable from any
-    // orbit while the smooth Gaussian cross-section does the volumetric look.
-    const _bv = new THREE.Vector3(), _bn = new THREE.Vector3(), _br = new THREE.Vector3(), _bm = new THREE.Matrix4();
-    const updateBeamBillboards = () => {
-      const arr = beamBillboardsRef.current;
-      for (let i = 0; i < arr.length; i++) {
-        const b = arr[i];
-        const center = b.userData.beamCenter as THREE.Vector3;
-        const axis = b.userData.beamAxis as THREE.Vector3;
-        _bv.copy(camera.position).sub(center);
-        _bn.copy(_bv).addScaledVector(axis, -_bv.dot(axis)); // view dir ⟂ to the axis
-        if (_bn.lengthSq() < 1e-6) _bn.set(1, 0, 0); else _bn.normalize();
-        _br.crossVectors(axis, _bn).normalize();
-        _bm.makeBasis(_br, axis, _bn); // local x=right, y=beam axis, z=face normal
-        b.quaternion.setFromRotationMatrix(_bm);
-      }
-    };
-
     const animate = () => {
       sceneRef.current!.animId = requestAnimationFrame(animate);
       applyWASD();
       controls.update();
-      updateBeamBillboards();
       if (photoModeRef.current) {
         renderer.toneMappingExposure = exposureRef.current;
         composer.render();
@@ -556,7 +555,6 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     // people can be draped on the *same* scale as the floor legend.
     const lit = fixtures.filter((f) => !f.hidden);
     litRef.current = lit; // keep the pointer handler's lux readout fresh
-    beamBillboardsRef.current = []; // rebuilt below; old quads die with their groups
     const heatOn = showHeatMap && lit.length > 0 && hasContent;
     let heatScale = 1000;
 
@@ -1112,44 +1110,46 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
       // In the photo view a beam is only visible where there's haze in the air
-      // (just like reality) – the shaft fades out as haze → 0.
-      if (!hidden && coneHeight > 0.1 && (!photoMode || haze > 0.01)) {
+      // (just like reality) – the shaft fades out as haze → 0. The raymarched
+      // shaft is also capped to the brightest fixtures (litIds, ≤24) so a huge
+      // rig can't tank the GPU; haze 0 disables all beams (zero cost).
+      if (!hidden && coneHeight > 0.1 && (photoMode ? (haze > 0.01 && litIds.has(f.id)) : true)) {
         const coneDirNorm = coneVec.clone().normalize();
         const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), coneDirNorm);
         const beamColor = isSel ? new THREE.Color('#ffcc33') : new THREE.Color(getBeamColorHex(f));
 
         if (photoMode) {
-          // One camera-facing billboard with a smooth Gaussian cross-section
-          // (see BEAM_FRAG): bright core, soft edge, denser near the lamp — no
-          // shells/rings. Rolled toward the camera each frame in the animate loop.
+          // True volumetric shaft, raymarched in BEAM_FRAG. The bounding cone is
+          // a touch wider than the field angle so the Gaussian tail fades out
+          // *inside* it (no hard rim); closed + FrontSide so the near wall always
+          // gives the march a start point.
           const fieldHalfRad = (fieldAngle / 2) * (Math.PI / 180);
-          const halfWidth = Math.tan(Math.min(Math.PI / 2.1, fieldHalfRad)) * coneHeight * 1.15; // incl. a little soft tail
-          const center = fixturePos.clone().add(coneDirNorm.clone().multiplyScalar(coneHeight / 2));
-          const quad = new THREE.Mesh(
-            new THREE.PlaneGeometry(1, 1),
-            new THREE.ShaderMaterial({
-              uniforms: {
-                uColor: { value: beamColor },
-                uHaze: { value: haze },
-                uIntensity: { value: 1.4 + 1.4 * (f.dimming / 100) },
-                uHeight: { value: coneHeight },
-                uHalfWidth: { value: halfWidth },
-                uSigma: { value: fieldHalfRad / Math.sqrt(2 * Math.LN10) },
-                uTipFade: { value: 0.06 },
-              },
-              vertexShader: BEAM_VERT,
-              fragmentShader: BEAM_FRAG,
-              transparent: true,
-              depthWrite: false,
-              side: THREE.DoubleSide,
-              blending: THREE.AdditiveBlending,
-            }),
-          );
-          quad.scale.set(2 * halfWidth, coneHeight, 1);
-          quad.position.copy(center);
-          quad.userData = { noPick: true, beamCenter: center.clone(), beamAxis: coneDirNorm.clone() };
-          group.add(quad);
-          beamBillboardsRef.current.push(quad);
+          const halfA = Math.min(Math.PI / 2.1, fieldHalfRad * 1.45);
+          const geo = new THREE.ConeGeometry(Math.tan(halfA) * coneHeight, coneHeight, 40, 1, false);
+          geo.translate(0, -coneHeight / 2, 0);
+          const cone = new THREE.Mesh(geo, new THREE.ShaderMaterial({
+            uniforms: {
+              uApex: { value: fixturePos.clone() },
+              uDir: { value: coneDirNorm.clone() },
+              uHeight: { value: coneHeight },
+              uSigma: { value: fieldHalfRad / Math.sqrt(2 * Math.LN10) },
+              uColor: { value: beamColor },
+              uHaze: { value: haze },
+              uIntensity: { value: 0.7 + 0.3 * (f.dimming / 100) },
+              uTipFade: { value: 0.05 },
+              uGain: { value: 3.5 },
+            },
+            vertexShader: BEAM_VERT,
+            fragmentShader: BEAM_FRAG,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.FrontSide,
+            blending: THREE.AdditiveBlending,
+          }));
+          cone.userData = { noPick: true };
+          cone.position.copy(fixturePos);
+          cone.setRotationFromQuaternion(quat);
+          group.add(cone);
         } else {
           // Technical 3D: a faint solid cone as a beam-coverage indicator.
           const geo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
