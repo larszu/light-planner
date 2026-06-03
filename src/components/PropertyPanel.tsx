@@ -84,13 +84,24 @@ const PropertyPanel: React.FC<Props> = ({
   const [showSpecs, setShowSpecs] = React.useState(true);
   const [barnHelp, setBarnHelp] = React.useState(false);
 
-  const numField = (label: string, value: number, onChange: (v: number) => void, step = 0.1, min?: number, max?: number) => (
-    <label className="prop-field">
-      <span>{label}</span>
-      <input type="number" value={value} step={step} min={min} max={max}
-        onChange={(e) => onChange(Number(e.target.value))} />
-    </label>
-  );
+  const numField = (label: string, value: number, onChange: (v: number) => void, step = 0.1, min?: number, max?: number) => {
+    const clamp = (v: number) => {
+      if (min != null && v < min) v = min;
+      if (max != null && v > max) v = max;
+      return Math.round(v * 1000) / 1000; // tame float error from ± step
+    };
+    return (
+      <label className="prop-field prop-pos-field">
+        <span>{label}</span>
+        <div className="pos-nudge-group">
+          <button type="button" className="nudge-btn" onClick={() => onChange(clamp(value - step))}>◀</button>
+          <input type="number" value={value} step={step} min={min} max={max}
+            onChange={(e) => onChange(Number(e.target.value))} />
+          <button type="button" className="nudge-btn" onClick={() => onChange(clamp(value + step))}>▶</button>
+        </div>
+      </label>
+    );
+  };
 
   if (selFixture) {
     const f = selFixture;
