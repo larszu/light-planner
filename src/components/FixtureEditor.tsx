@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Fixture, FixtureCategory, BeamShape, LensType, MountType } from '../types';
 import { extractFixtureSpecs, AI_MODELS, type ExtractedFields, type VerificationItem } from '../utils/aiExtract';
+import { useHost } from '../integration/hostContext';
 
 interface Props {
   onSave: (fixture: Fixture) => void;
