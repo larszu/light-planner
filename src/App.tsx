@@ -1,15 +1,16 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView } from './types';
 import { convexHull } from './core/geometry';
-import Toolbar from './components/Toolbar';
-import Sidebar from './components/Sidebar';
+import TopBar from './components/TopBar';
+import ToolRail from './components/ToolRail';
+import Dock from './components/Dock';
+import StatusBar from './components/StatusBar';
+import CanvasActions from './components/CanvasActions';
 import PlanCanvas from './components/PlanCanvas';
 import PropertyPanel from './components/PropertyPanel';
 import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import FloorPlanPanel from './components/FloorPlanPanel';
-import ScenePanel from './components/ScenePanel';
-import LayersPanel from './components/LayersPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
 import { autoPatch, findPatchConflicts } from './core/patch';
@@ -19,7 +20,6 @@ import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
 import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
-import MenuBar from './components/MenuBar';
 import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
@@ -1057,6 +1057,16 @@ const App: React.FC = () => {
     walls: walls.length, floorPlan: floorPlan ? 1 : 0,
   };
 
+  // Top-bar mode switch: 2D plan / 3D / Foto (= 3D + photo relight).
+  const handleSetMode = useCallback((m: '2d' | '3d' | 'photo') => {
+    if (m === '2d') { setViewMode('2d'); return; }
+    setViewMode('3d');
+    if (m === 'photo' && !photoMode) togglePhotoMode();
+    else if (m === '3d' && photoMode) togglePhotoMode();
+  }, [setViewMode, photoMode, togglePhotoMode]);
+
+  const activeSceneName = scenes.find((s) => s.id === activeSceneId)?.name ?? null;
+
   // Publish the live lighting document to the zustand projectStore so a host
   // (Cable-Planner) can read/subscribe to the current plan (e.g. pull fixtures
   // as equipment, or embed it in its own project file).
@@ -1070,78 +1080,58 @@ const App: React.FC = () => {
 
   return (
     <div className="app">
-      <MenuBar
+      <TopBar
+        projectName={projectMeta?.name ?? ''}
         viewMode={viewMode}
+        photoMode={photoMode}
         showHeatMap={showHeatMap}
-        snapEnabled={snapStep > 0}
+        exposure={exposure}
+        haze={haze}
+        showBeams={showBeams}
+        heatMapScale={heatMapScale}
+        heatMapTarget={heatMapTarget}
+        snapStep={snapStep}
+        onSetMode={handleSetMode}
+        onToggleHeatMap={toggleHeatMap}
+        onExposureChange={setExposure}
+        onHazeChange={setHaze}
+        onToggleBeams={toggleBeams}
+        onHeatMapScaleChange={setHeatMapScale}
+        onHeatMapTargetChange={setHeatMapTarget}
+        onToggleSnap={toggleSnap}
+        onUploadFloorPlan={handleUploadFloorPlan}
+        onOpenSchedule={() => setScheduleOpen(true)}
+        onExport={handleExport}
         onNew={handleNew}
         onSave={() => setProjectDialogMode('save')}
         onLoad={() => setProjectDialogMode('load')}
         onSaveToFile={handleSaveToFile}
         onLoadFromFile={handleLoadFromFile}
-        onExport={handleExport}
         onUndo={handleUndo}
         onRedo={handleRedo}
-        onCopy={handleCopy}
-        onPaste={handlePaste}
-        onDuplicate={handleDuplicate}
-        onOpenSchedule={() => setScheduleOpen(true)}
-        onViewModeChange={setViewMode}
-        onToggleHeatMap={toggleHeatMap}
-        onToggleSnap={toggleSnap}
         onAbout={() => setAboutOpen(true)}
       />
-      <Toolbar
-        activeTool={activeTool}
-        viewMode={viewMode}
-        showHeatMap={showHeatMap}
-        heatMapScale={heatMapScale}
-        onToolChange={handleToolChange}
-        onViewModeChange={setViewMode}
-        onToggleHeatMap={toggleHeatMap}
-        heatMapTarget={heatMapTarget}
-        onHeatMapScaleChange={setHeatMapScale}
-        onHeatMapTargetChange={setHeatMapTarget}
-        photoMode={photoMode}
-        exposure={exposure}
-        haze={haze}
-        showBeams={showBeams}
-        onTogglePhotoMode={togglePhotoMode}
-        onExposureChange={setExposure}
-        onHazeChange={setHaze}
-        onToggleBeams={toggleBeams}
-        onUploadFloorPlan={handleUploadFloorPlan}
-        onExport={handleExport}
-        onAutoThreePoint={handleAutoThreePoint}
-        onAutoThreePointConfig={() => setShowThreePointDialog(true)}
-        onAutoDistribute={() => setAreaLightOpen(true)}
-        hasArea={lightArea !== null}
-        onGenerateCeiling={handleGenerateCeiling}
-        hasWalls={walls.length > 0}
-        onAlignX={() => handleAlign('x')}
-        onAlignY={() => handleAlign('y')}
-        onAlignZ={() => handleAlign('z')}
-        onDistributeH={handleDistributeH}
-        onDistributeV={handleDistributeV}
-        onSaveProject={() => setProjectDialogMode('save')}
-        onLoadProject={() => setProjectDialogMode('load')}
-        onOpenSchedule={() => setScheduleOpen(true)}
-        snapEnabled={snapStep > 0}
-        onToggleSnap={toggleSnap}
-        hasPersons={persons.length > 0}
-        hasStageElements={stageElements.length > 0}
-        hasSelection={selectedIds.size > 0}
-        multiSelected={selectedIds.size > 1}
-        onGroupSelection={handleGroupSelection}
-        onUngroupSelection={handleUngroupSelection}
-        onRotateSelection={(deg: number) => handleRotateSelectionAroundPerson(deg)}
-      />
       <div className="app-body">
-        <Sidebar
+        <ToolRail activeTool={activeTool} onToolChange={handleToolChange} />
+        <Dock
           customFixtures={customFixtures}
+          fixtureToPlace={fixtureToPlace}
           onAddCustomFixture={handleAddCustomFixture}
           onSelectFixtureToPlace={handleSelectFixtureToPlace}
-          fixtureToPlace={fixtureToPlace}
+          layers={layers}
+          layerCounts={layerCounts}
+          onToggleLayerVisible={toggleLayerVisible}
+          onToggleLayerLocked={toggleLayerLocked}
+          scenes={scenes}
+          activeSceneId={activeSceneId}
+          hiddenCount={hiddenCount}
+          fixtureCount={fixtures.length}
+          onSaveScene={handleSaveScene}
+          onToggleScene={handleToggleScene}
+          onUpdateScene={handleUpdateScene}
+          onRenameScene={handleRenameScene}
+          onDeleteScene={handleDeleteScene}
+          onShowAll={handleShowAllFixtures}
         />
         <div className="canvas-area">
           {viewMode === '2d' ? (
@@ -1217,9 +1207,25 @@ const App: React.FC = () => {
               />
             </Suspense>
           )}
-          {cursorLux !== null && (
-            <div className="cursor-lux-display">{Math.round(cursorLux)} lx</div>
-          )}
+          <CanvasActions
+            viewMode={viewMode}
+            hasSelection={selectedIds.size > 0}
+            multiSelected={selectedIds.size > 1}
+            hasArea={lightArea !== null}
+            hasWalls={walls.length > 0}
+            onAlignX={() => handleAlign('x')}
+            onAlignY={() => handleAlign('y')}
+            onAlignZ={() => handleAlign('z')}
+            onDistributeH={handleDistributeH}
+            onDistributeV={handleDistributeV}
+            onGroup={handleGroupSelection}
+            onUngroup={handleUngroupSelection}
+            onRotate={(deg) => handleRotateSelectionAroundPerson(deg)}
+            onAutoThreePoint={handleAutoThreePoint}
+            onAutoThreePointConfig={() => setShowThreePointDialog(true)}
+            onAutoDistribute={() => setAreaLightOpen(true)}
+            onGenerateCeiling={handleGenerateCeiling}
+          />
           {fixtureToPlace && viewMode === '2d' && (
             <div className="placing-hint">
               Klicke auf den Plan um <strong>{fixtureToPlace.name}</strong> zu platzieren · ESC zum Abbrechen
@@ -1261,24 +1267,6 @@ const App: React.FC = () => {
               onRemove={handleRemoveFloorPlan}
             />
           )}
-          <ScenePanel
-            scenes={scenes}
-            activeSceneId={activeSceneId}
-            hiddenCount={hiddenCount}
-            fixtureCount={fixtures.length}
-            onSaveScene={handleSaveScene}
-            onToggleScene={handleToggleScene}
-            onUpdateScene={handleUpdateScene}
-            onRenameScene={handleRenameScene}
-            onDeleteScene={handleDeleteScene}
-            onShowAll={handleShowAllFixtures}
-          />
-          <LayersPanel
-            layers={layers}
-            counts={layerCounts}
-            onToggleVisible={toggleLayerVisible}
-            onToggleLocked={toggleLayerLocked}
-          />
         </div>
         <PropertyPanel
           fixtures={fixtures}
@@ -1305,6 +1293,17 @@ const App: React.FC = () => {
           onAreaLight={() => setAreaLightOpen(true)}
         />
       </div>
+      <StatusBar
+        viewMode={viewMode}
+        photoMode={photoMode}
+        cursorLux={cursorLux}
+        selectionCount={selectedIds.size}
+        snapStep={snapStep}
+        haze={haze}
+        exposure={exposure}
+        activeSceneName={activeSceneName}
+        hiddenCount={hiddenCount}
+      />
       {showThreePointDialog && (
         <ThreePointDialog
           targetLux={heatMapTarget}
