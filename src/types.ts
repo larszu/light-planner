@@ -201,6 +201,17 @@ export interface Shape {
   color: string;
 }
 
+// ── Surface materials (floor & walls) – standard, tileable texture templates
+//    tinted around a chosen base colour, used by the realistic (Render) view. ──
+export type FloorPresetId = 'solid' | 'parquet' | 'planks' | 'concrete' | 'tiles' | 'carpet';
+export type WallPresetId = 'solid' | 'plaster' | 'woodchip' | 'concrete' | 'brick';
+
+// The room's floor finish (global). 'color' tints the chosen template.
+export interface FloorMaterial {
+  preset: FloorPresetId;
+  color: string; // hex
+}
+
 // ── Wall (architecture) – reflects light back into the room ──
 export interface Wall {
   id: string;
@@ -210,7 +221,8 @@ export interface Wall {
   cx?: number; cy?: number;
   height: number;           // wall height (meters)
   reflectance: number;      // 0..1 diffuse reflectance (Reflexionsgrad)
-  color: string;            // surface colour (hex)
+  color: string;            // surface colour (hex) – tints the material template
+  material?: WallPresetId;  // finish template (Render view); absent = 'plaster'
   label: string;
 }
 
@@ -312,6 +324,7 @@ export interface ProjectData {
   scenes?: Scene[];
   cameras?: CameraView[];
   layers?: Layers;
+  floor?: FloorMaterial; // room floor finish (Render view)
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
   floorPlan?: Omit<FloorPlan, 'image'>;

@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from './Icon';
+import type { FloorMaterial, FloorPresetId } from '../types';
+import { FLOOR_PRESETS, floorPreset } from '../core/surfaceTextures';
 
 type Mode = '2d' | '3d' | 'photo';
 
@@ -12,6 +14,7 @@ interface Props {
   haze: number;
   showBeams: boolean;
   ambience: number;
+  floor: FloorMaterial;
   heatMapScale: number;
   heatMapTarget: number;
   snapStep: number;
@@ -22,6 +25,7 @@ interface Props {
   onHazeChange: (v: number) => void;
   onToggleBeams: () => void;
   onAmbienceChange: (v: number) => void;
+  onFloorChange: (f: FloorMaterial) => void;
   onHeatMapScaleChange: (v: number) => void;
   onHeatMapTargetChange: (v: number) => void;
   onToggleSnap: () => void;
@@ -116,9 +120,19 @@ const TopBar: React.FC<Props> = (p) => {
                     <input type="range" min={0} max={1} step={0.02} value={p.haze} onChange={(e) => p.onHazeChange(+e.target.value)} />
                     <em>{Math.round(p.haze * 100)}%</em></label>
                   <button className="tb-dd-item" onClick={p.onToggleBeams}><Icon name="beam" size={15} />Lichtkegel<span className={`tb-check ${p.showBeams ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
+                  <div className="tb-dd-sec">Boden</div>
+                  <div className="tb-chips">
+                    {FLOOR_PRESETS.map((fp) => (
+                      <button key={fp.id} className={`tb-chip ${p.floor.preset === fp.id ? 'on' : ''}`}
+                        onClick={() => p.onFloorChange({ preset: fp.id as FloorPresetId, color: fp.defaultColor })}>{fp.label}</button>
+                    ))}
+                  </div>
+                  <label className="tb-slider"><span>Bodenfarbe</span>
+                    <input type="color" value={p.floor.color} onChange={(e) => p.onFloorChange({ ...p.floor, color: e.target.value })} />
+                    <em>{floorPreset(p.floor.preset).label}</em></label>
                 </>
               ) : (
-                <div className="tb-hint">Belichtung, Dunst & Lichtkegel erscheinen im <b>Render</b>-Modus.</div>
+                <div className="tb-hint">Belichtung, Boden & Lichtkegel erscheinen im <b>Render</b>-Modus.</div>
               )}
               {p.showHeatMap && (
                 <>

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView, FloorMaterial } from './types';
+import { DEFAULT_FLOOR } from './core/surfaceTextures';
 import { convexHull } from './core/geometry';
 import TopBar from './components/TopBar';
 import ToolRail from './components/ToolRail';
@@ -123,6 +124,7 @@ const App: React.FC = () => {
   const [trusses, setTrusses] = useState<Truss[]>([]);
   const [walls, setWalls] = useState<Wall[]>([]);
   const [ceilings, setCeilings] = useState<Ceiling[]>([]);
+  const [floor, setFloor] = useState<FloorMaterial>(DEFAULT_FLOOR);
   const [planMode, setPlanMode] = useState<PlanMode>('none');
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
   const snapStep = useUiStore((s) => s.snapStep);
@@ -651,6 +653,7 @@ const App: React.FC = () => {
       scenes,
       cameras,
       layers,
+      floor,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     try {
@@ -660,7 +663,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -679,6 +682,7 @@ const App: React.FC = () => {
     preSceneRef.current = null;
     setCameras(data.cameras ?? []);
     setLayers(data.layers ?? DEFAULT_LAYERS);
+    setFloor(data.floor ?? DEFAULT_FLOOR);
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
     if (data.floorPlan) {
@@ -709,7 +713,7 @@ const App: React.FC = () => {
       meta: { name: 'Neues Projekt', author: '', version: '1.0', createdAt: now, updatedAt: now },
       fixtures: [], shapes: [], persons: [], stageElements: [],
       customFixtures, fixtureGroups: [], trusses: [], walls: [], ceilings: [],
-      scenes: [], cameras: [], layers: DEFAULT_LAYERS, floorPlan: undefined,
+      scenes: [], cameras: [], layers: DEFAULT_LAYERS, floor: DEFAULT_FLOOR, floorPlan: undefined,
     });
   }, [fixtures, persons, stageElements, trusses, walls, ceilings, shapes, floorPlan, customFixtures, handleLoadProject]);
 
@@ -956,12 +960,12 @@ const App: React.FC = () => {
     const data: ProjectData = {
       meta: { ...meta, updatedAt: now },
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
-      trusses, walls, ceilings, scenes, cameras, layers,
+      trusses, walls, ceilings, scenes, cameras, layers, floor,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, host]);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan, host]);
 
   const handleLoadFromFile = useCallback(async () => {
     const res = await host.openProjectFile();
@@ -1075,10 +1079,10 @@ const App: React.FC = () => {
   useEffect(() => {
     useProjectStore.getState().setDocument({
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
-      trusses, walls, ceilings, scenes, cameras, layers,
+      trusses, walls, ceilings, scenes, cameras, layers, floor,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     }, projectMeta ?? null);
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, projectMeta]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan, projectMeta]);
 
   return (
     <div className="app">
@@ -1091,6 +1095,7 @@ const App: React.FC = () => {
         haze={haze}
         showBeams={showBeams}
         ambience={ambience}
+        floor={floor}
         heatMapScale={heatMapScale}
         heatMapTarget={heatMapTarget}
         snapStep={snapStep}
@@ -1100,6 +1105,7 @@ const App: React.FC = () => {
         onHazeChange={setHaze}
         onToggleBeams={toggleBeams}
         onAmbienceChange={setAmbience}
+        onFloorChange={setFloor}
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
         onToggleSnap={toggleSnap}
@@ -1207,6 +1213,7 @@ const App: React.FC = () => {
                 haze={haze}
                 showBeams={showBeams}
                 ambience={ambience}
+                floor={floor}
                 onSelect={handleSelectWithGroups}
                 onHoverLux={setCursorLux}
               />

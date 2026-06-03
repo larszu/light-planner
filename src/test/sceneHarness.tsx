@@ -8,7 +8,7 @@ import Scene3D from '../components/Scene3D';
 import type { Scene3DHandle } from '../components/Scene3D';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import type {
-  PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, Layers, CameraView,
+  PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, Layers, CameraView, FloorMaterial, FloorPresetId, WallPresetId,
 } from '../types';
 
 const lib = (id: string) => fixtureLibrary.find((f) => f.id === id) ?? fixtureLibrary[0];
@@ -42,7 +42,7 @@ const trusses: Truss[] = [
   { id: 't1', x1: 1, y1: 1.5, x2: 10, y2: 1.5, height: 6, label: 'FOH' },
 ];
 const walls: Wall[] = [
-  { id: 'w1', x1: 1, y1: 9, x2: 10, y2: 9, height: 3, reflectance: 0.55, color: '#8a8f99', label: 'Rückwand' },
+  { id: 'w1', x1: 1, y1: 9, x2: 10, y2: 9, height: 3, reflectance: 0.55, color: '#c9b79a', material: 'woodchip', label: 'Rückwand' },
 ];
 const ceilings: Ceiling[] = [];
 const cameras: CameraView[] = [];
@@ -55,17 +55,20 @@ function Harness() {
   const [haze, setHaze] = useState(0.3);
   const [showBeams, setBeams] = useState(true);
   const [ambience, setAmb] = useState(0.55);
+  const [floor, setFloor] = useState<FloorMaterial>({ preset: 'parquet', color: '#8a5a2f' });
 
   useEffect(() => {
     const api = {
-      setMode: (m: { photo?: boolean; heatmap?: boolean; exposure?: number; haze?: number; beams?: boolean; ambience?: number }) => {
+      setMode: (m: { photo?: boolean; heatmap?: boolean; exposure?: number; haze?: number; beams?: boolean; ambience?: number; floor?: FloorPresetId; floorColor?: string }) => {
         if ('photo' in m) setPhoto(!!m.photo);
         if ('heatmap' in m) setHeat(!!m.heatmap);
         if (typeof m.exposure === 'number') setExposure(m.exposure);
         if (typeof m.haze === 'number') setHaze(m.haze);
         if (typeof m.beams === 'boolean') setBeams(m.beams);
         if (typeof m.ambience === 'number') setAmb(m.ambience);
+        if (m.floor || m.floorColor) setFloor((f) => ({ preset: m.floor ?? f.preset, color: m.floorColor ?? f.color }));
       },
+      setWallMaterial: (mat: WallPresetId) => { walls[0].material = mat; },
       // Point the camera in front of the people, looking at their faces.
       look: () => ref.current?.lookThroughCamera({ x: 6, y: 0.2, height: 1.55, aimX: 6, aimY: 6.3, fov: 52 }),
       lookAt: (c: { x: number; y: number; height: number; aimX: number; aimY: number; fov: number }) => ref.current?.lookThroughCamera(c),
@@ -97,6 +100,7 @@ function Harness() {
         haze={haze}
         showBeams={showBeams}
         ambience={ambience}
+        floor={floor}
         onSelect={() => {}}
         onHoverLux={(lx) => { (window as Window & typeof globalThis & { __lpLux?: number | null }).__lpLux = lx; }}
       />
