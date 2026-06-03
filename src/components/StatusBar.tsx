@@ -18,7 +18,7 @@ interface Props {
 const StatusBar: React.FC<Props> = ({ viewMode, photoMode, cursorLux, selectionCount, snapStep, haze, exposure, activeSceneName, hiddenCount }) => (
   <footer className="statusbar">
     <span className="sb-item"><Icon name={viewMode === '2d' ? 'plan2d' : (photoMode ? 'photo' : 'cube3d')} size={13} />
-      {viewMode === '2d' ? '2D-Plan' : (photoMode ? 'Foto' : '3D')}</span>
+      {viewMode === '2d' ? '2D-Plan' : (photoMode ? 'Render' : '3D')}</span>
     {cursorLux !== null && (
       <span className="sb-item sb-lux"><Icon name="heatmap" size={13} /><b>{Math.round(cursorLux).toLocaleString('de-DE')}</b> lx</span>
     )}

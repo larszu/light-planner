@@ -89,7 +89,7 @@ const TopBar: React.FC<Props> = (p) => {
       <div className="tb-modeswitch" role="tablist" aria-label="Ansicht">
         <button className={m === '2d' ? 'on' : ''} onClick={() => p.onSetMode('2d')}><Icon name="plan2d" size={15} />2D-Plan</button>
         <button className={m === '3d' ? 'on' : ''} onClick={() => p.onSetMode('3d')}><Icon name="cube3d" size={15} />3D</button>
-        <button className={m === 'photo' ? 'on' : ''} onClick={() => p.onSetMode('photo')}><Icon name="photo" size={15} />Foto</button>
+        <button className={m === 'photo' ? 'on' : ''} onClick={() => p.onSetMode('photo')} title="Render: fotorealistische Vorschau der 3D-Szene (echte Scheinwerfer, Schatten, Lichtkegel, realistische Personen)"><Icon name="photo" size={15} />Render</button>
       </div>
 
       {/* ── right: display toggles, render settings, actions ── */}
@@ -103,7 +103,7 @@ const TopBar: React.FC<Props> = (p) => {
             <div className="tb-dropdown tb-render">
               {(p.viewMode === '3d' && p.photoMode) ? (
                 <>
-                  <div className="tb-dd-sec">Foto-Render</div>
+                  <div className="tb-dd-sec">Render</div>
                   <label className="tb-slider"><span>Belichtung</span>
                     <input type="range" min={0.2} max={3} step={0.05} value={p.exposure} onChange={(e) => p.onExposureChange(+e.target.value)} />
                     <em>{p.exposure.toFixed(2)}</em></label>
@@ -113,7 +113,7 @@ const TopBar: React.FC<Props> = (p) => {
                   <button className="tb-dd-item" onClick={p.onToggleBeams}><Icon name="beam" size={15} />Lichtkegel<span className={`tb-check ${p.showBeams ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
                 </>
               ) : (
-                <div className="tb-hint">Belichtung, Dunst & Lichtkegel erscheinen im <b>Foto</b>-Modus.</div>
+                <div className="tb-hint">Belichtung, Dunst & Lichtkegel erscheinen im <b>Render</b>-Modus.</div>
               )}
               {p.showHeatMap && (
                 <>
