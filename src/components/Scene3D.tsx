@@ -146,6 +146,19 @@ function loadPersonModel(): Promise<PersonModel> {
   if (!personModelPromise) {
     const url = `${import.meta.env.BASE_URL}models/person.glb`;
     const loader = new GLTFLoader();
+    // GLTFLoader decodes embedded texture blobs via ImageBitmapLoader
+    // (createImageBitmap) by default. Under Electron's file:// origin that path
+    // fails on blob: URLs ("Couldn't load texture blob"), leaving every material
+    // white. The texture loader lives on the parser (created per-parse), so we
+    // register a plugin that swaps in a plain TextureLoader — its <img>-element
+    // decode path works in both the browser and the packaged Electron app.
+    loader.register((parser) => {
+      const tl = new THREE.TextureLoader(parser.options.manager);
+      tl.setCrossOrigin(parser.options.crossOrigin);
+      tl.setRequestHeader(parser.options.requestHeader);
+      parser.textureLoader = tl;
+      return { name: 'LP_compatible_texture_loader' };
+    });
     personModelPromise = fetchArrayBuffer(url)
       .then((buf) => loader.parseAsync(buf, ''))
       .then((g) => {
