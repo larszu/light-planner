@@ -34,5 +34,7 @@ const shot = async (name, cam) => {
 await shot('side', { x: 10.5, y: 3.0, height: 2.4, aimX: 5.5, aimY: 6.0, fov: 52 });
 await shot('34', { x: 3.2, y: -1.5, height: 4.2, aimX: 6.2, aimY: 6.0, fov: 55 });
 await shot('top', { x: 6, y: 5.6, height: 12, aimX: 6, aimY: 6.2, fov: 55 });
+// Looking back UP toward a lamp along its beam — forward scatter should brighten it.
+await shot('fwd', { x: 5.5, y: 6.5, height: 0.7, aimX: 3, aimY: 1.5, fov: 60 });
 await browser.close();
 console.log('DONE', OUT, 'haze', HAZE, 'beams', BEAMS);
