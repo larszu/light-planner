@@ -17,6 +17,37 @@ import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
 const LIGHT_K = 0.005;
 
+// ── Volumetric haze-beam shader (photo view) ─────────────────────────────────
+// A real light "cone" isn't a solid shape — you only see light *scattered by
+// haze in the air*. So instead of a flat translucent cone we additively render
+// the cone shell with: a grazing/Fresnel term (only the silhouette of the shaft
+// glows; looking straight through it, it's nearly invisible — just like reality),
+// an axial falloff (denser near the lamp, fading toward the floor), a soft tip,
+// and an overall density driven entirely by the haze slider (haze 0 ⇒ nothing).
+const BEAM_VERT = /* glsl */`
+  varying vec3 vView; varying vec3 vNrm; varying float vT;
+  uniform float uHeight;
+  void main() {
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vView = cameraPosition - wp.xyz;
+    vNrm = mat3(modelMatrix) * normal;
+    vT = clamp(-position.y / uHeight, 0.0, 1.0); // 0 at apex (lamp) → 1 at floor
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }`;
+const BEAM_FRAG = /* glsl */`
+  precision mediump float;
+  varying vec3 vView; varying vec3 vNrm; varying float vT;
+  uniform vec3 uColor; uniform float uHaze; uniform float uIntensity; uniform float uTipFade;
+  void main() {
+    float graze = 1.0 - abs(dot(normalize(vView), normalize(vNrm)));
+    graze = pow(clamp(graze, 0.0, 1.0), 3.0);          // hollow shaft: mainly the silhouette glows
+    float tip = smoothstep(0.0, uTipFade, vT);          // soft fade-in at the lens
+    float axial = tip / (1.0 + 5.0 * vT * vT);          // ~1/d² scatter, brightest near the lamp
+    float a = graze * axial * uIntensity * uHaze * 2.3; // haze drives overall density
+    if (a < 0.0025) discard;
+    gl_FragColor = vec4(uColor, a);
+  }`;
+
 // Bend the standard (Mixamo/RPM) skeleton into a seated pose: thighs forward,
 // knees bent, slight forward lean + arms resting. Tuned for the bundled avatar.
 function applySitPose(root: THREE.Object3D) {
@@ -1030,18 +1061,33 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         // Shift geometry so tip is at local origin (tip at y=+h/2, base at y=-h/2)
         coneGeo.translate(0, -coneHeight / 2, 0);
 
-        // Photo mode: additive haze shaft scaled by the haze amount; bloom then
-        // turns the bright core into a glow. Back faces only so the shaft
-        // doesn't wash out subjects in front of it.
-        const volA = (0.025 + 0.06 * (f.dimming / 100)) * Math.min(1.0, haze * 3);
-        const coneMat = new THREE.MeshBasicMaterial({
-          color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
-          transparent: true,
-          opacity: photoMode ? volA : (isSel ? Math.max(dimOpacity, 0.02) : dimOpacity),
-          side: photoMode ? THREE.BackSide : THREE.DoubleSide,
-          depthWrite: false,
-          blending: photoMode ? THREE.AdditiveBlending : THREE.NormalBlending,
-        });
+        // Photo view: a physically-motivated haze shaft (only scattered light is
+        // visible — see BEAM_FRAG). Otherwise (technical 3D) a faint solid cone as
+        // a beam-coverage indicator.
+        const coneMat: THREE.Material = photoMode
+          ? new THREE.ShaderMaterial({
+              uniforms: {
+                uColor: { value: isSel ? new THREE.Color('#ffcc33') : new THREE.Color(getBeamColorHex(f)) },
+                uHaze: { value: haze },
+                uIntensity: { value: 0.4 + 0.6 * (f.dimming / 100) },
+                uTipFade: { value: 0.08 },
+                uHeight: { value: coneHeight },
+              },
+              vertexShader: BEAM_VERT,
+              fragmentShader: BEAM_FRAG,
+              transparent: true,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+              blending: THREE.AdditiveBlending,
+            })
+          : new THREE.MeshBasicMaterial({
+              color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
+              transparent: true,
+              opacity: isSel ? Math.max(dimOpacity, 0.02) : dimOpacity,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+              blending: THREE.NormalBlending,
+            });
         const cone = new THREE.Mesh(coneGeo, coneMat);
         cone.userData = { noPick: true }; // don't let the beam shaft swallow the lux pick
         cone.position.copy(fixturePos);
@@ -1119,13 +1165,17 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         group.add(spot.target);
       }
 
-      // Thin line from fixture to aim point
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(f.x, f.mountingHeight, f.y),
-        new THREE.Vector3(f.aimX, 0, f.aimY),
-      ]);
-      const lineMat = new THREE.LineBasicMaterial({ color: isSel ? '#ffcc33' : '#888888', opacity: 0.5, transparent: true });
-      group.add(new THREE.Line(lineGeo, lineMat));
+      // Thin fixture→aim helper line — useful in the technical view, but
+      // unrealistic in the photo view, so draw it only when not in photo mode
+      // (or when this fixture is selected, to keep the aim editable).
+      if (!photoMode || isSel) {
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(f.x, f.mountingHeight, f.y),
+          new THREE.Vector3(f.aimX, 0, f.aimY),
+        ]);
+        const lineMat = new THREE.LineBasicMaterial({ color: isSel ? '#ffcc33' : '#888888', opacity: 0.5, transparent: true });
+        group.add(new THREE.Line(lineGeo, lineMat));
+      }
 
       scene.add(group);
     }

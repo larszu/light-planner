@@ -39,13 +39,13 @@ await shot('b-topdown', { x: 6, y: 5.6, height: 12, aimX: 6, aimY: 6.2, fov: 55 
 // Low grazing from the side: shadow length + brightness gradient across the floor.
 await shot('c-graze', { x: 11.5, y: 6.2, height: 1.4, aimX: 5.5, aimY: 6.2, fov: 50 });
 
-// Exposure sweep at the 3/4 angle so we can judge if contrast needs tuning.
-await page.evaluate(() => window.__lp.lookAt({ x: 3.2, y: -1.5, height: 4.2, aimX: 6.2, aimY: 6.0, fov: 55 }));
-for (const e of [0.8, 1.6]) {
-  await page.evaluate((ex) => window.__lp.setMode({ exposure: ex }), e);
-  await sleep(1200);
-  await page.screenshot({ path: `${OUT}/d-exposure-${e}.png` });
-  console.log('shot exposure', e);
+// Haze sweep at a beam-revealing angle: 0 must show NO shaft, rising = denser.
+await page.evaluate(() => window.__lp.lookAt({ x: 10.5, y: 3.0, height: 2.4, aimX: 5.5, aimY: 6.0, fov: 52 }));
+for (const h of [0, 0.15, 0.45, 0.9]) {
+  await page.evaluate((hz) => window.__lp.setMode({ haze: hz }), h);
+  await sleep(1300);
+  await page.screenshot({ path: `${OUT}/haze-${h}.png` });
+  console.log('shot haze', h);
 }
 
 await browser.close();
