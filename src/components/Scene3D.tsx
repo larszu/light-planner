@@ -48,6 +48,41 @@ const BEAM_FRAG = /* glsl */`
     gl_FragColor = vec4(uColor, a);
   }`;
 
+// A projected "gobo" that gives each spotlight a physically-shaped soft edge.
+// Real fixtures don't throw a hard-edged disc — intensity falls off gradually
+// from the centre (50 % at the beam angle, 10 % at the field angle, then spill).
+// We bake that exact radial Gaussian (same σ the heat-map uses) into a texture
+// and project it as SpotLight.map, so the floor pool fades off like the real
+// beam instead of ending in a hard circle. Cached per (rounded) field angle.
+const beamMapCache = new Map<number, THREE.Texture>();
+function beamProfileMap(fieldAngleDeg: number): THREE.Texture {
+  const key = Math.round(Math.max(2, fieldAngleDeg));
+  const hit = beamMapCache.get(key);
+  if (hit) return hit;
+  const N = 128;
+  const fieldHalf = (key / 2) * (Math.PI / 180);
+  const sigma = fieldHalf / Math.sqrt(2 * Math.LN10); // I(fieldHalf) = 10 % · I₀
+  const coneHalf = fieldHalf * 1.7;                    // texture radius 1.0 ⇒ Gaussian tail ≈ 0
+  const cv = document.createElement('canvas'); cv.width = N; cv.height = N;
+  const ctx = cv.getContext('2d')!;
+  const img = ctx.createImageData(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const nx = ((x + 0.5) / N) * 2 - 1, ny = ((y + 0.5) / N) * 2 - 1;
+    const theta = Math.hypot(nx, ny) * coneHalf;
+    const v = Math.exp(-(theta * theta) / (2 * sigma * sigma));
+    const c = Math.max(0, Math.min(255, Math.round(255 * v)));
+    const i = (y * N + x) * 4;
+    img.data[i] = c; img.data[i + 1] = c; img.data[i + 2] = c; img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.NoColorSpace; // use the Gaussian values directly (no sRGB decode)
+  tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  beamMapCache.set(key, tex);
+  return tex;
+}
+
 // Bend the standard (Mixamo/RPM) skeleton into a seated pose: thighs forward,
 // knees bent, slight forward lean + arms resting. Tuned for the bundled avatar.
 function applySitPose(root: THREE.Object3D) {
@@ -1109,12 +1144,18 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         const spot = new THREE.SpotLight(new THREE.Color(getBeamColorHex(f)));
         spot.position.copy(fixturePos);
         spot.target.position.copy(aimPos);
-        spot.angle = Math.min(Math.PI / 2.2, (fieldAngle / 2) * (Math.PI / 180));
-        const beamDeg = f.currentBeamAngle ?? f.fixture.beamAngle;
-        spot.penumbra = Math.max(0.15, Math.min(0.9, 1 - beamDeg / Math.max(fieldAngle, 0.01)));
+        // Physically-shaped soft edge: open the cone out to the beam's soft tail
+        // (1.7×field-half) and project the beam's own Gaussian intensity profile
+        // as the spotlight map, so the floor pool fades off gradually like a real
+        // fixture instead of ending in a hard circle.
+        const fieldHalfRad = (fieldAngle / 2) * (Math.PI / 180);
+        spot.angle = Math.min(Math.PI / 2.2, fieldHalfRad * 1.7);
+        spot.penumbra = 0.18;            // the Gaussian map carries the edge softness
         spot.decay = 2;
         spot.distance = 0;
         spot.intensity = peakCandela(f) * LIGHT_K;
+        spot.map = beamProfileMap(fieldAngle);
+        spot.shadow.focus = 1;           // project the map across the full cone (even without shadows)
         if (shadowIds.has(f.id)) {
           spot.castShadow = true;
           spot.shadow.mapSize.set(1024, 1024);
