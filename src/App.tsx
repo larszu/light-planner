@@ -107,6 +107,8 @@ const App: React.FC = () => {
   const setExposure = useUiStore((s) => s.setExposure);
   const haze = useUiStore((s) => s.haze);
   const setHaze = useUiStore((s) => s.setHaze);
+  const showBeams = useUiStore((s) => s.showBeams);
+  const toggleBeams = useUiStore((s) => s.toggleBeams);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [cameras, setCameras] = useState<CameraView[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
@@ -1103,9 +1105,11 @@ const App: React.FC = () => {
         photoMode={photoMode}
         exposure={exposure}
         haze={haze}
+        showBeams={showBeams}
         onTogglePhotoMode={togglePhotoMode}
         onExposureChange={setExposure}
         onHazeChange={setHaze}
+        onToggleBeams={toggleBeams}
         onUploadFloorPlan={handleUploadFloorPlan}
         onExport={handleExport}
         onAutoThreePoint={handleAutoThreePoint}
@@ -1207,6 +1211,7 @@ const App: React.FC = () => {
                 photoMode={photoMode}
                 exposure={exposure}
                 haze={haze}
+                showBeams={showBeams}
                 onSelect={handleSelectWithGroups}
                 onHoverLux={setCursorLux}
               />

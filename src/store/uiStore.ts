@@ -14,6 +14,7 @@ interface UiState {
   photoMode: boolean;
   exposure: number;
   haze: number;
+  showBeams: boolean; // global on/off for the volumetric light shafts (photo view)
   snapStep: number; // 0 = off, else grid step (m)
   language: Language;
 
@@ -25,6 +26,7 @@ interface UiState {
   togglePhotoMode: () => void;
   setExposure: (v: number) => void;
   setHaze: (v: number) => void;
+  toggleBeams: () => void;
   toggleSnap: () => void;
   setLanguage: (l: Language) => void;
 }
@@ -37,6 +39,7 @@ export const useUiStore = create<UiState>((set) => ({
   photoMode: false,
   exposure: 1.2,
   haze: 0.15,
+  showBeams: true,
   snapStep: 0,
   language: (typeof localStorage !== 'undefined' && localStorage.getItem('lp-lang') === 'en' ? 'en' : 'de'),
 
@@ -48,6 +51,7 @@ export const useUiStore = create<UiState>((set) => ({
   togglePhotoMode: () => set((s) => ({ photoMode: !s.photoMode })),
   setExposure: (exposure) => set({ exposure }),
   setHaze: (haze) => set({ haze }),
+  toggleBeams: () => set((s) => ({ showBeams: !s.showBeams })),
   toggleSnap: () => set((s) => ({ snapStep: s.snapStep > 0 ? 0 : 0.5 })),
   setLanguage: (language) => { try { localStorage.setItem('lp-lang', language); } catch { /* ignore */ } set({ language }); },
 }));

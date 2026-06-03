@@ -16,9 +16,11 @@ interface Props {
   photoMode: boolean;
   exposure: number;
   haze: number;
+  showBeams: boolean;
   onTogglePhotoMode: () => void;
   onExposureChange: (v: number) => void;
   onHazeChange: (v: number) => void;
+  onToggleBeams: () => void;
   onUploadFloorPlan: (file: File) => void;
   onExport: () => void;
   onAutoThreePoint: () => void;
@@ -60,9 +62,11 @@ const Toolbar: React.FC<Props> = ({
   photoMode,
   exposure,
   haze,
+  showBeams,
   onTogglePhotoMode,
   onExposureChange,
   onHazeChange,
+  onToggleBeams,
   onUploadFloorPlan,
   onExport,
   onAutoThreePoint,
@@ -248,6 +252,16 @@ const Toolbar: React.FC<Props> = ({
                 />
                 <span>{Math.round(haze * 100)}%</span>
               </label>
+            )}
+            {photoMode && (
+              <button
+                className={`tool-btn ${showBeams ? 'active' : ''}`}
+                onClick={onToggleBeams}
+                title="Lichtkegel global ein-/ausschalten (volumetrische Strahlen im Dunst)"
+              >
+                <span className="tool-icon">🔦</span>
+                <span className="tool-label">Kegel</span>
+              </button>
             )}
           </div>
         </>

@@ -234,11 +234,12 @@ interface Props {
   photoMode: boolean;
   exposure: number;
   haze: number;
+  showBeams: boolean;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
   onHoverLux?: (lux: number | null) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, onSelect, onHoverLux }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, onSelect, onHoverLux }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -1110,10 +1111,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
       // In the photo view a beam is only visible where there's haze in the air
-      // (just like reality) – the shaft fades out as haze → 0. The raymarched
-      // shaft is also capped to the brightest fixtures (litIds, ≤24) so a huge
-      // rig can't tank the GPU; haze 0 disables all beams (zero cost).
-      if (!hidden && coneHeight > 0.1 && (photoMode ? (haze > 0.01 && litIds.has(f.id)) : true)) {
+      // (just like reality) – the shaft fades out as haze → 0. A global toggle
+      // (showBeams) turns the volumetric shafts off entirely (e.g. for a big rig
+      // on a weaker GPU); haze 0 also disables them (zero cost).
+      if (!hidden && coneHeight > 0.1 && (photoMode ? (showBeams && haze > 0.01) : true)) {
         const coneDirNorm = coneVec.clone().normalize();
         const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), coneDirNorm);
         const beamColor = isSel ? new THREE.Color('#ffcc33') : new THREE.Color(getBeamColorHex(f));
@@ -1308,7 +1309,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, personModel]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, showBeams, personModel]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {
