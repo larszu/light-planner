@@ -39,31 +39,42 @@ const BEAM_FRAG = /* glsl */`
   uniform float uHeight;  // apex→floor distance
   uniform float uSigma;   // Gaussian σ (rad), anchored on the field angle
   uniform vec3 uColor; uniform float uHaze; uniform float uIntensity; uniform float uTipFade; uniform float uGain;
+  uniform float uHG;      // Henyey–Greenstein asymmetry (forward scatter, 0..~0.9)
+  uniform float uExtinct; // haze extinction coefficient per metre (per unit haze)
   float hash(vec2 p) { return fract(sin(dot(p, vec2(41.31, 289.07))) * 43758.5453); }
   void main() {
     vec3 ro = cameraPosition;
     vec3 rd = normalize(vWorldPos - ro);
     float entry = length(vWorldPos - ro);     // near wall (FrontSide)
-    const int STEPS = 22;
+    const int STEPS = 24;
     float step = uHeight / float(STEPS);
     float jitter = hash(gl_FragCoord.xy) * step;
+    float k = uHG, kk = uHG * uHG;
+    float sigT = uExtinct * uHaze;            // extinction per metre
+    // Single-scattering integral along the view ray:
+    //   L = ∫ phase(α)·E(P)·T_light·T_view ds,  E = I(θ)/d² (true inverse-square).
     float acc = 0.0;
     for (int i = 0; i < STEPS; i++) {
-      vec3 P = ro + rd * (entry + jitter + float(i) * step);
+      float s = entry + jitter + float(i) * step; // camera → P distance
+      vec3 P = ro + rd * s;
       vec3 toP = P - uApex;
-      float axial = dot(toP, uDir);            // along the beam axis
+      float axial = dot(toP, uDir);
       if (axial < 0.0 || axial > uHeight) continue;
-      float radial = length(toP - uDir * axial);
-      float theta = atan(radial / max(axial, 0.03));
-      float g = exp(-(theta * theta) / (2.0 * uSigma * uSigma));
+      float d2 = dot(toP, toP);                  // |lamp→P|²
+      float d = sqrt(d2);
+      float radial = sqrt(max(0.0, d2 - axial * axial));
+      float theta = atan(radial / max(axial, 1e-3));
+      float Iprof = exp(-(theta * theta) / (2.0 * uSigma * uSigma));   // beam intensity I(θ)
+      float E = Iprof / max(d2, 0.09);            // irradiance (1/d², clamped at the lens)
+      float cosA = dot(toP / d, -rd);             // light propagation · view-to-camera
+      float phase = (1.0 - kk) / pow(max(1e-4, 1.0 + kk - 2.0 * k * cosA), 1.5); // Henyey–Greenstein
+      float trans = exp(-sigT * (d + s));         // Beer–Lambert: light path + view path
       float tip = smoothstep(0.0, uTipFade * uHeight, axial);
-      float t = axial / uHeight;
-      acc += g * tip / (1.0 + 5.0 * t * t);     // ~1/d² scatter, brightest near the lamp
+      acc += E * phase * trans * tip;
     }
-    // Beer–Lambert saturation: keeps a side view visible while a near-axial view
-    // (long path through the core) saturates softly instead of blowing out.
-    float dens = acc * step * uHaze * uIntensity * uGain;
-    float a = (1.0 - exp(-dens)) * 0.85;
+    // Accumulated optical depth → medium opacity (1 − e^−τ).
+    float tau = acc * step * uHaze * uIntensity * uGain;
+    float a = (1.0 - exp(-tau)) * 0.9;
     if (a < 0.003) discard;
     gl_FragColor = vec4(uColor, a);
   }`;
@@ -234,11 +245,12 @@ interface Props {
   photoMode: boolean;
   exposure: number;
   haze: number;
+  showBeams: boolean;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
   onHoverLux?: (lux: number | null) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, onSelect, onHoverLux }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, onSelect, onHoverLux }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -1110,10 +1122,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
       // In the photo view a beam is only visible where there's haze in the air
-      // (just like reality) – the shaft fades out as haze → 0. The raymarched
-      // shaft is also capped to the brightest fixtures (litIds, ≤24) so a huge
-      // rig can't tank the GPU; haze 0 disables all beams (zero cost).
-      if (!hidden && coneHeight > 0.1 && (photoMode ? (haze > 0.01 && litIds.has(f.id)) : true)) {
+      // (just like reality) – the shaft fades out as haze → 0. A global toggle
+      // (showBeams) turns the volumetric shafts off entirely (e.g. for a big rig
+      // on a weaker GPU); haze 0 also disables them (zero cost).
+      if (!hidden && coneHeight > 0.1 && (photoMode ? (showBeams && haze > 0.01) : true)) {
         const coneDirNorm = coneVec.clone().normalize();
         const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), coneDirNorm);
         const beamColor = isSel ? new THREE.Color('#ffcc33') : new THREE.Color(getBeamColorHex(f));
@@ -1137,7 +1149,9 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
               uHaze: { value: haze },
               uIntensity: { value: 0.7 + 0.3 * (f.dimming / 100) },
               uTipFade: { value: 0.05 },
-              uGain: { value: 3.5 },
+              uGain: { value: 32.0 },
+              uHG: { value: 0.6 },     // forward-scattering haze (Mie-like)
+              uExtinct: { value: 0.03 },
             },
             vertexShader: BEAM_VERT,
             fragmentShader: BEAM_FRAG,
@@ -1308,7 +1322,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, personModel]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, showBeams, personModel]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {
