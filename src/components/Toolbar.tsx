@@ -94,7 +94,7 @@ const Toolbar: React.FC<Props> = ({
   onRotateSelection,
 }) => {
   const { t } = useTranslation();
-  const tools: { id: Tool; label: string; icon: string }[] = [
+  const tools: { id: Tool; label: string; icon: string; hint?: string }[] = [
     { id: 'select', label: t('tool.select', 'Auswahl'), icon: '⊹' },
     { id: 'pan', label: t('tool.pan', 'Verschieben'), icon: '✋' },
     { id: 'rect', label: t('tool.rect', 'Rechteck'), icon: '▭' },
@@ -105,7 +105,8 @@ const Toolbar: React.FC<Props> = ({
     { id: 'stagepoly', label: t('tool.stagepoly', 'Bühne (Polygon)'), icon: '⬠' },
     { id: 'truss', label: t('tool.truss', 'Traverse'), icon: '▤' },
     { id: 'wall', label: t('tool.wall', 'Wand'), icon: '▬' },
-    { id: 'camera', label: t('tool.camera', 'Kamera'), icon: '🎥' },
+    { id: 'camera', label: t('tool.camera', 'Kamera'), icon: '🎥',
+      hint: t('tool.camera.hint', 'Kamera-Standpunkt setzen: einen Blickwinkel im Plan platzieren, um die 3D-Szene von dort anzusehen. (Das ist NICHT der Foto-Modus.)') },
   ];
 
   return (
@@ -116,7 +117,7 @@ const Toolbar: React.FC<Props> = ({
             key={t.id}
             className={`tool-btn ${activeTool === t.id ? 'active' : ''}`}
             onClick={() => onToolChange(t.id)}
-            title={t.label}
+            title={t.hint ?? t.label}
           >
             <span className="tool-icon">{t.icon}</span>
             <span className="tool-label">{t.label}</span>
@@ -220,7 +221,7 @@ const Toolbar: React.FC<Props> = ({
             <button
               className={`tool-btn ${photoMode ? 'active' : ''}`}
               onClick={onTogglePhotoMode}
-              title="Foto-Ansicht: echte Scheinwerfer mit Schattenwurf, Bloom & Lichtkegeln"
+              title="Foto-Modus (Render-Stil): die ganze 3D-Szene fotorealistisch zeigen – echte Scheinwerfer, Schatten, Bloom, volumetrische Lichtkegel & realistische Personen. (Das ist KEIN Kamera-Werkzeug.)"
             >
               <span className="tool-icon">📷</span>
               <span className="tool-label">Foto</span>

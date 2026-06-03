@@ -79,41 +79,6 @@ const BEAM_FRAG = /* glsl */`
     gl_FragColor = vec4(uColor, a);
   }`;
 
-// A projected "gobo" that gives each spotlight a physically-shaped soft edge.
-// Real fixtures don't throw a hard-edged disc — intensity falls off gradually
-// from the centre (50 % at the beam angle, 10 % at the field angle, then spill).
-// We bake that exact radial Gaussian (same σ the heat-map uses) into a texture
-// and project it as SpotLight.map, so the floor pool fades off like the real
-// beam instead of ending in a hard circle. Cached per (rounded) field angle.
-const beamMapCache = new Map<number, THREE.Texture>();
-function beamProfileMap(fieldAngleDeg: number): THREE.Texture {
-  const key = Math.round(Math.max(2, fieldAngleDeg));
-  const hit = beamMapCache.get(key);
-  if (hit) return hit;
-  const N = 128;
-  const fieldHalf = (key / 2) * (Math.PI / 180);
-  const sigma = fieldHalf / Math.sqrt(2 * Math.LN10); // I(fieldHalf) = 10 % · I₀
-  const coneHalf = fieldHalf * 1.7;                    // texture radius 1.0 ⇒ Gaussian tail ≈ 0
-  const cv = document.createElement('canvas'); cv.width = N; cv.height = N;
-  const ctx = cv.getContext('2d')!;
-  const img = ctx.createImageData(N, N);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const nx = ((x + 0.5) / N) * 2 - 1, ny = ((y + 0.5) / N) * 2 - 1;
-    const theta = Math.hypot(nx, ny) * coneHalf;
-    const v = Math.exp(-(theta * theta) / (2 * sigma * sigma));
-    const c = Math.max(0, Math.min(255, Math.round(255 * v)));
-    const i = (y * N + x) * 4;
-    img.data[i] = c; img.data[i + 1] = c; img.data[i + 2] = c; img.data[i + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(cv);
-  tex.colorSpace = THREE.NoColorSpace; // use the Gaussian values directly (no sRGB decode)
-  tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
-  tex.needsUpdate = true;
-  beamMapCache.set(key, tex);
-  return tex;
-}
-
 // Bend the standard (Mixamo/RPM) skeleton into a seated pose: thighs forward,
 // knees bent, slight forward lean + arms resting. Tuned for the bundled avatar.
 function applySitPose(root: THREE.Object3D) {
@@ -281,10 +246,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
   // Real human model for the photo view (lazy-loaded on first use).
   const [personModel, setPersonModel] = React.useState<PersonModel | null>(null);
   useEffect(() => {
-    // Load the real human for the photo view AND the heat-map (so heat values
-    // drape onto a real body, not a stand-in).
-    if ((photoMode || showHeatMap) && !personModel) loadPersonModel().then(setPersonModel).catch(() => { /* keep fallback */ });
-  }, [photoMode, showHeatMap, personModel]);
+    // Load the real human only for the photo view (plain 3D / heat-map use the
+    // simple stand-in figure, so the heavy GLB isn't needed there).
+    if (photoMode && !personModel) loadPersonModel().then(setPersonModel).catch(() => { /* keep fallback */ });
+  }, [photoMode, personModel]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1004,11 +969,11 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         }
       }
 
-      // A real, photo-scanned casual human whenever the model is available —
-      // used for BOTH the photo view and the heat-map. In heat-map mode the
-      // figure stays photo-real and the lux values are draped on top (so the
-      // person is never replaced by a stand-in shape).
-      if ((photoMode || heatOn) && personModel) {
+      // A real, photo-scanned casual human — ONLY in the photo view. Plain 3D
+      // and the heat-map use the simple stand-in figure (below), so turning the
+      // photo view off (or heat-map on without photo) gives clean cylinders.
+      // In photo + heat-map the lux values are draped on top of the real body.
+      if (photoMode && personModel) {
         const m = cloneSkeleton(personModel.scene) as THREE.Group;
         const s = p.height / personModel.height;
         m.scale.setScalar(s);
@@ -1083,22 +1048,25 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         .filter((f) => !f.hidden && peakCandela(f) > 0)
         .map((f) => ({ id: f.id, cd: peakCandela(f) }))
         .sort((a, b) => b.cd - a.cd);
-      const MAX_LIGHTS = 24, MAX_SHADOWS = 6;
+      const MAX_LIGHTS = 12, MAX_SHADOWS = 4;
       ranked.slice(0, MAX_LIGHTS).forEach((r, i) => { litIds.add(r.id); if (i < MAX_SHADOWS) shadowIds.add(r.id); });
     }
 
     // Fixtures
     if (layers.fixtures.visible) for (const f of fixtures) {
       const isSel = selectedIds.has(f.id);
-      const hidden = !!f.hidden; // muted lamp: ghosted body, no beam
+      // "off" = emits no light: hidden, dimmed to 0, or fully blocked by gel.
+      // Drives both the ghosted body and the (no) beam, so a lamp switched off
+      // in a scene reads as off in 3D.
+      const off = peakCandela(f) <= 0;
       const group = new THREE.Group();
       group.userData = { dynamic: true, selectId: f.id };
 
       // Fixture body (small box at mounting height)
       const bodyGeo = new THREE.BoxGeometry(0.4, 0.3, 0.5);
       const bodyMat = new THREE.MeshStandardMaterial({
-        color: isSel ? '#ffcc33' : (hidden ? '#5a6270' : '#4fc3f7'),
-        transparent: hidden, opacity: hidden ? 0.4 : 1,
+        color: isSel ? '#ffcc33' : (off ? '#5a6270' : '#4fc3f7'),
+        transparent: off, opacity: off ? 0.4 : 1,
       });
       const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
       bodyMesh.position.set(f.x, f.mountingHeight, f.y);
@@ -1121,11 +1089,11 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const beamRadAtBase = Math.tan((fieldAngle / 2) * (Math.PI / 180)) * coneHeight;
       const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
-      // In the photo view a beam is only visible where there's haze in the air
-      // (just like reality) – the shaft fades out as haze → 0. A global toggle
-      // (showBeams) turns the volumetric shafts off entirely (e.g. for a big rig
-      // on a weaker GPU); haze 0 also disables them (zero cost).
-      if (!hidden && coneHeight > 0.1 && (photoMode ? (showBeams && haze > 0.01) : true)) {
+      // A beam is only drawn for a lamp that actually emits — peakCandela() is 0
+      // when the fixture is hidden OR dimmed to 0 (or fully blocked by gel), so a
+      // lamp switched off in a scene shows no cone. In the photo view it also
+      // needs haze, and the global showBeams toggle / haze 0 disable all shafts.
+      if (!off && coneHeight > 0.1 && (photoMode ? (showBeams && haze > 0.01) : true)) {
         const coneDirNorm = coneVec.clone().normalize();
         const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), coneDirNorm);
         const beamColor = isSel ? new THREE.Color('#ffcc33') : new THREE.Color(getBeamColorHex(f));
@@ -1147,7 +1115,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
               uSigma: { value: fieldHalfRad / Math.sqrt(2 * Math.LN10) },
               uColor: { value: beamColor },
               uHaze: { value: haze },
-              uIntensity: { value: 0.7 + 0.3 * (f.dimming / 100) },
+              uIntensity: { value: Math.max(0.12, f.dimming / 100) }, // beam density tracks the dimmer
               uTipFade: { value: 0.05 },
               uGain: { value: 32.0 },
               uHG: { value: 0.6 },     // forward-scattering haze (Mie-like)
@@ -1190,18 +1158,18 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         const spot = new THREE.SpotLight(new THREE.Color(getBeamColorHex(f)));
         spot.position.copy(fixturePos);
         spot.target.position.copy(aimPos);
-        // Physically-shaped soft edge: open the cone out to the beam's soft tail
-        // (1.7×field-half) and project the beam's own Gaussian intensity profile
-        // as the spotlight map, so the floor pool fades off gradually like a real
-        // fixture instead of ending in a hard circle.
+        // Soft pool edge via penumbra (NOT a projected map): giving every
+        // spotlight its own gobo texture blew past the GPU's texture-unit limit
+        // once a rig had a handful of lamps, which made all the lit materials
+        // (people, fixtures, floor) fail to render — they vanished, leaving only
+        // the unlit heat-map overlays. Penumbra needs no texture and still fades
+        // the edge gradually (cone opened a little past the field angle).
         const fieldHalfRad = (fieldAngle / 2) * (Math.PI / 180);
-        spot.angle = Math.min(Math.PI / 2.2, fieldHalfRad * 1.7);
-        spot.penumbra = 0.18;            // the Gaussian map carries the edge softness
+        spot.angle = Math.min(Math.PI / 2.2, fieldHalfRad * 1.35);
+        spot.penumbra = 0.55;
         spot.decay = 2;
         spot.distance = 0;
         spot.intensity = peakCandela(f) * LIGHT_K;
-        spot.map = beamProfileMap(fieldAngle);
-        spot.shadow.focus = 1;           // project the map across the full cone (even without shadows)
         if (shadowIds.has(f.id)) {
           spot.castShadow = true;
           spot.shadow.mapSize.set(1024, 1024);
