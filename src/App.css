@@ -6,18 +6,24 @@
 }
 
 :root {
-  --bg: #1a1a2e;
-  --panel: #252536;
-  --panel-alt: #2a2a3c;
-  --border: #3a3a50;
-  --accent: #4fc3f7;
-  --accent2: #ff7043;
-  --warn: #ffa726;
-  --danger: #ef5350;
-  --success: #66bb6a;
-  --text: #e0e0e0;
-  --text2: #999;
-  --radius: 6px;
+  --bg: #0e1116;
+  --bg-2: #141a22;
+  --panel: #171e27;
+  --panel-alt: #1c242f;
+  --border: #28323f;
+  --line-2: #323e4d;
+  --accent: #3b9dff;
+  --accent-soft: #3b9dff22;
+  --accent2: #ff7a45;
+  --warm: #f5a524;
+  --warn: #f5a524;
+  --danger: #fb7185;
+  --success: #34d399;
+  --good: #34d399;
+  --text: #e7eef6;
+  --text2: #9aa7b6;
+  --text3: #5f6c7c;
+  --radius: 8px;
 }
 
 body {
@@ -34,16 +40,19 @@ body {
 
 /* ── App Layout ────────────────────────────────────────── */
 .app {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 52px 1fr 28px;
   height: 100vh;
+  background: var(--bg);
 }
 
 .app-body {
-  display: flex;
-  flex: 1;
+  display: grid;
+  grid-template-columns: 56px 264px 1fr 308px;
+  min-height: 0;
   overflow: hidden;
 }
+.canvas-area { min-width: 0; }
 
 /* ── Menu Bar ──────────────────────────────────────────── */
 .menubar {
@@ -2251,3 +2260,114 @@ kbd {
   background: rgba(239, 83, 80, 0.15);
   border-radius: 3px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   NEW UI CHROME (TopBar / ToolRail / Dock / StatusBar / CanvasActions)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Top app bar ── */
+.topbar {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px;
+  padding: 0 14px; background: linear-gradient(#1a222d, #141b24);
+  border-bottom: 1px solid var(--border); position: relative; z-index: 30;
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-logo { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #3b9dff, #7c5cff); box-shadow: inset 0 0 0 1px #ffffff22, 0 4px 12px -5px #3b9dff88; }
+.brand-name { font-size: 14px; font-weight: 700; letter-spacing: .2px; }
+.brand-proj { color: var(--text2); font-size: 12px; padding-left: 12px; border-left: 1px solid var(--line-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.tb-menuwrap { position: relative; }
+.tb-icon { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel);
+  color: var(--text2); display: grid; place-items: center; cursor: pointer; }
+.tb-icon:hover { color: var(--text); border-color: var(--line-2); }
+.tb-icon.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.tb-btn { height: 34px; padding: 0 13px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel);
+  color: var(--text); font: inherit; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.tb-btn:hover { border-color: var(--line-2); }
+.tb-btn.primary { background: linear-gradient(#3b9dff, #2f86e6); border-color: #2f86e6; color: #fff; box-shadow: 0 4px 12px -5px #3b9dff99; }
+.tb-div { width: 1px; height: 22px; background: var(--border); margin: 0 2px; }
+.topbar-right { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+
+.tb-modeswitch { display: flex; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; justify-self: center; }
+.tb-modeswitch button { appearance: none; border: 0; background: transparent; color: var(--text2); font: inherit; font-weight: 600;
+  font-size: 13px; padding: 6px 16px; border-radius: 7px; cursor: pointer; display: flex; align-items: center; gap: 7px; }
+.tb-modeswitch button:hover { color: var(--text); }
+.tb-modeswitch button.on { background: var(--accent); color: #fff; box-shadow: 0 2px 8px -2px var(--accent); }
+
+/* dropdown / popover */
+.tb-dropdown { position: absolute; top: 42px; min-width: 250px; background: var(--panel); border: 1px solid var(--line-2);
+  border-radius: 12px; box-shadow: 0 16px 40px -12px #000c, 0 4px 12px -4px #0008; padding: 7px; z-index: 50; }
+.topbar-left .tb-dropdown { left: 0; }
+.topbar-right .tb-dropdown { right: 0; }
+.tb-render { width: 280px; }
+.tb-dd-sec { font-size: 10px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text3); font-weight: 700; padding: 9px 10px 5px; }
+.tb-dd-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: transparent; border: 0;
+  color: var(--text); font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.tb-dd-item:hover { background: var(--panel-alt); }
+.tb-dd-item kbd { margin-left: auto; color: var(--text3); font-size: 11px; font-family: ui-monospace, monospace; }
+.tb-dd-item .tb-check { margin-left: auto; color: var(--text3); opacity: 0; }
+.tb-dd-item .tb-check.on { opacity: 1; color: var(--accent); }
+.tb-dd-div { height: 1px; background: var(--border); margin: 6px 4px; }
+.tb-hint { color: var(--text2); font-size: 12px; padding: 10px; line-height: 1.45; }
+.tb-hint b { color: var(--text); }
+.tb-slider { display: grid; grid-template-columns: 78px 1fr 44px; align-items: center; gap: 8px; padding: 7px 10px; color: var(--text2); font-size: 12px; }
+.tb-slider input[type=range] { accent-color: var(--accent); }
+.tb-slider input[type=number] { width: 100%; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 6px; font: inherit; }
+.tb-slider em { color: var(--text); font-style: normal; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── Tool rail ── */
+.toolrail { background: var(--bg-2); border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  align-items: center; gap: 5px; padding: 10px 0; z-index: 20; }
+.toolrail-btn { position: relative; width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--text2); display: grid; place-items: center; cursor: pointer; }
+.toolrail-btn:hover { background: var(--panel); color: var(--text); }
+.toolrail-btn.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.toolrail-div { width: 24px; height: 1px; background: var(--border); margin: 4px 0; }
+.toolrail-tip { position: absolute; left: 48px; top: 50%; transform: translateY(-50%) translateX(-4px);
+  background: #0b0f14; color: var(--text); border: 1px solid var(--line-2); padding: 4px 9px; border-radius: 7px;
+  font-size: 12px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s, transform .12s; z-index: 60; box-shadow: var(--sh, 0 4px 12px -4px #000a); }
+.toolrail-btn:hover .toolrail-tip { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+/* ── Left dock ── */
+.dock { background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.dock-tabs { display: flex; gap: 3px; padding: 8px 8px 0; border-bottom: 1px solid var(--border); }
+.dock-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 4px; border: 0;
+  background: transparent; color: var(--text2); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 8px 8px 0 0; position: relative; }
+.dock-tab:hover { color: var(--text); }
+.dock-tab.on { color: var(--text); background: var(--panel-alt); box-shadow: inset 0 -2px 0 var(--accent); }
+.dock-badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; border-radius: 20px; padding: 0 6px; }
+.dock-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+/* panels reused inside the dock — strip their standalone chrome */
+.dock-body .sidebar { width: 100%; min-width: 0; border: 0; background: transparent; flex: 1; }
+.dock-body .scene-panel, .dock-body .layers-panel { position: static; width: 100%; background: transparent;
+  border: 0; border-radius: 0; backdrop-filter: none; box-shadow: none; top: auto; right: auto; bottom: auto; left: auto; }
+
+/* ── Inspector (existing property panel fills its column) ── */
+.property-panel { width: 100%; min-width: 0; }
+
+/* ── Status bar ── */
+.statusbar { display: flex; align-items: center; gap: 16px; padding: 0 14px; background: var(--bg-2);
+  border-top: 1px solid var(--border); color: var(--text2); font-size: 11.5px; }
+.sb-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sb-item b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
+.sb-lux b { color: var(--warm); }
+.sb-spacer { flex: 1; }
+.sb-scene { color: var(--good); }
+.sb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 7px 1px var(--good); }
+
+/* ── Canvas contextual actions ── */
+.canvas-actions { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 15; }
+.ca-group { display: flex; align-items: center; gap: 3px; background: #10161ecc; backdrop-filter: blur(10px);
+  border: 1px solid var(--line-2); border-radius: 11px; padding: 5px 8px; box-shadow: 0 8px 24px -10px #000c; }
+.ca-label { color: var(--text3); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; font-weight: 700; margin-right: 4px; }
+.ca-btn { height: 30px; min-width: 30px; padding: 0 6px; border: 0; border-radius: 8px; background: transparent; color: var(--text2);
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; }
+.ca-btn:hover { background: var(--panel); color: var(--text); }
+.ca-btn.text { padding: 0 9px; }
+.ca-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+
+/* dock library: tab already says "Bibliothek" — drop the redundant heading, keep the hint */
+.dock-body .sidebar-header h2 { display: none; }
+.dock-body .sidebar-header { padding: 8px 12px 2px; }
+.dock-body .sidebar-hint { font-size: 11px; color: var(--text3); }
