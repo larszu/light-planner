@@ -195,7 +195,7 @@ const App: React.FC = () => {
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
   }, []);
-  useEffect(() => { if (viewMode === '3d') setPlanMode('none'); }, [viewMode]);
+  useEffect(() => { if (viewMode === '3d') setPlanMode('none'); setCursorLux(null); }, [viewMode]);
 
   // Switching to any drawing/placement tool cancels a pending fixture drop,
   // so the tool isn't swallowed by the place-on-click handler.
@@ -693,6 +693,33 @@ const App: React.FC = () => {
     setProjectDialogMode(null);
   }, []);
 
+  // ── New / empty project ──
+  // Clears the scene (keeping the user's custom-fixture library) so you can
+  // start fresh. Confirms first when there's unsaved content on the canvas.
+  const handleNew = useCallback(() => {
+    const hasContent = fixtures.length || persons.length || stageElements.length
+      || trusses.length || walls.length || ceilings.length || shapes.length || !!floorPlan;
+    if (hasContent && !window.confirm('Neues Projekt anlegen? Nicht gespeicherte Änderungen am aktuellen Projekt gehen verloren.')) return;
+    const now = new Date().toISOString();
+    handleLoadProject({
+      meta: { name: 'Neues Projekt', author: '', version: '1.0', createdAt: now, updatedAt: now },
+      fixtures: [], shapes: [], persons: [], stageElements: [],
+      customFixtures, fixtureGroups: [], trusses: [], walls: [], ceilings: [],
+      scenes: [], cameras: [], layers: DEFAULT_LAYERS, floorPlan: undefined,
+    });
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, shapes, floorPlan, customFixtures, handleLoadProject]);
+
+  useEffect(() => {
+    const onNewKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        handleNew();
+      }
+    };
+    window.addEventListener('keydown', onNewKey);
+    return () => window.removeEventListener('keydown', onNewKey);
+  }, [handleNew]);
+
   const handleDeleteProject = useCallback((id: string) => {
     deleteProjectFromStorage(id);
   }, []);
@@ -1045,6 +1072,7 @@ const App: React.FC = () => {
         viewMode={viewMode}
         showHeatMap={showHeatMap}
         snapEnabled={snapStep > 0}
+        onNew={handleNew}
         onSave={() => setProjectDialogMode('save')}
         onLoad={() => setProjectDialogMode('load')}
         onSaveToFile={handleSaveToFile}
@@ -1180,10 +1208,11 @@ const App: React.FC = () => {
                 exposure={exposure}
                 haze={haze}
                 onSelect={handleSelectWithGroups}
+                onHoverLux={setCursorLux}
               />
             </Suspense>
           )}
-          {cursorLux !== null && viewMode === '2d' && (
+          {cursorLux !== null && (
             <div className="cursor-lux-display">{Math.round(cursorLux)} lx</div>
           )}
           {fixtureToPlace && viewMode === '2d' && (

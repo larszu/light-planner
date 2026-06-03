@@ -6,6 +6,7 @@ interface Props {
   viewMode: ViewMode;
   showHeatMap: boolean;
   snapEnabled: boolean;
+  onNew: () => void;
   onSave: () => void;
   onLoad: () => void;
   onSaveToFile: () => void;
@@ -41,6 +42,8 @@ const MenuBar: React.FC<Props> = (props) => {
 
   const menus: { id: string; label: string; items: MenuItem[] }[] = [
     { id: 'file', label: t('menu.file', 'Datei'), items: [
+      { label: t('menu.new', 'Neu'), shortcut: 'Strg+N', onClick: props.onNew },
+      { label: '', separator: true },
       { label: t('menu.save', 'Speichern (Browser)…'), shortcut: 'Strg+S', onClick: props.onSave },
       { label: t('menu.load', 'Laden (Browser)…'), onClick: props.onLoad },
       { label: '', separator: true },

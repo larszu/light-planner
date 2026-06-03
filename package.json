@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "shots": "node scripts/render-shots.mjs",
     "electron:dev": "vite build && electron .",
     "electron:build": "vite build && electron-builder --win",
     "dist:win": "npm run build && electron-builder --win nsis portable --publish never",
