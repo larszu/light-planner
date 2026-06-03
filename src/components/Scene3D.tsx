@@ -15,7 +15,93 @@ import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
-const LIGHT_K = 0.0016;
+const LIGHT_K = 0.005;
+
+// ── Volumetric haze-beam shader (photo view, raymarched) ─────────────────────
+// A real beam in haze is light scattered through the beam *volume*, so the eye
+// integrates a bright core with soft edges. We render the bounding cone's near
+// wall and raymarch the view ray forward through the cone, integrating the beam's
+// own Gaussian radial profile (10 % at the field angle — the σ the heat-map uses)
+// with a ~1/d² scatter that's denser near the lamp. A per-pixel jitter hides the
+// step count. Density is driven entirely by the haze slider (haze 0 ⇒ nothing).
+const BEAM_VERT = /* glsl */`
+  varying vec3 vWorldPos;
+  void main() {
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }`;
+const BEAM_FRAG = /* glsl */`
+  precision highp float;
+  varying vec3 vWorldPos;
+  uniform vec3 uApex;     // lamp position (world)
+  uniform vec3 uDir;      // unit axis apex→aim (world)
+  uniform float uHeight;  // apex→floor distance
+  uniform float uSigma;   // Gaussian σ (rad), anchored on the field angle
+  uniform vec3 uColor; uniform float uHaze; uniform float uIntensity; uniform float uTipFade; uniform float uGain;
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(41.31, 289.07))) * 43758.5453); }
+  void main() {
+    vec3 ro = cameraPosition;
+    vec3 rd = normalize(vWorldPos - ro);
+    float entry = length(vWorldPos - ro);     // near wall (FrontSide)
+    const int STEPS = 22;
+    float step = uHeight / float(STEPS);
+    float jitter = hash(gl_FragCoord.xy) * step;
+    float acc = 0.0;
+    for (int i = 0; i < STEPS; i++) {
+      vec3 P = ro + rd * (entry + jitter + float(i) * step);
+      vec3 toP = P - uApex;
+      float axial = dot(toP, uDir);            // along the beam axis
+      if (axial < 0.0 || axial > uHeight) continue;
+      float radial = length(toP - uDir * axial);
+      float theta = atan(radial / max(axial, 0.03));
+      float g = exp(-(theta * theta) / (2.0 * uSigma * uSigma));
+      float tip = smoothstep(0.0, uTipFade * uHeight, axial);
+      float t = axial / uHeight;
+      acc += g * tip / (1.0 + 5.0 * t * t);     // ~1/d² scatter, brightest near the lamp
+    }
+    // Beer–Lambert saturation: keeps a side view visible while a near-axial view
+    // (long path through the core) saturates softly instead of blowing out.
+    float dens = acc * step * uHaze * uIntensity * uGain;
+    float a = (1.0 - exp(-dens)) * 0.85;
+    if (a < 0.003) discard;
+    gl_FragColor = vec4(uColor, a);
+  }`;
+
+// A projected "gobo" that gives each spotlight a physically-shaped soft edge.
+// Real fixtures don't throw a hard-edged disc — intensity falls off gradually
+// from the centre (50 % at the beam angle, 10 % at the field angle, then spill).
+// We bake that exact radial Gaussian (same σ the heat-map uses) into a texture
+// and project it as SpotLight.map, so the floor pool fades off like the real
+// beam instead of ending in a hard circle. Cached per (rounded) field angle.
+const beamMapCache = new Map<number, THREE.Texture>();
+function beamProfileMap(fieldAngleDeg: number): THREE.Texture {
+  const key = Math.round(Math.max(2, fieldAngleDeg));
+  const hit = beamMapCache.get(key);
+  if (hit) return hit;
+  const N = 128;
+  const fieldHalf = (key / 2) * (Math.PI / 180);
+  const sigma = fieldHalf / Math.sqrt(2 * Math.LN10); // I(fieldHalf) = 10 % · I₀
+  const coneHalf = fieldHalf * 1.7;                    // texture radius 1.0 ⇒ Gaussian tail ≈ 0
+  const cv = document.createElement('canvas'); cv.width = N; cv.height = N;
+  const ctx = cv.getContext('2d')!;
+  const img = ctx.createImageData(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const nx = ((x + 0.5) / N) * 2 - 1, ny = ((y + 0.5) / N) * 2 - 1;
+    const theta = Math.hypot(nx, ny) * coneHalf;
+    const v = Math.exp(-(theta * theta) / (2 * sigma * sigma));
+    const c = Math.max(0, Math.min(255, Math.round(255 * v)));
+    const i = (y * N + x) * 4;
+    img.data[i] = c; img.data[i + 1] = c; img.data[i + 2] = c; img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.NoColorSpace; // use the Gaussian values directly (no sRGB decode)
+  tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  beamMapCache.set(key, tex);
+  return tex;
+}
 
 // Bend the standard (Mixamo/RPM) skeleton into a seated pose: thighs forward,
 // knees bent, slight forward lean + arms resting. Tuned for the bundled avatar.
@@ -235,16 +321,17 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     pmrem.compileEquirectangularShader();
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = env;
-    scene.environmentIntensity = photoModeRef.current ? 0.32 : 0;
+    scene.environmentIntensity = photoModeRef.current ? 0.18 : 0;
 
-    // Lighting. Photo mode keeps a gentle sky/ground hemisphere fill plus the
-    // IBL above so the scene has believable ambience, while the fixtures
-    // dominate and cast the real shadows; the flat ambient/key stay low.
-    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? 0.12 : 0.5);
+    // Lighting. Photo mode keeps a low sky/ground hemisphere fill plus a little
+    // IBL so unlit faces aren't pure black — but kept dim on purpose so the
+    // fixtures dominate, the floor pools read with real brightness falloff and
+    // the cast shadows stay visible (high contrast = lit vs not).
+    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? 0.07 : 0.5);
     scene.add(ambient);
-    const hemi = new THREE.HemisphereLight('#556688', '#14141c', photoModeRef.current ? 0.85 : 0.0);
+    const hemi = new THREE.HemisphereLight('#556688', '#14141c', photoModeRef.current ? 0.40 : 0.0);
     scene.add(hemi);
-    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.12 : 0.3);
+    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.07 : 0.3);
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
@@ -411,10 +498,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     if (!s) return;
     s.renderer.toneMapping = photoMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     s.renderer.toneMappingExposure = exposure;
-    s.ambient.intensity = photoMode ? 0.12 : 0.5;
-    s.hemi.intensity = photoMode ? 0.85 : 0.0;
-    s.dir.intensity = photoMode ? 0.12 : 0.3;
-    s.scene.environmentIntensity = photoMode ? 0.32 : 0;
+    s.ambient.intensity = photoMode ? 0.07 : 0.5;
+    s.hemi.intensity = photoMode ? 0.40 : 0.0;
+    s.dir.intensity = photoMode ? 0.07 : 0.3;
+    s.scene.environmentIntensity = photoMode ? 0.18 : 0;
     s.grid.visible = !photoMode;
     (s.ground.material as THREE.MeshStandardMaterial).color.set(photoMode ? '#313139' : '#222238');
     const bg = photoMode ? '#15151c' : '#1a1a2e';
@@ -1023,36 +1110,63 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const dimOpacity = 0.03 + 0.06 * (f.dimming / 100); // visible but not washed out when stacked
 
       // In the photo view a beam is only visible where there's haze in the air
-      // (just like reality) – the shaft fades out as haze → 0.
-      if (!hidden && coneHeight > 0.1 && (!photoMode || haze > 0.01)) {
-        const coneGeo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
-        // Shift geometry so tip is at local origin (tip at y=+h/2, base at y=-h/2)
-        coneGeo.translate(0, -coneHeight / 2, 0);
-
-        // Photo mode: additive haze shaft scaled by the haze amount; bloom then
-        // turns the bright core into a glow. Back faces only so the shaft
-        // doesn't wash out subjects in front of it.
-        const volA = (0.025 + 0.06 * (f.dimming / 100)) * Math.min(1.0, haze * 3);
-        const coneMat = new THREE.MeshBasicMaterial({
-          color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
-          transparent: true,
-          opacity: photoMode ? volA : (isSel ? Math.max(dimOpacity, 0.02) : dimOpacity),
-          side: photoMode ? THREE.BackSide : THREE.DoubleSide,
-          depthWrite: false,
-          blending: photoMode ? THREE.AdditiveBlending : THREE.NormalBlending,
-        });
-        const cone = new THREE.Mesh(coneGeo, coneMat);
-        cone.userData = { noPick: true }; // don't let the beam shaft swallow the lux pick
-        cone.position.copy(fixturePos);
-
-        // Orient: local -Y (base direction) should point toward aim
+      // (just like reality) – the shaft fades out as haze → 0. The raymarched
+      // shaft is also capped to the brightest fixtures (litIds, ≤24) so a huge
+      // rig can't tank the GPU; haze 0 disables all beams (zero cost).
+      if (!hidden && coneHeight > 0.1 && (photoMode ? (haze > 0.01 && litIds.has(f.id)) : true)) {
         const coneDirNorm = coneVec.clone().normalize();
-        const quat = new THREE.Quaternion().setFromUnitVectors(
-          new THREE.Vector3(0, -1, 0),
-          coneDirNorm,
-        );
-        cone.setRotationFromQuaternion(quat);
-        group.add(cone);
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), coneDirNorm);
+        const beamColor = isSel ? new THREE.Color('#ffcc33') : new THREE.Color(getBeamColorHex(f));
+
+        if (photoMode) {
+          // True volumetric shaft, raymarched in BEAM_FRAG. The bounding cone is
+          // a touch wider than the field angle so the Gaussian tail fades out
+          // *inside* it (no hard rim); closed + FrontSide so the near wall always
+          // gives the march a start point.
+          const fieldHalfRad = (fieldAngle / 2) * (Math.PI / 180);
+          const halfA = Math.min(Math.PI / 2.1, fieldHalfRad * 1.45);
+          const geo = new THREE.ConeGeometry(Math.tan(halfA) * coneHeight, coneHeight, 40, 1, false);
+          geo.translate(0, -coneHeight / 2, 0);
+          const cone = new THREE.Mesh(geo, new THREE.ShaderMaterial({
+            uniforms: {
+              uApex: { value: fixturePos.clone() },
+              uDir: { value: coneDirNorm.clone() },
+              uHeight: { value: coneHeight },
+              uSigma: { value: fieldHalfRad / Math.sqrt(2 * Math.LN10) },
+              uColor: { value: beamColor },
+              uHaze: { value: haze },
+              uIntensity: { value: 0.7 + 0.3 * (f.dimming / 100) },
+              uTipFade: { value: 0.05 },
+              uGain: { value: 3.5 },
+            },
+            vertexShader: BEAM_VERT,
+            fragmentShader: BEAM_FRAG,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.FrontSide,
+            blending: THREE.AdditiveBlending,
+          }));
+          cone.userData = { noPick: true };
+          cone.position.copy(fixturePos);
+          cone.setRotationFromQuaternion(quat);
+          group.add(cone);
+        } else {
+          // Technical 3D: a faint solid cone as a beam-coverage indicator.
+          const geo = new THREE.ConeGeometry(beamRadAtBase, coneHeight, 24, 1, true);
+          geo.translate(0, -coneHeight / 2, 0);
+          const cone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            color: beamColor,
+            transparent: true,
+            opacity: isSel ? Math.max(dimOpacity, 0.02) : dimOpacity,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.NormalBlending,
+          }));
+          cone.userData = { noPick: true };
+          cone.position.copy(fixturePos);
+          cone.setRotationFromQuaternion(quat);
+          group.add(cone);
+        }
       }
 
       // Photo mode: a real spotlight from this fixture → genuine shadows on
@@ -1062,12 +1176,18 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         const spot = new THREE.SpotLight(new THREE.Color(getBeamColorHex(f)));
         spot.position.copy(fixturePos);
         spot.target.position.copy(aimPos);
-        spot.angle = Math.min(Math.PI / 2.2, (fieldAngle / 2) * (Math.PI / 180));
-        const beamDeg = f.currentBeamAngle ?? f.fixture.beamAngle;
-        spot.penumbra = Math.max(0.15, Math.min(0.9, 1 - beamDeg / Math.max(fieldAngle, 0.01)));
+        // Physically-shaped soft edge: open the cone out to the beam's soft tail
+        // (1.7×field-half) and project the beam's own Gaussian intensity profile
+        // as the spotlight map, so the floor pool fades off gradually like a real
+        // fixture instead of ending in a hard circle.
+        const fieldHalfRad = (fieldAngle / 2) * (Math.PI / 180);
+        spot.angle = Math.min(Math.PI / 2.2, fieldHalfRad * 1.7);
+        spot.penumbra = 0.18;            // the Gaussian map carries the edge softness
         spot.decay = 2;
         spot.distance = 0;
         spot.intensity = peakCandela(f) * LIGHT_K;
+        spot.map = beamProfileMap(fieldAngle);
+        spot.shadow.focus = 1;           // project the map across the full cone (even without shadows)
         if (shadowIds.has(f.id)) {
           spot.castShadow = true;
           spot.shadow.mapSize.set(1024, 1024);
@@ -1118,13 +1238,17 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         group.add(spot.target);
       }
 
-      // Thin line from fixture to aim point
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(f.x, f.mountingHeight, f.y),
-        new THREE.Vector3(f.aimX, 0, f.aimY),
-      ]);
-      const lineMat = new THREE.LineBasicMaterial({ color: isSel ? '#ffcc33' : '#888888', opacity: 0.5, transparent: true });
-      group.add(new THREE.Line(lineGeo, lineMat));
+      // Thin fixture→aim helper line — useful in the technical view, but
+      // unrealistic in the photo view, so draw it only when not in photo mode
+      // (or when this fixture is selected, to keep the aim editable).
+      if (!photoMode || isSel) {
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(f.x, f.mountingHeight, f.y),
+          new THREE.Vector3(f.aimX, 0, f.aimY),
+        ]);
+        const lineMat = new THREE.LineBasicMaterial({ color: isSel ? '#ffcc33' : '#888888', opacity: 0.5, transparent: true });
+        group.add(new THREE.Line(lineGeo, lineMat));
+      }
 
       scene.add(group);
     }

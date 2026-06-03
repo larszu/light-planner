@@ -35,7 +35,7 @@ export const useUiStore = create<UiState>((set) => ({
   heatMapScale: 1000,
   heatMapTarget: 0,
   photoMode: false,
-  exposure: 1.0,
+  exposure: 1.2,
   haze: 0.15,
   snapStep: 0,
   language: (typeof localStorage !== 'undefined' && localStorage.getItem('lp-lang') === 'en' ? 'en' : 'de'),

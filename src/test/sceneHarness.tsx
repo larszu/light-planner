@@ -28,8 +28,8 @@ const allLayers: Layers = (
 // Two profile spots on an overhead truss lighting two people (one standing on
 // the floor, one sitting on a low podium), with a reflective back wall.
 const fixtures: PlacedFixture[] = [
-  fx('etc-s4-zoom-25-50', { x: 3, y: 1.5, mountingHeight: 6, aimX: 5, aimY: 6, currentColorTemp: 5600 }),
-  fx('etc-s4-zoom-25-50', { x: 8, y: 1.5, mountingHeight: 6, aimX: 7.4, aimY: 6.6, currentColorTemp: 3000 }),
+  fx('etc-s4-19', { x: 3, y: 1.5, mountingHeight: 6, aimX: 5, aimY: 6, currentColorTemp: 5600 }),
+  fx('etc-s4-19', { x: 8, y: 1.5, mountingHeight: 6, aimX: 7.4, aimY: 6.6, currentColorTemp: 3000 }),
 ];
 const persons: Person[] = [
   { id: 'p1', x: 5, y: 6, height: 1.80, label: 'A', pose: 'standing', facing: 270 },
