@@ -17,6 +17,7 @@ const en: Record<string, string> = {
   'menu.edit': 'Edit',
   'menu.view': 'View',
   'menu.help': 'Help',
+  'menu.new': 'New',
   'menu.save': 'Save (browser)…',
   'menu.load': 'Load (browser)…',
   'menu.saveFile': 'Project to file… (choose location)',

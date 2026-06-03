@@ -40,10 +40,31 @@ function applySitPose(root: THREE.Object3D) {
 // it isn't loaded (or in the non-photo view).
 interface PersonModel { scene: THREE.Group; height: number; minY: number }
 let personModelPromise: Promise<PersonModel> | null = null;
+
+// Load the model bytes via XHR rather than three's fetch-based FileLoader:
+// fetch() can't read file:// URLs, so the packaged Electron app (which serves
+// the UI from file://) would otherwise fail to load the GLB and fall back to
+// the stand-in figure. XHR handles both http(s) and file:// (status 0 = ok).
+function fetchArrayBuffer(url: string): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'arraybuffer';
+    xhr.onload = () => (xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300))
+      ? resolve(xhr.response as ArrayBuffer)
+      : reject(new Error(`HTTP ${xhr.status} for ${url}`));
+    xhr.onerror = () => reject(new Error(`network error for ${url}`));
+    xhr.send();
+  });
+}
+
 function loadPersonModel(): Promise<PersonModel> {
   if (!personModelPromise) {
     const url = `${import.meta.env.BASE_URL}models/person.glb`;
-    personModelPromise = new GLTFLoader().loadAsync(url).then((g) => {
+    const loader = new GLTFLoader();
+    personModelPromise = fetchArrayBuffer(url)
+      .then((buf) => loader.parseAsync(buf, ''))
+      .then((g) => {
       const scene = g.scene;
       // The bind pose is a T-pose; sample the idle clip so the figure stands
       // naturally (arms down). One mixer.update bakes the pose into the bones,
@@ -130,8 +151,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
   // Real human model for the photo view (lazy-loaded on first use).
   const [personModel, setPersonModel] = React.useState<PersonModel | null>(null);
   useEffect(() => {
-    if (photoMode && !personModel) loadPersonModel().then(setPersonModel).catch(() => { /* keep fallback */ });
-  }, [photoMode, personModel]);
+    // Load the real human for the photo view AND the heat-map (so heat values
+    // drape onto a real body, not a stand-in).
+    if ((photoMode || showHeatMap) && !personModel) loadPersonModel().then(setPersonModel).catch(() => { /* keep fallback */ });
+  }, [photoMode, showHeatMap, personModel]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -416,8 +439,11 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
       const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        // Always double-sided: these flat drapes have mixed triangle winding, so
+        // FrontSide would cull podium/polygon tops when viewed from above. The
+        // `twoSided` flag only governs the lux calc (lit from either face).
         vertexColors: true, transparent: true, depthWrite: false, toneMapped: false,
-        side: twoSided ? THREE.DoubleSide : THREE.FrontSide,
+        side: THREE.DoubleSide,
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       }));
       mesh.renderOrder = 2;
@@ -509,6 +535,52 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }));
       mesh.userData = { dynamic: true, selectId: selId };
       scene.add(mesh);
+    };
+
+    // Drape the heat-map over the *real* (posed, skinned) human: read each
+    // skinned vertex in its final world position, colour it by the lux that
+    // actually reaches it, and build a thin see-through shell hugging the body —
+    // so the figure stays photo-real while the head/torso/legs show real values.
+    const _v = new THREE.Vector3(), _n = new THREE.Vector3();
+    const buildPersonHeatOverlay = (root: THREE.Object3D, selId: string) => {
+      root.updateMatrixWorld(true);
+      root.traverse((o) => {
+        const sm = o as THREE.SkinnedMesh;
+        if (!(sm as unknown as THREE.Mesh).isMesh) return;
+        const geo = sm.geometry;
+        const posAttr = geo.getAttribute('position');
+        if (!posAttr) return;
+        const normAttr = geo.getAttribute('normal');
+        if ((sm as unknown as { isSkinnedMesh?: boolean }).isSkinnedMesh && sm.skeleton) sm.skeleton.update();
+        const normalMat = new THREE.Matrix3().getNormalMatrix(sm.matrixWorld);
+        const count = posAttr.count;
+        const wpos = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 4);
+        let anyLit = false;
+        for (let i = 0; i < count; i++) {
+          sm.getVertexPosition(i, _v);       // posed (skinned) local position
+          _v.applyMatrix4(sm.matrixWorld);   // → world
+          if (normAttr) _n.fromBufferAttribute(normAttr, i).applyMatrix3(normalMat).normalize();
+          else _n.set(0, 1, 0);
+          const [r, g, b, a] = heatColorAt(_v.x, _v.y, _v.z, _n.x, _n.y, _n.z, false);
+          // sit the shell a hair outside the skin to avoid z-fighting
+          wpos[i * 3] = _v.x + _n.x * 0.012; wpos[i * 3 + 1] = _v.y + _n.y * 0.012; wpos[i * 3 + 2] = _v.z + _n.z * 0.012;
+          colors[i * 4] = r; colors[i * 4 + 1] = g; colors[i * 4 + 2] = b; colors[i * 4 + 3] = a;
+          if (a > 0.004) anyLit = true;
+        }
+        if (!anyLit) return;
+        const og = new THREE.BufferGeometry();
+        og.setAttribute('position', new THREE.Float32BufferAttribute(wpos, 3));
+        if (geo.index) og.setIndex(Array.from(geo.index.array as ArrayLike<number>));
+        og.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+        const mesh = new THREE.Mesh(og, new THREE.MeshBasicMaterial({
+          vertexColors: true, transparent: true, depthWrite: false, toneMapped: false,
+          polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        }));
+        mesh.renderOrder = 3;
+        mesh.userData = { dynamic: true, selectId: selId };
+        scene.add(mesh);
+      });
     };
 
     // Floor heat-map (textured plane), sized to cover the whole rig.
@@ -707,24 +779,11 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         }
       }
 
-      // Heat-map drape: a tessellated figure coloured by the lux actually
-      // reaching each part of the body — the head, closer to the lamp, reads a
-      // different value than the feet. Takes precedence over the photo model so
-      // the values stay readable as data.
-      if (heatOn) {
-        const bodyH = p.height * 0.75, headR = p.height * 0.1;
-        const cyl = new THREE.CylinderGeometry(0.18, 0.2, bodyH, 16, 18);
-        cyl.translate(p.x, floorH + bodyH / 2, p.y);
-        paintFigureHeat(cyl, p.id);
-        const sph = new THREE.SphereGeometry(headR, 16, 14);
-        sph.translate(p.x, floorH + bodyH + headR, p.y);
-        paintFigureHeat(sph, p.id);
-        continue;
-      }
-
-      // Photo view: a real, photo-scanned casual human (its own PBR textures)
-      // that casts & receives real shadows. Scaled to the person's height.
-      if (photoMode && personModel) {
+      // A real, photo-scanned casual human whenever the model is available —
+      // used for BOTH the photo view and the heat-map. In heat-map mode the
+      // figure stays photo-real and the lux values are draped on top (so the
+      // person is never replaced by a stand-in shape).
+      if ((photoMode || heatOn) && personModel) {
         const m = cloneSkeleton(personModel.scene) as THREE.Group;
         const s = p.height / personModel.height;
         m.scale.setScalar(s);
@@ -744,10 +803,25 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
           if (!mesh.isMesh) return;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
-          if (isSel) mesh.material = Array.isArray(mesh.material) ? mesh.material.map(highlight) : highlight(mesh.material);
+          // Selection glow only in the pure photo view (the heat drape would hide it).
+          if (isSel && photoMode && !heatOn) mesh.material = Array.isArray(mesh.material) ? mesh.material.map(highlight) : highlight(mesh.material);
         });
         m.userData = { dynamic: true, selectId: p.id };
         scene.add(m);
+        if (heatOn) buildPersonHeatOverlay(m, p.id);
+        continue;
+      }
+
+      // Heat-map fallback before the model has loaded: a tessellated figure
+      // coloured by the lux reaching each body part (head vs feet).
+      if (heatOn) {
+        const bodyH = p.height * 0.75, headR = p.height * 0.1;
+        const cyl = new THREE.CylinderGeometry(0.18, 0.2, bodyH, 16, 18);
+        cyl.translate(p.x, floorH + bodyH / 2, p.y);
+        paintFigureHeat(cyl, p.id);
+        const sph = new THREE.SphereGeometry(headR, 16, 14);
+        sph.translate(p.x, floorH + bodyH + headR, p.y);
+        paintFigureHeat(sph, p.id);
         continue;
       }
 
@@ -828,7 +902,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         // Photo mode: additive haze shaft scaled by the haze amount; bloom then
         // turns the bright core into a glow. Back faces only so the shaft
         // doesn't wash out subjects in front of it.
-        const volA = (0.05 + 0.10 * (f.dimming / 100)) * Math.min(1.2, haze * 4);
+        const volA = (0.025 + 0.06 * (f.dimming / 100)) * Math.min(1.0, haze * 3);
         const coneMat = new THREE.MeshBasicMaterial({
           color: isSel ? '#ffcc33' : new THREE.Color(getBeamColorHex(f)),
           transparent: true,
@@ -942,8 +1016,10 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     //  block so the surface drape can share its lux scale.)
 
     // ── Dimension annotations (Maßlinien) ──
-    // Add size labels for stage elements
-    for (const se of stageElements) {
+    // CAD-style size labels — only in the plain 3D view. In the photo/heat-map
+    // views they clutter the render and (being depthTest:false) punch through
+    // podiums/people, hiding the heat drape on a podium top.
+    if (!photoMode && !showHeatMap) for (const se of stageElements) {
       const label = `${se.width}×${se.depth}m h=${se.height}m`;
       const canvas2d = document.createElement('canvas');
       canvas2d.width = 256;
