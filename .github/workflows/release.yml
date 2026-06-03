@@ -32,11 +32,11 @@ jobs:
             script: dist:mac
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@4e9702d5a75cbb4d7acb4e5fb5cf6a8b8d3aa5f2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - uses: actions/setup-node@49933ea5288caeca8642195f2ed94ec4c75d956a
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: 'npm'
