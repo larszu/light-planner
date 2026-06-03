@@ -15,7 +15,7 @@ import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
-const LIGHT_K = 0.005;
+const LIGHT_K = 0.0032;
 
 // ── Volumetric haze-beam shader (photo view, raymarched) ─────────────────────
 // A real beam in haze is light scattered through the beam *volume*, so the eye
@@ -45,17 +45,19 @@ const BEAM_FRAG = /* glsl */`
   void main() {
     vec3 ro = cameraPosition;
     vec3 rd = normalize(vWorldPos - ro);
-    float entry = length(vWorldPos - ro);     // near wall (FrontSide)
+    float far = length(vWorldPos - ro);       // far wall (BackSide) — always present
     const int STEPS = 24;
     float step = uHeight / float(STEPS);
     float jitter = hash(gl_FragCoord.xy) * step;
     float k = uHG, kk = uHG * uHG;
     float sigT = uExtinct * uHaze;            // extinction per metre
-    // Single-scattering integral along the view ray:
+    // Single-scattering integral along the view ray, marching from the cone's far
+    // wall back toward the camera (so the shaft is visible from any orbit/inside):
     //   L = ∫ phase(α)·E(P)·T_light·T_view ds,  E = I(θ)/d² (true inverse-square).
     float acc = 0.0;
     for (int i = 0; i < STEPS; i++) {
-      float s = entry + jitter + float(i) * step; // camera → P distance
+      float s = far - jitter - float(i) * step; // distance from camera; march toward it
+      if (s <= 0.0) break;                       // don't sample behind the camera
       vec3 P = ro + rd * s;
       vec3 toP = P - uApex;
       float axial = dot(toP, uDir);
@@ -1125,7 +1127,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
             fragmentShader: BEAM_FRAG,
             transparent: true,
             depthWrite: false,
-            side: THREE.FrontSide,
+            side: THREE.BackSide,
             blending: THREE.AdditiveBlending,
           }));
           cone.userData = { noPick: true };
@@ -1165,8 +1167,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         // the unlit heat-map overlays. Penumbra needs no texture and still fades
         // the edge gradually (cone opened a little past the field angle).
         const fieldHalfRad = (fieldAngle / 2) * (Math.PI / 180);
-        spot.angle = Math.min(Math.PI / 2.2, fieldHalfRad * 1.35);
-        spot.penumbra = 0.55;
+        spot.angle = Math.min(Math.PI / 2.2, fieldHalfRad * 1.15);
+        spot.penumbra = 0.85; // soft radial falloff from the centre (textureless gobo substitute)
         spot.decay = 2;
         spot.distance = 0;
         spot.intensity = peakCandela(f) * LIGHT_K;
