@@ -932,7 +932,7 @@ body {
 .schedule-table .row-muted td { color: var(--text2); }
 
 /* ── Rig check (Prüfung) ── */
-.rig-pills { display: inline-flex; gap: 6px; margin-left: 8px; vertical-align: middle; }
+.rig-pills { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; }
 .rig-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; text-transform: none; letter-spacing: 0; }
 .rig-pill.off { background: var(--panel-alt); color: var(--text3); }
 .rig-pill.err { background: rgba(251, 113, 133, 0.16); color: var(--danger); }
@@ -969,6 +969,38 @@ body {
 .cc-name { font-size: 11px; font-weight: 700; color: var(--text2); }
 .cc-bar { width: 50px; margin-right: 0; }
 .cc-val { font-size: 11px; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ── Tool hub (Geräteliste / Analyse, split into focused tabs) ── */
+.modal.tool-modal { width: min(900px, 95vw); max-width: 95vw; height: min(80vh, 740px); max-height: 92vh;
+  padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.tool-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px;
+  border-bottom: 1px solid var(--border); flex: 0 0 auto; }
+.tool-head h3 { margin: 0; display: flex; align-items: center; gap: 9px; font-size: 15.5px; }
+.tool-body { display: flex; flex: 1; min-height: 0; }
+.tool-nav { flex: 0 0 192px; width: 192px; border-right: 1px solid var(--border); background: var(--bg-2);
+  padding: 10px 8px; display: flex; flex-direction: column; gap: 3px; }
+.tool-nav button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px; border: 0;
+  border-radius: 8px; background: transparent; color: var(--text2); font: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; text-align: left; }
+.tool-nav button span { flex: 1; }
+.tool-nav button:hover { background: var(--panel); color: var(--text); }
+.tool-nav button.on { background: var(--accent-soft); color: var(--accent); }
+.tool-nav .nav-badge { min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; color: #fff;
+  font-size: 10.5px; font-weight: 700; display: grid; place-items: center; }
+.tool-nav .nav-badge.err { background: var(--danger); }
+.tool-nav .nav-badge.warn { background: var(--warn); }
+.tool-content { flex: 1; min-width: 0; overflow: auto; padding: 16px 18px; }
+.tool-content .schedule-subhead:first-child, .tool-content .schedule-actions:first-child,
+.tool-content .rig-pills:first-child, .tool-content .schedule-cards:first-child { margin-top: 0; }
+.tool-empty-wrap { display: grid; place-items: center; flex: 1; }
+.tool-empty { color: var(--text2); padding: 8px 0; }
+/* export tab */
+.export-row { display: flex; align-items: center; gap: 14px; padding: 13px 14px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--panel-alt); margin-bottom: 10px; }
+.export-row .er-icon { color: var(--accent); flex: 0 0 auto; }
+.export-row .er-text { flex: 1; min-width: 0; }
+.export-row .er-text b { display: block; font-size: 13.5px; color: var(--text); }
+.export-row .er-text span { font-size: 12px; color: var(--text2); }
 
 .patch-conflict {
   background: rgba(239, 83, 80, 0.15);
