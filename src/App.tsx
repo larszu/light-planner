@@ -1343,7 +1343,11 @@ const App: React.FC = () => {
       {scheduleOpen && (
         <ScheduleDialog
           fixtures={fixtures}
-          trussCount={trusses.length}
+          trusses={trusses}
+          walls={walls}
+          ceilings={ceilings}
+          area={lightArea}
+          projectName={projectMeta?.name ?? ''}
           conflicts={patchConflicts}
           onAutoNumber={handleAutoNumber}
           onAutoPatch={handleAutoPatch}

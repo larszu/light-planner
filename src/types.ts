@@ -256,6 +256,7 @@ export interface Truss {
   x2: number;           // end point (meters)
   y2: number;
   height: number;       // trim height above floor (meters)
+  capacity?: number;    // safe working load (kg); absent ⇒ a conservative default
   label: string;
 }
 
