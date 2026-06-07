@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import type { PlacedFixture, Truss, Wall, Ceiling } from '../types';
-import { computePower, fixtureCounts, footprint, trussLoads, circuitBreakdown } from '../core/patch';
+import { computePower, fixtureCounts, footprint, trussLoads, circuitBreakdown, colorCounts } from '../core/patch';
 import { rigCheck, issueCounts } from '../core/rigCheck';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
 import { gelLibrary } from '../core/gelLibrary';
+import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
 import Icon from './Icon';
 import type { IconName } from './Icon';
 
@@ -18,17 +19,25 @@ interface Props {
   conflicts: Set<string>;
   onAutoNumber: () => void;
   onAutoPatch: () => void;
+  onLocate: (ids: string[]) => void;
   onClose: () => void;
 }
 
-type Tab = 'list' | 'check' | 'photo' | 'load' | 'export';
+type Tab = 'list' | 'magic' | 'check' | 'photo' | 'load' | 'export';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'list', label: 'Geräteliste & Patch', icon: 'schedule' },
+  { id: 'magic', label: 'Magic Sheet', icon: 'grid' },
   { id: 'check', label: 'Prüfung', icon: 'check' },
   { id: 'photo', label: 'Photometrie', icon: 'heatmap' },
   { id: 'load', label: 'Last & Strom', icon: 'truss' },
   { id: 'export', label: 'Export', icon: 'export' },
 ];
+
+const cssRgb = (rgb: [number, number, number]) => `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+// Representative swatch per gel family (the library has no per-gel RGB).
+const gelSwatch = (type: string): string =>
+  type === 'CTO' ? '#f0a35e' : type === 'CTB' ? '#7fb6f0'
+    : (type === 'frost' || type === 'diffusion') ? '#e8ecf2' : '#9aa7b6';
 
 const gelCodes = (ids?: string[]) =>
   (ids ?? []).map((id) => gelLibrary.find((g) => g.id === id)?.code ?? '').filter(Boolean).join('+');
@@ -53,7 +62,7 @@ const utilClass = (u: number) => (u >= 1 ? 'util-over' : u >= 0.8 ? 'util-warn' 
 
 // A focused multi-tool hub for paperwork, validation, analysis and interchange.
 // Each tab is one job, so no single view is overloaded.
-const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, conflicts, onAutoNumber, onAutoPatch, onClose }) => {
+const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, conflicts, onAutoNumber, onAutoPatch, onLocate, onClose }) => {
   const [tab, setTabState] = useState<Tab>(() => {
     try { const t = localStorage.getItem('lp-tool-tab'); if (t && TABS.some((x) => x.id === t)) return t as Tab; } catch { /* ignore */ }
     return 'list';
@@ -68,6 +77,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const photo = photometricReport(fixtures, walls, ceilings, area);
   const loads = trussLoads(fixtures, trusses);
   const circuits = circuitBreakdown(fixtures);
+  const colors = colorCounts(fixtures);
   const checkBadge = ic.errors + ic.warnings;
 
   const ordered = [...fixtures].sort((a, b) => (a.channel ?? 1e9) - (b.channel ?? 1e9) || a.y - b.y || a.x - b.x);
@@ -87,10 +97,28 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     const rows = counts.map((c) => [c.count, c.manufacturer, c.name, c.watts, c.weight, c.count * c.watts, (c.count * c.weight).toFixed(1)]);
     downloadCsv('geraeteliste.csv', [header, ...rows]);
   };
+  const exportColors = () => {
+    const header = ['Anzahl', 'Marke', 'Code', 'Name', 'Typ'];
+    const rows = colors.map((c) => [c.count, c.brand, c.code, c.name, c.type]);
+    downloadCsv('farbliste.csv', [header, ...rows]);
+  };
   const exportMvr = () => {
     const data = buildMvr(fixtures, trusses, projectName);
     triggerDownload(new Blob([data as BlobPart], { type: 'application/octet-stream' }), `${safe}.mvr`);
   };
+
+  // Magic sheet: channels grouped by purpose (system), each a clickable chip
+  // tinted by its effective colour temperature — at-a-glance "what is what".
+  const groups = (() => {
+    const m = new Map<string, PlacedFixture[]>();
+    for (const f of fixtures) {
+      const key = (f.purpose && f.purpose.trim()) || 'Ohne Zweck';
+      (m.get(key) ?? m.set(key, []).get(key)!).push(f);
+    }
+    return [...m.entries()]
+      .map(([name, fs]) => ({ name, fs: fs.sort((a, b) => (a.channel ?? 1e9) - (b.channel ?? 1e9)) }))
+      .sort((a, b) => (a.name === 'Ohne Zweck' ? 1 : 0) - (b.name === 'Ohne Zweck' ? 1 : 0) || a.name.localeCompare(b.name));
+  })();
 
   const activeLabel = TABS.find((t) => t.id === tab)!.label;
 
@@ -118,7 +146,8 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         <thead><tr><th>Unit</th><th>Ch</th><th>DMX</th><th>Typ</th><th>Pos (x,y,h)</th><th>Gel</th><th>Zweck</th></tr></thead>
         <tbody>
           {ordered.map((f) => (
-            <tr key={f.id} className={conflicts.has(f.id) ? 'row-conflict' : ''}>
+            <tr key={f.id} className={conflicts.has(f.id) ? 'row-conflict' : ''}
+              onClick={() => onLocate([f.id])} title="Im Plan zeigen">
               <td>{f.unitNumber ?? '–'}</td>
               <td>{f.channel ?? '–'}</td>
               <td>{f.universe != null && f.dmxAddress != null ? `${f.universe}.${f.dmxAddress}` : (footprint(f) === 0 ? 'Dimmer' : '–')}</td>
@@ -130,7 +159,48 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           ))}
         </tbody>
       </table>
+      {colors.length > 0 && (
+        <>
+          <h4 className="schedule-subhead">Farben &amp; Verbrauch ({colors.reduce((s, c) => s + c.count, 0)} Schnitte)</h4>
+          <table className="schedule-table">
+            <thead><tr><th>Anz.</th><th>Farbe</th><th>Marke / Code</th><th>Name</th><th>Typ</th></tr></thead>
+            <tbody>
+              {colors.map((c) => (
+                <tr key={c.id}>
+                  <td><strong>{c.count}</strong></td>
+                  <td><span className="gel-swatch" style={{ background: gelSwatch(c.type) }} /></td>
+                  <td>{c.brand} {c.code}</td><td>{c.name}</td><td>{c.type}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
     </>
+  );
+
+  const magicPanel = (
+    <div className="magic-sheet">
+      {groups.map((g) => (
+        <div key={g.name} className="magic-group">
+          <div className="magic-group-head">{g.name} <em>{g.fs.length}</em></div>
+          <div className="magic-chips">
+            {g.fs.map((f) => (
+              <button key={f.id} className="magic-chip" onClick={() => onLocate([f.id])}
+                title={`${f.fixture.name} · ${f.x},${f.y} · ${f.mountingHeight} m`}>
+                <span className="mc-tint" style={{ background: cssRgb(cctToRgb(getFixtureCCT(f))) }} />
+                <span className="mc-ch">{f.channel ?? '–'}</span>
+                <span className="mc-meta">
+                  <span className="mc-type">{f.fixture.name}</span>
+                  <span className="mc-gel">{gelCodes(f.gelFilterIds) || `${Math.round(getFixtureCCT(f))} K`}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="prop-derived">Nach Zweck gruppiert · Tönung = effektive Farbtemperatur · Klick zeigt die Leuchte im Plan.</div>
+    </div>
   );
 
   const checkPanel = (
@@ -144,9 +214,17 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         <div className="rig-clean">✓ Keine Probleme gefunden.</div>
       ) : (
         <ul className="rig-issues">
-          {issues.map((i, k) => (
-            <li key={k} className={`rig-issue sev-${i.severity}`}><span className="rig-dot" />{i.message}</li>
-          ))}
+          {issues.map((i, k) => {
+            const locatable = !!i.ids && i.ids.length > 0;
+            return (
+              <li key={k} className={`rig-issue sev-${i.severity} ${locatable ? 'locatable' : ''}`}
+                onClick={locatable ? () => onLocate(i.ids!) : undefined}
+                title={locatable ? 'Betroffene Leuchten im Plan zeigen' : undefined}>
+                <span className="rig-dot" />{i.message}
+                {locatable && <Icon name="chevronRight" size={14} className="rig-go" />}
+              </li>
+            );
+          })}
         </ul>
       )}
       <div className="prop-derived">Geprüft: DMX-Überlappung, doppelte Kanäle, ungepatchte Movers, Traversen-Last, Strom-Headroom.</div>
@@ -228,6 +306,11 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         <button className="btn-secondary" onClick={exportInventory}>⬇ CSV</button>
       </div>
       <div className="export-row">
+        <Icon name="heatmap" size={22} className="er-icon" />
+        <div className="er-text"><b>Farbliste (CSV)</b><span>Gel-Schnitte je Code – für Farb-Bestellung &amp; Vorbereitung.</span></div>
+        <button className="btn-secondary" onClick={exportColors} disabled={colors.length === 0}>⬇ CSV</button>
+      </div>
+      <div className="export-row">
         <Icon name="cube3d" size={22} className="er-icon" />
         <div className="er-text"><b>MVR (GDTF/MVR)</b><span>Rig mit Positionen & Patch – öffnet in Capture, grandMA3, WYSIWYG, Vectorworks, BlenderDMX.</span></div>
         <button className="btn-secondary" onClick={exportMvr}>⬇ .mvr</button>
@@ -235,7 +318,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     </div>
   );
 
-  const panels: Record<Tab, React.ReactNode> = { list: listPanel, check: checkPanel, photo: photoPanel, load: loadPanel, export: exportPanel };
+  const panels: Record<Tab, React.ReactNode> = { list: listPanel, magic: magicPanel, check: checkPanel, photo: photoPanel, load: loadPanel, export: exportPanel };
 
   return (
     <div className="modal-overlay" onMouseDown={onClose}>

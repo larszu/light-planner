@@ -23,13 +23,13 @@ const trusses: Truss[] = [
   { id: 't2', x1: 1, y1: 9, x2: 11, y2: 9, height: 5, capacity: 25, label: 'Back (Überlast)' },
 ];
 let fixtures: PlacedFixture[] = [
-  mk('f1', mover, 3, 2, { aimX: 4, aimY: 6 }),
-  mk('f2', mover, 6, 2, { aimX: 6, aimY: 6 }),
-  mk('f3', mover, 9, 2, { aimX: 8, aimY: 6 }),
-  mk('f4', conv, 3, 9, { aimX: 4, aimY: 6 }),
-  mk('f5', conv, 6, 9, { aimX: 6, aimY: 6 }),
-  mk('f6', conv, 9, 9, { aimX: 8, aimY: 6 }),
-  mk('f7', conv, 5, 0.5, { mountingHeight: 1.6, aimX: 5, aimY: 6 }), // floor stand
+  mk('f1', mover, 3, 2, { aimX: 4, aimY: 6, purpose: 'Frontlicht', gelFilterIds: ['lee-205'] }),
+  mk('f2', mover, 6, 2, { aimX: 6, aimY: 6, purpose: 'Frontlicht', gelFilterIds: ['lee-205'] }),
+  mk('f3', mover, 9, 2, { aimX: 8, aimY: 6, purpose: 'Frontlicht' }),
+  mk('f4', conv, 3, 9, { aimX: 4, aimY: 6, purpose: 'Gegenlicht', gelFilterIds: ['lee-201'] }),
+  mk('f5', conv, 6, 9, { aimX: 6, aimY: 6, purpose: 'Gegenlicht', gelFilterIds: ['lee-201'] }),
+  mk('f6', conv, 9, 9, { aimX: 8, aimY: 6, purpose: 'Gegenlicht' }),
+  mk('f7', conv, 5, 0.5, { mountingHeight: 1.6, aimX: 5, aimY: 6, purpose: 'Effekt' }), // floor stand
 ];
 fixtures = autoPatch(fixtures, { startUniverse: 1, startAddress: 1, number: true, patch: true });
 // Force a DMX overlap + duplicate channel to exercise the rig check.
@@ -52,6 +52,7 @@ createRoot(document.getElementById('root')!).render(
     conflicts={findPatchConflicts(fixtures)}
     onAutoNumber={() => {}}
     onAutoPatch={() => {}}
+    onLocate={(ids) => { (window as Window & { __located?: string[] }).__located = ids; }}
     onClose={() => {}}
   />,
 );

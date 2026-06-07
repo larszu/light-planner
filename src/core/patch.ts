@@ -5,6 +5,7 @@
 // respecting each fixture's footprint, and total up the electrical load.
 
 import type { PlacedFixture, Truss } from '../types';
+import { gelLibrary } from './gelLibrary';
 
 const UNIVERSE_SIZE = 512;
 
@@ -126,6 +127,30 @@ export function fixtureCounts(fixtures: PlacedFixture[]): FixtureCount[] {
     });
   }
   return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
+// ── Colour cut list (gel consumption) ────────────────────────────────────────
+// Counts every gel "cut" across the rig (a fixture with two gels = two cuts),
+// the Lightwright "Color Count" paperwork used for ordering and prep.
+export interface ColorCount {
+  id: string;
+  code: string;
+  brand: string;
+  name: string;
+  type: string;
+  count: number;
+}
+
+export function colorCounts(fixtures: PlacedFixture[]): ColorCount[] {
+  const map = new Map<string, ColorCount>();
+  for (const f of fixtures) for (const gid of f.gelFilterIds ?? []) {
+    const ex = map.get(gid);
+    if (ex) { ex.count += 1; continue; }
+    const g = gelLibrary.find((x) => x.id === gid);
+    if (!g) continue;
+    map.set(gid, { id: g.id, code: g.code, brand: g.brand, name: g.name, type: g.type, count: 1 });
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
 }
 
 // ── Rigging: load per truss ──────────────────────────────────────────────────

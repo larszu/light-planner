@@ -1351,6 +1351,7 @@ const App: React.FC = () => {
           conflicts={patchConflicts}
           onAutoNumber={handleAutoNumber}
           onAutoPatch={handleAutoPatch}
+          onLocate={(ids) => { if (ids.length) { setSelectedIds(new Set(ids)); setViewMode('2d'); setScheduleOpen(false); } }}
           onClose={() => setScheduleOpen(false)}
         />
       )}
