@@ -1024,6 +1024,34 @@ body {
 .mc-meta { display: flex; flex-direction: column; min-width: 0; }
 .mc-type { font-size: 11.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mc-gel { font-size: 10.5px; color: var(--text2); }
+.magic-chip.focused { border-color: var(--success); }
+.mc-done { margin-left: auto; color: var(--success); flex: 0 0 auto; }
+
+/* ── Focus session (Einleuchten) ── */
+.focus-tool { display: flex; flex-direction: column; gap: 10px; }
+.focus-progress { display: flex; align-items: center; gap: 10px; }
+.fp-bar { flex: 1; height: 8px; border-radius: 5px; background: var(--bg-2); border: 1px solid var(--border); overflow: hidden; }
+.fp-bar i { display: block; height: 100%; background: var(--success); transition: width 0.2s; }
+.fp-label { font-size: 12px; font-weight: 600; color: var(--text2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.focus-group .schedule-subhead { margin-top: 4px; }
+.focus-rows { display: flex; flex-direction: column; gap: 5px; }
+.focus-row { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--panel-alt); }
+.focus-row.done { background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.35); }
+.focus-tick { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 6px; border: 1.5px solid var(--text3);
+  background: transparent; color: #fff; display: grid; place-items: center; cursor: pointer; }
+.focus-tick.on { background: var(--success); border-color: var(--success); }
+.focus-ch { flex: 0 0 auto; min-width: 26px; font-size: 16px; font-weight: 800; color: var(--text);
+  font-variant-numeric: tabular-nums; text-align: center; }
+.focus-info { flex: 0 0 152px; display: flex; flex-direction: column; min-width: 0; }
+.focus-info b { font-size: 12.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-info span { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.focus-note { flex: 1; min-width: 0; background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); padding: 6px 8px; font: inherit; font-size: 12.5px; }
+.focus-note:focus { outline: none; border-color: var(--accent); }
+.focus-locate { flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text2); display: grid; place-items: center; cursor: pointer; }
+.focus-locate:hover { color: var(--accent); border-color: var(--accent); }
 
 .patch-conflict {
   background: rgba(239, 83, 80, 0.15);

@@ -138,6 +138,10 @@ export interface PlacedFixture {
   // ── Temporarily mute a single lamp without deleting it: it stops
   //    contributing to the heatmap and is drawn ghosted (still selectable). ──
   hidden?: boolean;
+  // ── Focus session (Einleuchten): a per-fixture note ("Gesicht Solist, harte
+  //    Kante") and a done flag, tracked live during the focus call. ──
+  focusNote?: string;
+  focused?: boolean;
 }
 
 // ── Scene / Look ─────────────────────────────────────────────────────

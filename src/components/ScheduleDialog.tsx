@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { PlacedFixture, Truss, Wall, Ceiling } from '../types';
-import { computePower, fixtureCounts, footprint, trussLoads, circuitBreakdown, colorCounts } from '../core/patch';
+import { computePower, fixtureCounts, footprint, trussLoads, circuitBreakdown, colorCounts, nearestTrussId } from '../core/patch';
 import { rigCheck, issueCounts } from '../core/rigCheck';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
@@ -20,13 +20,15 @@ interface Props {
   onAutoNumber: () => void;
   onAutoPatch: () => void;
   onLocate: (ids: string[]) => void;
+  onUpdateFixture: (id: string, updates: Partial<PlacedFixture>) => void;
   onClose: () => void;
 }
 
-type Tab = 'list' | 'magic' | 'check' | 'photo' | 'load' | 'export';
+type Tab = 'list' | 'magic' | 'focus' | 'check' | 'photo' | 'load' | 'export';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'list', label: 'Geräteliste & Patch', icon: 'schedule' },
   { id: 'magic', label: 'Magic Sheet', icon: 'grid' },
+  { id: 'focus', label: 'Fokus', icon: 'autolight' },
   { id: 'check', label: 'Prüfung', icon: 'check' },
   { id: 'photo', label: 'Photometrie', icon: 'heatmap' },
   { id: 'load', label: 'Last & Strom', icon: 'truss' },
@@ -62,7 +64,7 @@ const utilClass = (u: number) => (u >= 1 ? 'util-over' : u >= 0.8 ? 'util-warn' 
 
 // A focused multi-tool hub for paperwork, validation, analysis and interchange.
 // Each tab is one job, so no single view is overloaded.
-const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, conflicts, onAutoNumber, onAutoPatch, onLocate, onClose }) => {
+const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, conflicts, onAutoNumber, onAutoPatch, onLocate, onUpdateFixture, onClose }) => {
   const [tab, setTabState] = useState<Tab>(() => {
     try { const t = localStorage.getItem('lp-tool-tab'); if (t && TABS.some((x) => x.id === t)) return t as Tab; } catch { /* ignore */ }
     return 'list';
@@ -84,11 +86,11 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const safe = (projectName || 'lichtplan').replace(/[^\w.-]+/g, '_');
 
   const exportSchedule = () => {
-    const header = ['Unit', 'Kanal', 'Universe', 'Adresse', 'Typ', 'Hersteller', 'X (m)', 'Y (m)', 'Höhe (m)', 'Gel', 'Zweck', 'W', 'kg'];
+    const header = ['Unit', 'Kanal', 'Universe', 'Adresse', 'Typ', 'Hersteller', 'X (m)', 'Y (m)', 'Höhe (m)', 'Gel', 'Zweck', 'Fokussiert', 'Fokus-Notiz', 'W', 'kg'];
     const rows = ordered.map((f) => [
       f.unitNumber ?? '', f.channel ?? '', f.universe ?? '', f.dmxAddress ?? '',
       f.fixture.name, f.fixture.manufacturer, f.x, f.y, f.mountingHeight,
-      gelCodes(f.gelFilterIds), f.purpose ?? '', f.fixture.wattage, f.fixture.weight,
+      gelCodes(f.gelFilterIds), f.purpose ?? '', f.focused ? 'ja' : '', f.focusNote ?? '', f.fixture.wattage, f.fixture.weight,
     ]);
     downloadCsv('instrument-schedule.csv', [header, ...rows]);
   };
@@ -119,6 +121,21 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
       .map(([name, fs]) => ({ name, fs: fs.sort((a, b) => (a.channel ?? 1e9) - (b.channel ?? 1e9)) }))
       .sort((a, b) => (a.name === 'Ohne Zweck' ? 1 : 0) - (b.name === 'Ohne Zweck' ? 1 : 0) || a.name.localeCompare(b.name));
   })();
+
+  // Focus session: group by hanging position (truss) — the order a focus call
+  // actually works through the rig — and track per-fixture done + note.
+  const focusGroups = (() => {
+    const m = new Map<string, PlacedFixture[]>();
+    for (const f of fixtures) {
+      const tid = nearestTrussId(f, trusses);
+      const key = tid ? (trusses.find((t) => t.id === tid)?.label || 'Traverse') : 'Boden / Stative';
+      (m.get(key) ?? m.set(key, []).get(key)!).push(f);
+    }
+    return [...m.entries()]
+      .map(([name, fs]) => ({ name, fs: fs.sort((a, b) => (a.channel ?? 1e9) - (b.channel ?? 1e9)) }))
+      .sort((a, b) => (a.name === 'Boden / Stative' ? 1 : 0) - (b.name === 'Boden / Stative' ? 1 : 0) || a.name.localeCompare(b.name));
+  })();
+  const focusedCount = fixtures.filter((f) => f.focused).length;
 
   const activeLabel = TABS.find((t) => t.id === tab)!.label;
 
@@ -186,20 +203,54 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           <div className="magic-group-head">{g.name} <em>{g.fs.length}</em></div>
           <div className="magic-chips">
             {g.fs.map((f) => (
-              <button key={f.id} className="magic-chip" onClick={() => onLocate([f.id])}
-                title={`${f.fixture.name} · ${f.x},${f.y} · ${f.mountingHeight} m`}>
+              <button key={f.id} className={`magic-chip ${f.focused ? 'focused' : ''}`} onClick={() => onLocate([f.id])}
+                title={`${f.fixture.name} · ${f.x},${f.y} · ${f.mountingHeight} m${f.focused ? ' · fokussiert' : ''}`}>
                 <span className="mc-tint" style={{ background: cssRgb(cctToRgb(getFixtureCCT(f))) }} />
                 <span className="mc-ch">{f.channel ?? '–'}</span>
                 <span className="mc-meta">
                   <span className="mc-type">{f.fixture.name}</span>
                   <span className="mc-gel">{gelCodes(f.gelFilterIds) || `${Math.round(getFixtureCCT(f))} K`}</span>
                 </span>
+                {f.focused && <span className="mc-done"><Icon name="check" size={11} /></span>}
               </button>
             ))}
           </div>
         </div>
       ))}
       <div className="prop-derived">Nach Zweck gruppiert · Tönung = effektive Farbtemperatur · Klick zeigt die Leuchte im Plan.</div>
+    </div>
+  );
+
+  const focusPanel = (
+    <div className="focus-tool">
+      <div className="focus-progress">
+        <div className="fp-bar"><i style={{ width: `${fixtures.length ? (focusedCount / fixtures.length) * 100 : 0}%` }} /></div>
+        <span className="fp-label">{focusedCount} von {fixtures.length} fokussiert</span>
+      </div>
+      {focusGroups.map((g) => (
+        <div key={g.name} className="focus-group">
+          <div className="schedule-subhead">{g.name} · {g.fs.filter((f) => f.focused).length}/{g.fs.length}</div>
+          <div className="focus-rows">
+            {g.fs.map((f) => (
+              <div key={f.id} className={`focus-row ${f.focused ? 'done' : ''}`}>
+                <button className={`focus-tick ${f.focused ? 'on' : ''}`} title="fokussiert"
+                  onClick={() => onUpdateFixture(f.id, { focused: !f.focused })}>
+                  {f.focused && <Icon name="check" size={14} />}
+                </button>
+                <span className="focus-ch">{f.channel ?? '–'}</span>
+                <span className="focus-info">
+                  <b>{f.fixture.name}</b>
+                  <span>{f.purpose || '—'} · Ziel {f.aimX},{f.aimY}</span>
+                </span>
+                <input className="focus-note" placeholder="Fokus-Notiz – z. B. Gesicht Solist, harte Kante…"
+                  value={f.focusNote ?? ''} onChange={(e) => onUpdateFixture(f.id, { focusNote: e.target.value })} />
+                <button className="focus-locate" title="Im Plan zeigen" onClick={() => onLocate([f.id])}><Icon name="select" size={15} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="prop-derived">Live beim Einleuchten: abhaken, Fokus-Notiz je Leuchte erfassen, im Plan finden. Wird im Projekt gespeichert und im Schedule-CSV exportiert.</div>
     </div>
   );
 
@@ -318,7 +369,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     </div>
   );
 
-  const panels: Record<Tab, React.ReactNode> = { list: listPanel, magic: magicPanel, check: checkPanel, photo: photoPanel, load: loadPanel, export: exportPanel };
+  const panels: Record<Tab, React.ReactNode> = { list: listPanel, magic: magicPanel, focus: focusPanel, check: checkPanel, photo: photoPanel, load: loadPanel, export: exportPanel };
 
   return (
     <div className="modal-overlay" onMouseDown={onClose}>

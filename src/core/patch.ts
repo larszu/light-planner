@@ -167,6 +167,17 @@ function distToSegment(px: number, py: number, ax: number, ay: number, bx: numbe
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
+// The truss a fixture is hung on (nearest segment within `snap` m), or null
+// for floor stands / booms. Used for load totals and focus-session grouping.
+export function nearestTrussId(f: PlacedFixture, trusses: Truss[], snap = 1.0): string | null {
+  let bestId: string | null = null, bestD = Infinity;
+  for (const t of trusses) {
+    const d = distToSegment(f.x, f.y, t.x1, t.y1, t.x2, t.y2);
+    if (d < bestD) { bestD = d; bestId = t.id; }
+  }
+  return bestId && bestD <= snap ? bestId : null;
+}
+
 export interface TrussLoad {
   id: string;
   label: string;

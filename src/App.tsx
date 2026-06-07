@@ -1352,6 +1352,7 @@ const App: React.FC = () => {
           onAutoNumber={handleAutoNumber}
           onAutoPatch={handleAutoPatch}
           onLocate={(ids) => { if (ids.length) { setSelectedIds(new Set(ids)); setViewMode('2d'); setScheduleOpen(false); } }}
+          onUpdateFixture={handleUpdateFixture}
           onClose={() => setScheduleOpen(false)}
         />
       )}
