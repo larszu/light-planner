@@ -22,6 +22,7 @@ import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
 import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
+import { composePlot } from './utils/plotExport';
 import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
@@ -957,6 +958,20 @@ const App: React.FC = () => {
     }
   }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget, host]);
 
+  // The 2D plan's current draw scale (backing px per metre), reported by
+  // PlanCanvas — used to size an accurate scale bar in the printed plot.
+  const planPxPerMeterRef = useRef(40);
+  const handleExportPlot = useCallback(async () => {
+    const srcCanvas = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
+    if (viewMode !== '2d' || !srcCanvas) { window.alert('Lichtplan-Druck: bitte in der 2D-Plan-Ansicht ausführen.'); return; }
+    const out = composePlot(srcCanvas, planPxPerMeterRef.current, fixtures, {
+      projectName: projectMeta?.name || 'Lichtplan', author: projectMeta?.author,
+    });
+    const base = `${projectMeta?.name || 'Lichtplan'} Plan ${String(exportCounterRef.current++).padStart(3, '0')}`;
+    const bytes = dataUrlToBytes(out.toDataURL('image/jpeg', 0.92));
+    await host.exportFile(jpegToPdfBlob(bytes, out.width, out.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
+  }, [viewMode, fixtures, projectMeta, host]);
+
   // Current project document as a single object (used by version snapshots).
   const buildCurrentDoc = useCallback((): ProjectData => {
     const now = new Date().toISOString();
@@ -1129,6 +1144,7 @@ const App: React.FC = () => {
         onUploadFloorPlan={handleUploadFloorPlan}
         onOpenSchedule={() => setScheduleOpen(true)}
         onExport={handleExport}
+        onExportPlot={handleExportPlot}
         onNew={handleNew}
         onSave={() => setProjectDialogMode('save')}
         onLoad={() => setProjectDialogMode('load')}
@@ -1209,6 +1225,7 @@ const App: React.FC = () => {
               planMode={planMode}
               onUpdateFloorPlan={handleUpdateFloorPlan}
               onCalibrateSegment={handleCalibrateSegment}
+              onViewChange={(s) => { planPxPerMeterRef.current = s; }}
             />
           ) : (
             <Suspense fallback={<div className="loading-3d">3D-Ansicht wird geladen…</div>}>

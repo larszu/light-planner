@@ -52,6 +52,7 @@ interface Props {
   onMoveAim: (id: string, aimX: number, aimY: number) => void;
   onUpdateFloorPlan: (updates: Partial<FloorPlan>) => void;
   onCalibrateSegment: (x1: number, y1: number, x2: number, y2: number) => void;
+  onViewChange?: (pixelsPerMeter: number) => void;
 }
 
 const GRID_COLOR = '#2a2a3c';
@@ -115,10 +116,12 @@ const PlanCanvas: React.FC<Props> = ({
   onMoveAim,
   onUpdateFloorPlan,
   onCalibrateSegment,
+  onViewChange,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
+  const reportedScaleRef = useRef(0);
   const dragRef = useRef<{
     type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'resize-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'move-camera' | 'move-camera-aim' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'draw-stage' | 'calibrate' | 'move-plan' | 'marquee';
     corner?: 0 | 1 | 2 | 3;
@@ -239,6 +242,12 @@ const PlanCanvas: React.FC<Props> = ({
     const v = viewRef.current;
     const w = canvas.width;
     const h = canvas.height;
+    // Report the draw scale (backing px per metre) so the plot export can size
+    // an accurate scale bar; only on change to avoid churn.
+    if (onViewChange && v.scale !== reportedScaleRef.current) {
+      reportedScaleRef.current = v.scale;
+      onViewChange(v.scale);
+    }
 
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#1a1a2e';
@@ -1021,7 +1030,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, showFocusNotes, planMode, activeTool, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, showFocusNotes, planMode, activeTool, screenToWorld, drawRulers, onViewChange]);
 
   useEffect(() => {
     const container = containerRef.current;

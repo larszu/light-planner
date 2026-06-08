@@ -35,6 +35,7 @@ interface Props {
   onUploadFloorPlan: (f: File) => void;
   onOpenSchedule: () => void;
   onExport: (format: 'png' | 'jpg' | 'pdf') => void;
+  onExportPlot: () => void;
   onNew: () => void;
   onSave: () => void;
   onLoad: () => void;
@@ -81,9 +82,10 @@ const TopBar: React.FC<Props> = (p) => {
               <button className="tb-dd-item" onClick={run(p.onSaveToFile)}><Icon name="export" size={15} />Projekt als Datei…</button>
               <button className="tb-dd-item" onClick={run(p.onLoadFromFile)}><Icon name="import" size={15} />Projekt aus Datei…</button>
               <div className="tb-dd-div" />
+              <button className="tb-dd-item" onClick={run(p.onExportPlot)}><Icon name="schedule" size={15} />Lichtplan drucken (PDF, Titelblock + Legende)…</button>
               <button className="tb-dd-item" onClick={run(() => p.onExport('png'))}>Export als PNG…</button>
               <button className="tb-dd-item" onClick={run(() => p.onExport('jpg'))}>Export als JPG…</button>
-              <button className="tb-dd-item" onClick={run(() => p.onExport('pdf'))}>Export als PDF…</button>
+              <button className="tb-dd-item" onClick={run(() => p.onExport('pdf'))}>Export als PDF (Bild)…</button>
               <div className="tb-dd-sec">Bearbeiten</div>
               <button className="tb-dd-item" onClick={run(p.onUndo)}><Icon name="undo" size={15} />Rückgängig<kbd>Strg Z</kbd></button>
               <button className="tb-dd-item" onClick={run(p.onRedo)}><Icon name="redo" size={15} />Wiederholen<kbd>Strg Y</kbd></button>
