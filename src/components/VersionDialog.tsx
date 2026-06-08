@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import type { ProjectData } from '../types';
 import { versionsFor, saveVersion, deleteVersion, type ProjectVersion } from '../utils/versionStore';
-import { diffProjects, categoryCount, type CategoryDiff, type ProjectDiff } from '../core/diff';
+import { diffProjects } from '../core/diff';
+import DiffView from './DiffView';
 import Icon from './Icon';
 
 interface Props {
@@ -11,41 +12,6 @@ interface Props {
   onRestore: (doc: ProjectData) => void;
   onClose: () => void;
 }
-
-const CATS: { key: keyof Omit<ProjectDiff, 'total'>; label: string }[] = [
-  { key: 'fixtures', label: 'Leuchten' },
-  { key: 'persons', label: 'Personen' },
-  { key: 'trusses', label: 'Traversen' },
-  { key: 'walls', label: 'Wände' },
-  { key: 'stageElements', label: 'Bühne' },
-  { key: 'ceilings', label: 'Decken' },
-];
-
-const CategorySection: React.FC<{ label: string; diff: CategoryDiff }> = ({ label, diff }) => {
-  if (categoryCount(diff) === 0) return null;
-  return (
-    <div className="diff-cat">
-      <div className="diff-cat-head">{label}</div>
-      {diff.added.map((a) => (
-        <div key={'a' + a.id} className="diff-item add"><span className="diff-badge">+</span>{a.label}</div>
-      ))}
-      {diff.removed.map((r) => (
-        <div key={'r' + r.id} className="diff-item rem"><span className="diff-badge">−</span>{r.label}</div>
-      ))}
-      {diff.changed.map((c) => (
-        <div key={'c' + c.id} className="diff-item chg">
-          <span className="diff-badge">~</span>
-          <div className="diff-chg-body">
-            <b>{c.label}</b>
-            {c.fields.map((f, i) => (
-              <span key={i} className="diff-field">{f.field}: <s>{f.from}</s> → <em>{f.to}</em></span>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 // Save named snapshots of the rig and see exactly what changed since any of
 // them — added / removed / moved / re-patched / re-gelled, field by field.
@@ -116,7 +82,7 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                 <div className="diff-summary">
                   <b>{diff.total}</b> Änderung{diff.total === 1 ? '' : 'en'} seit „{selected.label}" → <b>{projectName || 'aktuell'}</b>
                 </div>
-                {CATS.map((c) => <CategorySection key={c.key} label={c.label} diff={diff[c.key]} />)}
+                <DiffView diff={diff} />
               </>
             )}
           </div>

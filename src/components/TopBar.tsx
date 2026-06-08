@@ -44,6 +44,7 @@ interface Props {
   onUndo: () => void;
   onRedo: () => void;
   onVersions: () => void;
+  onChanges: () => void;
   onAbout: () => void;
 }
 
@@ -89,7 +90,8 @@ const TopBar: React.FC<Props> = (p) => {
               <div className="tb-dd-sec">Bearbeiten</div>
               <button className="tb-dd-item" onClick={run(p.onUndo)}><Icon name="undo" size={15} />Rückgängig<kbd>Strg Z</kbd></button>
               <button className="tb-dd-item" onClick={run(p.onRedo)}><Icon name="redo" size={15} />Wiederholen<kbd>Strg Y</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onVersions)}><Icon name="undo" size={15} />Versionen &amp; Vergleich…</button>
+              <button className="tb-dd-item" onClick={run(p.onChanges)}><Icon name="tag" size={15} />Verlauf &amp; Änderungen…</button>
+              <button className="tb-dd-item" onClick={run(p.onVersions)}><Icon name="layers" size={15} />Versionen &amp; Vergleich…</button>
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={run(p.onAbout)}><Icon name="info" size={15} />Über LightPlanner</button>
             </div>

@@ -12,6 +12,9 @@ import PropertyPanel from './components/PropertyPanel';
 import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
 import VersionDialog from './components/VersionDialog';
+import ChangesDialog from './components/ChangesDialog';
+import { summarizeChange } from './core/diff';
+import { saveVersion } from './utils/versionStore';
 import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
@@ -137,6 +140,7 @@ const App: React.FC = () => {
   const [areaLightOpen, setAreaLightOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
+  const [changesOpen, setChangesOpen] = useState(false);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   // Look present just before a scene was switched on, so it can be switched off.
@@ -178,17 +182,49 @@ const App: React.FC = () => {
     setCeilings(snap.ceilings);
   }, []);
 
-  const handleUndo = useCallback(() => {
-    if (historyRef.current.length === 0) return;
-    futureRef.current.push({ ...stateRef.current });
-    restoreSnapshot(historyRef.current.pop()!);
+  // Move `count` steps in one direction (jump-to in the history timeline). The
+  // intermediate states are moved onto the opposite stack so redo/undo stays
+  // consistent. count = 1 is a normal single undo/redo.
+  const logPrefixRef = useRef<string | null>(null);
+  const restoreMany = useCallback((dir: 'undo' | 'redo', count: number) => {
+    const from = dir === 'undo' ? historyRef.current : futureRef.current;
+    const to = dir === 'undo' ? futureRef.current : historyRef.current;
+    const n = Math.min(count, from.length);
+    if (n <= 0) return;
+    to.push({ ...stateRef.current });
+    for (let i = 0; i < n - 1; i++) to.push(from.pop()!);
+    logPrefixRef.current = dir === 'undo' ? '↶ Rückgängig' : '↷ Wiederholt';
+    restoreSnapshot(from.pop()!);
   }, [restoreSnapshot]);
 
-  const handleRedo = useCallback(() => {
-    if (futureRef.current.length === 0) return;
-    historyRef.current.push({ ...stateRef.current });
-    restoreSnapshot(futureRef.current.pop()!);
-  }, [restoreSnapshot]);
+  const handleUndo = useCallback(() => restoreMany('undo', 1), [restoreMany]);
+  const handleRedo = useCallback(() => restoreMany('redo', 1), [restoreMany]);
+
+  // ── Activity log (Protokoll) ──────────────────────────────────────────────
+  // A timestamped, append-only trail of edits this session. Derived from the
+  // document state itself (no per-handler wiring): when the plan changes, the
+  // change is summarised and logged. Consecutive identical labels (e.g. a drag)
+  // are coalesced, and project loads are suppressed.
+  interface LogEntry { time: number; label: string }
+  const [activityLog, setActivityLog] = useState<LogEntry[]>([]);
+  const prevDocRef = useRef<Snapshot>(stateRef.current);
+  const suppressLogRef = useRef(true); // skip the initial mount + loads
+  useEffect(() => {
+    if (suppressLogRef.current) { suppressLogRef.current = false; prevDocRef.current = stateRef.current; return; }
+    const prefix = logPrefixRef.current; logPrefixRef.current = null;
+    const base = summarizeChange(prevDocRef.current, stateRef.current);
+    prevDocRef.current = stateRef.current;
+    if (base === 'Geändert' && !prefix) return; // no detectable change
+    const label = prefix ? `${prefix}: ${base}` : base;
+    setActivityLog((log) => {
+      const last = log[log.length - 1];
+      if (last && last.label === label && Date.now() - last.time < 1500) {
+        return [...log.slice(0, -1), { time: Date.now(), label }]; // coalesce
+      }
+      const next = [...log, { time: Date.now(), label }];
+      return next.length > 200 ? next.slice(next.length - 200) : next;
+    });
+  }, [fixtures, persons, stageElements, shapes, fixtureGroups, trusses, walls, ceilings]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -673,6 +709,8 @@ const App: React.FC = () => {
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
     futureRef.current = [];
+    suppressLogRef.current = true;       // don't log the bulk state swap
+    setActivityLog([{ time: Date.now(), label: `Projekt geladen: ${data.meta?.name ?? ''}`.trim() }]);
     setFixtures(data.fixtures);
     setShapes(data.shapes);
     setPersons(data.persons);
@@ -1153,6 +1191,7 @@ const App: React.FC = () => {
         onUndo={handleUndo}
         onRedo={handleRedo}
         onVersions={() => setVersionOpen(true)}
+        onChanges={() => setChangesOpen(true)}
         onAbout={() => setAboutOpen(true)}
       />
       <div className="app-body">
@@ -1385,6 +1424,26 @@ const App: React.FC = () => {
           onClose={() => setVersionOpen(false)}
         />
       )}
+      {changesOpen && (() => {
+        const states = [...historyRef.current, stateRef.current];
+        const undoSteps = [];
+        for (let t = states.length - 1; t >= 1; t--) undoSteps.push({ count: states.length - t, label: summarizeChange(states[t - 1], states[t]) });
+        const fut = futureRef.current; const redoSteps = []; let prev = stateRef.current;
+        for (let i = fut.length - 1, k = 1; i >= 0; i--, k++) { redoSteps.push({ count: k, label: summarizeChange(prev, fut[i]) }); prev = fut[i]; }
+        return (
+          <ChangesDialog
+            log={activityLog}
+            undoSteps={undoSteps}
+            redoSteps={redoSteps}
+            currentDoc={buildCurrentDoc()}
+            projectId={projectId}
+            projectName={projectMeta?.name ?? ''}
+            onJump={(dir, count) => restoreMany(dir, count)}
+            onSaveVersion={(lbl) => { try { saveVersion(projectId, lbl, buildCurrentDoc()); } catch (e) { window.alert(e instanceof Error ? e.message : String(e)); } }}
+            onClose={() => setChangesOpen(false)}
+          />
+        );
+      })()}
       {scheduleOpen && (
         <ScheduleDialog
           fixtures={fixtures}

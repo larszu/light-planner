@@ -123,3 +123,29 @@ export function diffProjects(before: ProjectData, after: ProjectData): ProjectDi
 }
 
 export const categoryCount = count;
+
+// A short human label for the change between two states (for the undo timeline
+// and the activity log). e.g. "+1 Leuchte", "Leuchte verschoben, +1 Wand".
+export function summarizeChange(before: Partial<ProjectData>, after: Partial<ProjectData>): string {
+  const d = diffProjects(before as ProjectData, after as ProjectData);
+  const parts: string[] = [];
+  const add = (cd: CategoryDiff, sing: string, plur: string) => {
+    if (cd.added.length) parts.push(`+${cd.added.length} ${cd.added.length === 1 ? sing : plur}`);
+    if (cd.removed.length) parts.push(`−${cd.removed.length} ${cd.removed.length === 1 ? sing : plur}`);
+    if (cd.changed.length) parts.push(`${cd.changed.length} ${cd.changed.length === 1 ? sing : plur} geändert`);
+  };
+  add(d.fixtures, 'Leuchte', 'Leuchten');
+  add(d.persons, 'Person', 'Personen');
+  add(d.trusses, 'Traverse', 'Traversen');
+  add(d.walls, 'Wand', 'Wände');
+  add(d.stageElements, 'Bühne', 'Bühnen');
+  add(d.ceilings, 'Decke', 'Decken');
+  if (parts.length === 0) {
+    // Shapes/annotations aren't in the structured diff — fall back to a coarse check.
+    const bs = before.shapes ?? [], as = after.shapes ?? [];
+    if (bs.length !== as.length) return as.length > bs.length ? 'Form hinzugefügt' : 'Form entfernt';
+    if (JSON.stringify(bs) !== JSON.stringify(as)) return 'Form bearbeitet';
+    return 'Geändert';
+  }
+  return parts.slice(0, 3).join(', ');
+}
