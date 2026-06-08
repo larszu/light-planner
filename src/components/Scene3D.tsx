@@ -8,10 +8,11 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers, CameraView } from '../types';
+import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers, CameraView, FloorMaterial } from '../types';
 import { computeHeatMap, surfaceLux, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../core/lightCalc';
 import { getBeamColorHex } from '../core/colorTemp';
 import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
+import { floorPreset, wallPreset, surfaceCanvas, DEFAULT_FLOOR, type SurfacePreset } from '../core/surfaceTextures';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
@@ -146,6 +147,19 @@ function loadPersonModel(): Promise<PersonModel> {
   if (!personModelPromise) {
     const url = `${import.meta.env.BASE_URL}models/person.glb`;
     const loader = new GLTFLoader();
+    // GLTFLoader decodes embedded texture blobs via ImageBitmapLoader
+    // (createImageBitmap) by default. Under Electron's file:// origin that path
+    // fails on blob: URLs ("Couldn't load texture blob"), leaving every material
+    // white. The texture loader lives on the parser (created per-parse), so we
+    // register a plugin that swaps in a plain TextureLoader — its <img>-element
+    // decode path works in both the browser and the packaged Electron app.
+    loader.register((parser) => {
+      const tl = new THREE.TextureLoader(parser.options.manager);
+      tl.setCrossOrigin(parser.options.crossOrigin);
+      tl.setRequestHeader(parser.options.requestHeader);
+      parser.textureLoader = tl;
+      return { name: 'LP_compatible_texture_loader' };
+    });
     personModelPromise = fetchArrayBuffer(url)
       .then((buf) => loader.parseAsync(buf, ''))
       .then((g) => {
@@ -195,6 +209,50 @@ export interface Scene3DHandle {
   lookThroughCamera: (cam: { x: number; y: number; height: number; aimX: number; aimY: number; fov: number }) => void;
 }
 
+// ── Floor / wall finishes (Render view) ──────────────────────────────────────
+// Procedural tile textures are expensive-ish to draw, so cache the resulting
+// THREE.Texture by preset+colour. Shared across all mounts/instances.
+const surfaceTexCache = new Map<string, THREE.Texture>();
+// `repeat` is baked into the cache key so the floor (repeat = 400 / tile, mapped
+// via the plane's 0..1 UVs) and the walls (repeat = 1, tiling baked into the
+// wall UVs) get independent cached textures and never fight over `.repeat`.
+function surfaceTexture<Id extends string>(preset: SurfacePreset<Id>, color: string, repeat: number): THREE.Texture | null {
+  if (!preset.draw) return null;
+  const key = `${preset.id}|${color}|${repeat.toFixed(3)}`;
+  let tex = surfaceTexCache.get(key) ?? null;
+  if (!tex) {
+    const cv = surfaceCanvas(preset, color);
+    if (!cv) return null;
+    tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8; // keep crisp at grazing floor angles (clamped by GPU)
+    tex.repeat.set(repeat, repeat);
+    surfaceTexCache.set(key, tex);
+  }
+  return tex;
+}
+
+// Apply the chosen floor finish to the persistent ground mesh. Only the
+// realistic (photo) view is textured; plain 3D keeps the dark schematic floor
+// so the helper grid and objects stay readable.
+function applyFloorMaterial(ground: THREE.Mesh, floor: FloorMaterial, photo: boolean) {
+  const m = ground.material as THREE.MeshStandardMaterial;
+  if (!photo) {
+    m.map = null; m.color.set('#222238'); m.roughness = 0.92;
+  } else {
+    const preset = floorPreset(floor.preset);
+    const tex = surfaceTexture(preset, floor.color, 400 / preset.tileMeters); // plane is 400 m across
+    if (tex) {
+      m.map = tex; m.color.set('#ffffff'); // the tinted texture carries the colour
+    } else {
+      m.map = null; m.color.set(floor.color);
+    }
+    m.roughness = preset.roughness;
+  }
+  m.needsUpdate = true;
+}
+
 interface Props {
   fixtures: PlacedFixture[];
   persons: Person[];
@@ -213,11 +271,13 @@ interface Props {
   exposure: number;
   haze: number;
   showBeams: boolean;
+  ambience: number;
+  floor: FloorMaterial;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
   onHoverLux?: (lux: number | null) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, onSelect, onHoverLux }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, floor, onSelect, onHoverLux }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -240,6 +300,8 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
   // Photo-realism flags read by the animation loop without re-creating it.
   const photoModeRef = useRef(photoMode);
   const exposureRef = useRef(exposure);
+  const ambienceRef = useRef(ambience);
+  ambienceRef.current = ambience;
   // Current lit fixtures + hover callback, read by the (once-built) pointer
   // handler so the live lux readout always uses fresh data.
   const litRef = useRef<PlacedFixture[]>([]);
@@ -285,7 +347,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
 
     // Ground plane – large so it always reads as a real floor; receives shadows.
     const groundGeo = new THREE.PlaneGeometry(400, 400);
-    const groundMat = new THREE.MeshStandardMaterial({ color: photoModeRef.current ? '#313139' : '#222238', roughness: 0.9, metalness: 0 });
+    const groundMat = new THREE.MeshStandardMaterial({ color: photoModeRef.current ? '#4a4d57' : '#222238', roughness: 0.92, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -300,17 +362,17 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     pmrem.compileEquirectangularShader();
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = env;
-    scene.environmentIntensity = photoModeRef.current ? 0.18 : 0;
+    const amb0 = ambienceRef.current;
+    scene.environmentIntensity = photoModeRef.current ? amb0 * 0.45 : 0;
 
-    // Lighting. Photo mode keeps a low sky/ground hemisphere fill plus a little
-    // IBL so unlit faces aren't pure black — but kept dim on purpose so the
-    // fixtures dominate, the floor pools read with real brightness falloff and
-    // the cast shadows stay visible (high contrast = lit vs not).
-    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? 0.07 : 0.5);
+    // Lighting. In the render view the fill (hemisphere + ambient + IBL) scales
+    // with the user's global "Ambiente" setting, so the floor/scene can be made
+    // as bright or as moody as wanted while the fixtures still carry the look.
+    const ambient = new THREE.AmbientLight('#7a7a92', photoModeRef.current ? amb0 * 0.18 : 0.5);
     scene.add(ambient);
-    const hemi = new THREE.HemisphereLight('#556688', '#14141c', photoModeRef.current ? 0.40 : 0.0);
+    const hemi = new THREE.HemisphereLight('#7d8aa0', '#1b1f2a', photoModeRef.current ? amb0 * 1.0 : 0.0);
     scene.add(hemi);
-    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? 0.07 : 0.3);
+    const dirLight = new THREE.DirectionalLight('#ffffff', photoModeRef.current ? amb0 * 0.18 : 0.3);
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
@@ -477,12 +539,12 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     if (!s) return;
     s.renderer.toneMapping = photoMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     s.renderer.toneMappingExposure = exposure;
-    s.ambient.intensity = photoMode ? 0.07 : 0.5;
-    s.hemi.intensity = photoMode ? 0.40 : 0.0;
-    s.dir.intensity = photoMode ? 0.07 : 0.3;
-    s.scene.environmentIntensity = photoMode ? 0.18 : 0;
+    s.ambient.intensity = photoMode ? ambience * 0.18 : 0.5;
+    s.hemi.intensity = photoMode ? ambience * 1.0 : 0.0;
+    s.dir.intensity = photoMode ? ambience * 0.18 : 0.3;
+    s.scene.environmentIntensity = photoMode ? ambience * 0.45 : 0;
     s.grid.visible = !photoMode;
-    (s.ground.material as THREE.MeshStandardMaterial).color.set(photoMode ? '#313139' : '#222238');
+    applyFloorMaterial(s.ground, floor, photoMode);
     const bg = photoMode ? '#15151c' : '#1a1a2e';
     s.scene.background = new THREE.Color(bg);
     if (s.scene.fog) (s.scene.fog as THREE.Fog).color.set(bg);
@@ -491,7 +553,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const m = (o as THREE.Mesh).material;
       if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { mm.needsUpdate = true; });
     });
-  }, [photoMode, exposure]);
+  }, [photoMode, exposure, ambience, floor]);
 
   // Update scene objects when data changes
   useEffect(() => {
@@ -521,7 +583,12 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
         if (o instanceof THREE.Mesh) {
           o.geometry.dispose();
           const mats = Array.isArray(o.material) ? o.material : [o.material];
-          mats.forEach((m) => { (m as THREE.MeshBasicMaterial).map?.dispose(); m.dispose(); });
+          // Skip disposing shared, cached surface textures (floor/wall finishes)
+          // — they're reused across rebuilds and live in surfaceTexCache.
+          mats.forEach((m) => {
+            if (!(m as { __keepMap?: boolean }).__keepMap) (m as THREE.MeshBasicMaterial).map?.dispose();
+            m.dispose();
+          });
         } else if (o instanceof THREE.SpotLight) {
           o.shadow?.map?.dispose();
         }
@@ -912,24 +979,40 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       scene.add(mesh);
     }
 
-    // Walls (vertical surfaces, straight or curved, that reflect light)
+    // Walls (vertical surfaces, straight or curved, that reflect light). In the
+    // realistic view they take a tileable finish (Putz/Rauhfaser/Beton/…) tinted
+    // to the wall colour; plain 3D keeps the flat schematic colour.
     if (layers.walls.visible) for (const w of walls) {
       if (Math.hypot(w.x2 - w.x1, w.y2 - w.y1) < 0.05) continue;
       const isSel = selectedIds.has(w.id);
+      const preset = wallPreset(w.material);
+      const tex = photoMode ? surfaceTexture(preset, w.color, 1) : null;
+      const tile = preset.tileMeters;
       const pts = sampleWall(w, isCurved(w) ? 18 : 1); // floor polyline
       const pos: number[] = [];
+      const uv: number[] = [];
+      let run = 0; // cumulative distance so the texture flows continuously
       for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i], b = pts[i + 1];
-        // two triangles forming the vertical quad a→b
+        const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+        const ua = run / tile, ub = (run + segLen) / tile, vh = w.height / tile;
+        // two triangles forming the vertical quad a→b, with UVs in tile units
         pos.push(a.x, 0, a.y, b.x, 0, b.y, b.x, w.height, b.y);
+        uv.push(ua, 0, ub, 0, ub, vh);
         pos.push(a.x, 0, a.y, b.x, w.height, b.y, a.x, w.height, a.y);
+        uv.push(ua, 0, ub, vh, ua, vh);
+        run += segLen;
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
       geo.computeVertexNormals();
-      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-        color: isSel ? '#ffcc33' : w.color, roughness: 0.85, metalness: 0, side: THREE.DoubleSide,
-      }));
+      const mat = new THREE.MeshStandardMaterial({
+        color: isSel ? '#ffcc33' : (tex ? '#ffffff' : w.color),
+        roughness: tex ? preset.roughness : 0.85, metalness: 0, side: THREE.DoubleSide,
+      });
+      if (tex) { mat.map = tex; (mat as { __keepMap?: boolean }).__keepMap = true; }
+      const mesh = new THREE.Mesh(geo, mat);
       mesh.castShadow = true; mesh.receiveShadow = true;
       mesh.userData = { dynamic: true, selectId: w.id };
       scene.add(mesh);

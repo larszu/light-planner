@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from './Icon';
+import type { FloorMaterial, FloorPresetId } from '../types';
+import { FLOOR_PRESETS, floorPreset } from '../core/surfaceTextures';
 
 type Mode = '2d' | '3d' | 'photo';
 
@@ -11,22 +13,29 @@ interface Props {
   exposure: number;
   haze: number;
   showBeams: boolean;
+  ambience: number;
+  floor: FloorMaterial;
   heatMapScale: number;
   heatMapTarget: number;
   snapStep: number;
+  showFocusNotes: boolean;
   // mode + display
   onSetMode: (m: Mode) => void;
   onToggleHeatMap: () => void;
   onExposureChange: (v: number) => void;
   onHazeChange: (v: number) => void;
   onToggleBeams: () => void;
+  onAmbienceChange: (v: number) => void;
+  onFloorChange: (f: FloorMaterial) => void;
   onHeatMapScaleChange: (v: number) => void;
   onHeatMapTargetChange: (v: number) => void;
   onToggleSnap: () => void;
+  onToggleFocusNotes: () => void;
   // actions
   onUploadFloorPlan: (f: File) => void;
   onOpenSchedule: () => void;
   onExport: (format: 'png' | 'jpg' | 'pdf') => void;
+  onExportPlot: () => void;
   onNew: () => void;
   onSave: () => void;
   onLoad: () => void;
@@ -34,6 +43,8 @@ interface Props {
   onLoadFromFile: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onVersions: () => void;
+  onChanges: () => void;
   onAbout: () => void;
 }
 
@@ -72,12 +83,15 @@ const TopBar: React.FC<Props> = (p) => {
               <button className="tb-dd-item" onClick={run(p.onSaveToFile)}><Icon name="export" size={15} />Projekt als Datei…</button>
               <button className="tb-dd-item" onClick={run(p.onLoadFromFile)}><Icon name="import" size={15} />Projekt aus Datei…</button>
               <div className="tb-dd-div" />
+              <button className="tb-dd-item" onClick={run(p.onExportPlot)}><Icon name="schedule" size={15} />Lichtplan drucken (PDF, Titelblock + Legende)…</button>
               <button className="tb-dd-item" onClick={run(() => p.onExport('png'))}>Export als PNG…</button>
               <button className="tb-dd-item" onClick={run(() => p.onExport('jpg'))}>Export als JPG…</button>
-              <button className="tb-dd-item" onClick={run(() => p.onExport('pdf'))}>Export als PDF…</button>
+              <button className="tb-dd-item" onClick={run(() => p.onExport('pdf'))}>Export als PDF (Bild)…</button>
               <div className="tb-dd-sec">Bearbeiten</div>
               <button className="tb-dd-item" onClick={run(p.onUndo)}><Icon name="undo" size={15} />Rückgängig<kbd>Strg Z</kbd></button>
               <button className="tb-dd-item" onClick={run(p.onRedo)}><Icon name="redo" size={15} />Wiederholen<kbd>Strg Y</kbd></button>
+              <button className="tb-dd-item" onClick={run(p.onChanges)}><Icon name="tag" size={15} />Verlauf &amp; Änderungen…</button>
+              <button className="tb-dd-item" onClick={run(p.onVersions)}><Icon name="layers" size={15} />Versionen &amp; Vergleich…</button>
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={run(p.onAbout)}><Icon name="info" size={15} />Über LightPlanner</button>
             </div>
@@ -107,13 +121,26 @@ const TopBar: React.FC<Props> = (p) => {
                   <label className="tb-slider"><span>Belichtung</span>
                     <input type="range" min={0.2} max={3} step={0.05} value={p.exposure} onChange={(e) => p.onExposureChange(+e.target.value)} />
                     <em>{p.exposure.toFixed(2)}</em></label>
+                  <label className="tb-slider"><span>Ambiente</span>
+                    <input type="range" min={0} max={1.5} step={0.05} value={p.ambience} onChange={(e) => p.onAmbienceChange(+e.target.value)} />
+                    <em>{Math.round(p.ambience * 100)}%</em></label>
                   <label className="tb-slider"><span>Dunst / Haze</span>
                     <input type="range" min={0} max={1} step={0.02} value={p.haze} onChange={(e) => p.onHazeChange(+e.target.value)} />
                     <em>{Math.round(p.haze * 100)}%</em></label>
                   <button className="tb-dd-item" onClick={p.onToggleBeams}><Icon name="beam" size={15} />Lichtkegel<span className={`tb-check ${p.showBeams ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
+                  <div className="tb-dd-sec">Boden</div>
+                  <div className="tb-chips">
+                    {FLOOR_PRESETS.map((fp) => (
+                      <button key={fp.id} className={`tb-chip ${p.floor.preset === fp.id ? 'on' : ''}`}
+                        onClick={() => p.onFloorChange({ preset: fp.id as FloorPresetId, color: fp.defaultColor })}>{fp.label}</button>
+                    ))}
+                  </div>
+                  <label className="tb-slider"><span>Bodenfarbe</span>
+                    <input type="color" value={p.floor.color} onChange={(e) => p.onFloorChange({ ...p.floor, color: e.target.value })} />
+                    <em>{floorPreset(p.floor.preset).label}</em></label>
                 </>
               ) : (
-                <div className="tb-hint">Belichtung, Dunst & Lichtkegel erscheinen im <b>Render</b>-Modus.</div>
+                <div className="tb-hint">Belichtung, Boden & Lichtkegel erscheinen im <b>Render</b>-Modus.</div>
               )}
               {p.showHeatMap && (
                 <>
@@ -128,6 +155,7 @@ const TopBar: React.FC<Props> = (p) => {
               )}
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={p.onToggleSnap}><Icon name="snap" size={15} />Einrasten<span className={`tb-check ${p.snapStep > 0 ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
+              <button className="tb-dd-item" onClick={p.onToggleFocusNotes} title="Fokus-Notizen je Scheinwerfer im 2D-Plan einblenden"><Icon name="tag" size={15} />Fokus-Notizen (Plan)<span className={`tb-check ${p.showFocusNotes ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
             </div>
           )}
         </div>

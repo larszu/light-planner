@@ -23,6 +23,7 @@ interface Props {
   showHeatMap: boolean;
   heatMapScale: number;
   heatMapTarget: number;
+  showFocusNotes: boolean;
   planMode: PlanMode;
   onPlaceFixture: (fixture: Fixture, x: number, y: number) => void;
   onMoveFixture: (id: string, x: number, y: number) => void;
@@ -51,6 +52,7 @@ interface Props {
   onMoveAim: (id: string, aimX: number, aimY: number) => void;
   onUpdateFloorPlan: (updates: Partial<FloorPlan>) => void;
   onCalibrateSegment: (x1: number, y1: number, x2: number, y2: number) => void;
+  onViewChange?: (pixelsPerMeter: number) => void;
 }
 
 const GRID_COLOR = '#2a2a3c';
@@ -85,6 +87,7 @@ const PlanCanvas: React.FC<Props> = ({
   showHeatMap,
   heatMapScale,
   heatMapTarget,
+  showFocusNotes,
   planMode,
   onPlaceFixture,
   onMoveFixture,
@@ -113,10 +116,12 @@ const PlanCanvas: React.FC<Props> = ({
   onMoveAim,
   onUpdateFloorPlan,
   onCalibrateSegment,
+  onViewChange,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
+  const reportedScaleRef = useRef(0);
   const dragRef = useRef<{
     type: 'pan' | 'move' | 'move-aim' | 'move-person' | 'move-stage' | 'resize-stage' | 'move-truss' | 'move-wall' | 'curve-wall' | 'move-shape' | 'move-camera' | 'move-camera-aim' | 'draw-rect' | 'draw-line' | 'draw-measure' | 'draw-truss' | 'draw-wall' | 'draw-stage' | 'calibrate' | 'move-plan' | 'marquee';
     corner?: 0 | 1 | 2 | 3;
@@ -237,6 +242,12 @@ const PlanCanvas: React.FC<Props> = ({
     const v = viewRef.current;
     const w = canvas.width;
     const h = canvas.height;
+    // Report the draw scale (backing px per metre) so the plot export can size
+    // an accurate scale bar; only on change to avoid churn.
+    if (onViewChange && v.scale !== reportedScaleRef.current) {
+      reportedScaleRef.current = v.scale;
+      onViewChange(v.scale);
+    }
 
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#1a1a2e';
@@ -804,6 +815,23 @@ const PlanCanvas: React.FC<Props> = ({
         ctx.font = `${8.5 / v.scale}px monospace`;
         ctx.fillText(parts.join(' · '), f.x, f.y + rad + 22 / v.scale);
       }
+      // Focus-note overlay (focus chart): the note tagged at the lantern, plus
+      // a done tick — shown only when the toggle is on, so the plan stays clean.
+      if (showFocusNotes && (f.focusNote || f.focused)) {
+        const tag = (f.focused ? '✓ ' : '') + (f.focusNote || '');
+        const fs = 8.5 / v.scale;
+        ctx.font = `${fs}px sans-serif`;
+        const padX = 3 / v.scale, padY = 2 / v.scale, h = fs + padY * 2;
+        const w = ctx.measureText(tag).width + padX * 2;
+        const bx = f.x - w / 2, by = f.y - rad - 6 / v.scale - 13 / v.scale - h;
+        ctx.fillStyle = f.focused ? 'rgba(52,211,153,0.92)' : 'rgba(245,165,36,0.92)';
+        ctx.beginPath();
+        (ctx.roundRect ? ctx.roundRect(bx, by, w, h, 3 / v.scale) : ctx.rect(bx, by, w, h));
+        ctx.fill();
+        ctx.fillStyle = '#10151c';
+        ctx.textAlign = 'center';
+        ctx.fillText(tag, f.x, by + h - padY - fs * 0.12);
+      }
       // Show aim distance as dimension line annotation
       const aimDist = Math.sqrt((f.aimX - f.x) ** 2 + (f.aimY - f.y) ** 2);
       if (aimDist > 0.3) {
@@ -1002,7 +1030,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, activeTool, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, showFocusNotes, planMode, activeTool, screenToWorld, drawRulers, onViewChange]);
 
   useEffect(() => {
     const container = containerRef.current;

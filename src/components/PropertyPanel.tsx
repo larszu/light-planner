@@ -2,7 +2,9 @@ import React from 'react';
 import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape, CameraView } from '../types';
 import { wallMidHandle, curveControlForMid } from '../core/geometry';
 import { luxFromFixture, effectiveFieldAngleDeg, explainLux } from '../core/lightCalc';
-import type { FixtureCategory, BeamShape, LensType, MountType } from '../types';
+import type { FixtureCategory, BeamShape, LensType, MountType, WallPresetId } from '../types';
+import { WALL_PRESETS, DEFAULT_WALL_MATERIAL, wallPreset } from '../core/surfaceTextures';
+import { DEFAULT_TRUSS_CAPACITY } from '../core/patch';
 import { gelLibrary } from '../core/gelLibrary';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
@@ -663,10 +665,12 @@ const PropertyPanel: React.FC<Props> = ({
           {numField('Ende X (m)', t.x2, (v) => onUpdateTruss(t.id, { x2: v }))}
           {numField('Ende Y (m)', t.y2, (v) => onUpdateTruss(t.id, { y2: v }))}
           {numField('Trimm-Höhe (m)', t.height, (v) => onUpdateTruss(t.id, { height: v }), 0.5, 0, 30)}
+          {numField('Traglast (kg)', t.capacity ?? DEFAULT_TRUSS_CAPACITY, (v) => onUpdateTruss(t.id, { capacity: v }), 10, 0, 5000)}
           <label className="prop-field">
             <span>Bezeichnung</span>
             <input type="text" value={t.label || ''} onChange={(e) => onUpdateTruss(t.id, { label: e.target.value })} />
           </label>
+          <div className="prop-derived">Last &amp; Auslastung pro Traverse siehe Geräteliste → „Last pro Traverse".</div>
         </div>
         <button className="delete-btn" onClick={() => onDelete(t.id)}>Traverse löschen</button>
       </div>
@@ -752,6 +756,13 @@ const PropertyPanel: React.FC<Props> = ({
             ))}
           </div>
           <label className="prop-field">
+            <span>Oberfläche</span>
+            <select value={w.material ?? DEFAULT_WALL_MATERIAL}
+              onChange={(e) => { const id = e.target.value as WallPresetId; onUpdateWall(w.id, { material: id, color: wallPreset(id).defaultColor }); }}>
+              {WALL_PRESETS.map((wp) => <option key={wp.id} value={wp.id}>{wp.label}</option>)}
+            </select>
+          </label>
+          <label className="prop-field">
             <span>Farbe</span>
             <input type="color" value={w.color} onChange={(e) => onUpdateWall(w.id, { color: e.target.value })} />
           </label>
@@ -759,7 +770,7 @@ const PropertyPanel: React.FC<Props> = ({
             <span>Bezeichnung</span>
             <input type="text" value={w.label || ''} onChange={(e) => onUpdateWall(w.id, { label: e.target.value })} />
           </label>
-          <div className="prop-derived">Reflektiert Licht diffus in den Raum (Ein-Bounce) – fließt in die Heatmap ein.</div>
+          <div className="prop-derived">Oberfläche &amp; Farbe gelten im Render-Modus. Reflektiert Licht diffus in den Raum (Ein-Bounce) – fließt in die Heatmap ein.</div>
         </div>
         <button className="delete-btn" onClick={() => onDelete(w.id)}>Wand löschen</button>
       </div>

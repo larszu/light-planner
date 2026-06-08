@@ -4,7 +4,8 @@
 // professional plots: number the rig in reading order, assign DMX addresses
 // respecting each fixture's footprint, and total up the electrical load.
 
-import type { PlacedFixture } from '../types';
+import type { PlacedFixture, Truss } from '../types';
+import { gelLibrary } from './gelLibrary';
 
 const UNIVERSE_SIZE = 512;
 
@@ -126,4 +127,125 @@ export function fixtureCounts(fixtures: PlacedFixture[]): FixtureCount[] {
     });
   }
   return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
+// ── Colour cut list (gel consumption) ────────────────────────────────────────
+// Counts every gel "cut" across the rig (a fixture with two gels = two cuts),
+// the Lightwright "Color Count" paperwork used for ordering and prep.
+export interface ColorCount {
+  id: string;
+  code: string;
+  brand: string;
+  name: string;
+  type: string;
+  count: number;
+}
+
+export function colorCounts(fixtures: PlacedFixture[]): ColorCount[] {
+  const map = new Map<string, ColorCount>();
+  for (const f of fixtures) for (const gid of f.gelFilterIds ?? []) {
+    const ex = map.get(gid);
+    if (ex) { ex.count += 1; continue; }
+    const g = gelLibrary.find((x) => x.id === gid);
+    if (!g) continue;
+    map.set(gid, { id: g.id, code: g.code, brand: g.brand, name: g.name, type: g.type, count: 1 });
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
+}
+
+// ── Rigging: load per truss ──────────────────────────────────────────────────
+// Conservative default safe-working-load for a truss when none is set. Real
+// trusses vary widely (a 3 m span of 30 cm box truss is good for far more);
+// this is a deliberately cautious default so the warning errs on the safe side.
+export const DEFAULT_TRUSS_CAPACITY = 150; // kg
+
+// Shortest distance from point (px,py) to segment (ax,ay)-(bx,by).
+function distToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2)) : 0;
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// The truss a fixture is hung on (nearest segment within `snap` m), or null
+// for floor stands / booms. Used for load totals and focus-session grouping.
+export function nearestTrussId(f: PlacedFixture, trusses: Truss[], snap = 1.0): string | null {
+  let bestId: string | null = null, bestD = Infinity;
+  for (const t of trusses) {
+    const d = distToSegment(f.x, f.y, t.x1, t.y1, t.x2, t.y2);
+    if (d < bestD) { bestD = d; bestId = t.id; }
+  }
+  return bestId && bestD <= snap ? bestId : null;
+}
+
+export interface TrussLoad {
+  id: string;
+  label: string;
+  fixtureCount: number;
+  weightKg: number;     // sum of fixtures hung on this truss
+  capacityKg: number;
+  utilization: number;  // weightKg / capacityKg
+  overloaded: boolean;
+}
+
+// Assign each fixture to the nearest truss within `snap` metres (it is hung on
+// it) and total the load. Fixtures not near any truss (floor stands, booms) are
+// reported separately.
+export function trussLoads(
+  fixtures: PlacedFixture[], trusses: Truss[], snap = 1.0,
+): { perTruss: TrussLoad[]; unassigned: { count: number; weightKg: number } } {
+  const totals = new Map<string, { count: number; weight: number }>();
+  trusses.forEach((t) => totals.set(t.id, { count: 0, weight: 0 }));
+  let unCount = 0, unWeight = 0;
+
+  for (const f of fixtures) {
+    let bestId: string | null = null, bestD = Infinity;
+    for (const t of trusses) {
+      const d = distToSegment(f.x, f.y, t.x1, t.y1, t.x2, t.y2);
+      if (d < bestD) { bestD = d; bestId = t.id; }
+    }
+    const w = f.fixture.weight || 0;
+    if (bestId && bestD <= snap) {
+      const acc = totals.get(bestId)!; acc.count += 1; acc.weight += w;
+    } else { unCount += 1; unWeight += w; }
+  }
+
+  const perTruss = trusses.map((t) => {
+    const acc = totals.get(t.id)!;
+    const cap = t.capacity && t.capacity > 0 ? t.capacity : DEFAULT_TRUSS_CAPACITY;
+    return {
+      id: t.id, label: t.label || 'Traverse', fixtureCount: acc.count, weightKg: acc.weight,
+      capacityKg: cap, utilization: cap > 0 ? acc.weight / cap : 0, overloaded: acc.weight > cap,
+    };
+  });
+  return { perTruss, unassigned: { count: unCount, weightKg: unWeight } };
+}
+
+// ── Power: distribution into circuits ────────────────────────────────────────
+// A 16 A / 230 V circuit carries 3680 W; plan to ~80 % (3000 W) for headroom.
+export const CIRCUIT_WATTS = 3000;
+
+export interface Circuit {
+  index: number;
+  watts: number;
+  fixtureCount: number;
+  utilization: number; // watts / CIRCUIT_WATTS
+}
+
+// Greedy first-fit in reading/patch order: keep filling a circuit until the
+// next fixture would exceed the budget, then start a new one.
+export function circuitBreakdown(fixtures: PlacedFixture[], budget = CIRCUIT_WATTS): Circuit[] {
+  const ordered = readingOrder(fixtures).filter((f) => (f.fixture.wattage || 0) > 0);
+  const circuits: Circuit[] = [];
+  let cur: Circuit | null = null;
+  for (const f of ordered) {
+    const w = f.fixture.wattage || 0;
+    if (!cur || cur.watts + w > budget) {
+      cur = { index: circuits.length + 1, watts: 0, fixtureCount: 0, utilization: 0 };
+      circuits.push(cur);
+    }
+    cur.watts += w; cur.fixtureCount += 1;
+  }
+  circuits.forEach((c) => { c.utilization = budget > 0 ? c.watts / budget : 0; });
+  return circuits;
 }

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView, FloorMaterial } from './types';
+import { DEFAULT_FLOOR } from './core/surfaceTextures';
 import { convexHull } from './core/geometry';
 import TopBar from './components/TopBar';
 import ToolRail from './components/ToolRail';
@@ -10,6 +11,10 @@ import PlanCanvas from './components/PlanCanvas';
 import PropertyPanel from './components/PropertyPanel';
 import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
+import VersionDialog from './components/VersionDialog';
+import ChangesDialog from './components/ChangesDialog';
+import { summarizeChange } from './core/diff';
+import { saveVersion } from './utils/versionStore';
 import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
@@ -20,6 +25,7 @@ import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
 import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
+import { composePlot } from './utils/plotExport';
 import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
@@ -109,6 +115,8 @@ const App: React.FC = () => {
   const setHaze = useUiStore((s) => s.setHaze);
   const showBeams = useUiStore((s) => s.showBeams);
   const toggleBeams = useUiStore((s) => s.toggleBeams);
+  const ambience = useUiStore((s) => s.ambience);
+  const setAmbience = useUiStore((s) => s.setAmbience);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [cameras, setCameras] = useState<CameraView[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
@@ -121,13 +129,18 @@ const App: React.FC = () => {
   const [trusses, setTrusses] = useState<Truss[]>([]);
   const [walls, setWalls] = useState<Wall[]>([]);
   const [ceilings, setCeilings] = useState<Ceiling[]>([]);
+  const [floor, setFloor] = useState<FloorMaterial>(DEFAULT_FLOOR);
   const [planMode, setPlanMode] = useState<PlanMode>('none');
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
   const snapStep = useUiStore((s) => s.snapStep);
   const toggleSnap = useUiStore((s) => s.toggleSnap);
+  const showFocusNotes = useUiStore((s) => s.showFocusNotes);
+  const toggleFocusNotes = useUiStore((s) => s.toggleFocusNotes);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [versionOpen, setVersionOpen] = useState(false);
+  const [changesOpen, setChangesOpen] = useState(false);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   // Look present just before a scene was switched on, so it can be switched off.
@@ -169,17 +182,49 @@ const App: React.FC = () => {
     setCeilings(snap.ceilings);
   }, []);
 
-  const handleUndo = useCallback(() => {
-    if (historyRef.current.length === 0) return;
-    futureRef.current.push({ ...stateRef.current });
-    restoreSnapshot(historyRef.current.pop()!);
+  // Move `count` steps in one direction (jump-to in the history timeline). The
+  // intermediate states are moved onto the opposite stack so redo/undo stays
+  // consistent. count = 1 is a normal single undo/redo.
+  const logPrefixRef = useRef<string | null>(null);
+  const restoreMany = useCallback((dir: 'undo' | 'redo', count: number) => {
+    const from = dir === 'undo' ? historyRef.current : futureRef.current;
+    const to = dir === 'undo' ? futureRef.current : historyRef.current;
+    const n = Math.min(count, from.length);
+    if (n <= 0) return;
+    to.push({ ...stateRef.current });
+    for (let i = 0; i < n - 1; i++) to.push(from.pop()!);
+    logPrefixRef.current = dir === 'undo' ? '↶ Rückgängig' : '↷ Wiederholt';
+    restoreSnapshot(from.pop()!);
   }, [restoreSnapshot]);
 
-  const handleRedo = useCallback(() => {
-    if (futureRef.current.length === 0) return;
-    historyRef.current.push({ ...stateRef.current });
-    restoreSnapshot(futureRef.current.pop()!);
-  }, [restoreSnapshot]);
+  const handleUndo = useCallback(() => restoreMany('undo', 1), [restoreMany]);
+  const handleRedo = useCallback(() => restoreMany('redo', 1), [restoreMany]);
+
+  // ── Activity log (Protokoll) ──────────────────────────────────────────────
+  // A timestamped, append-only trail of edits this session. Derived from the
+  // document state itself (no per-handler wiring): when the plan changes, the
+  // change is summarised and logged. Consecutive identical labels (e.g. a drag)
+  // are coalesced, and project loads are suppressed.
+  interface LogEntry { time: number; label: string }
+  const [activityLog, setActivityLog] = useState<LogEntry[]>([]);
+  const prevDocRef = useRef<Snapshot>(stateRef.current);
+  const suppressLogRef = useRef(true); // skip the initial mount + loads
+  useEffect(() => {
+    if (suppressLogRef.current) { suppressLogRef.current = false; prevDocRef.current = stateRef.current; return; }
+    const prefix = logPrefixRef.current; logPrefixRef.current = null;
+    const base = summarizeChange(prevDocRef.current, stateRef.current);
+    prevDocRef.current = stateRef.current;
+    if (base === 'Geändert' && !prefix) return; // no detectable change
+    const label = prefix ? `${prefix}: ${base}` : base;
+    setActivityLog((log) => {
+      const last = log[log.length - 1];
+      if (last && last.label === label && Date.now() - last.time < 1500) {
+        return [...log.slice(0, -1), { time: Date.now(), label }]; // coalesce
+      }
+      const next = [...log, { time: Date.now(), label }];
+      return next.length > 200 ? next.slice(next.length - 200) : next;
+    });
+  }, [fixtures, persons, stageElements, shapes, fixtureGroups, trusses, walls, ceilings]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -649,6 +694,7 @@ const App: React.FC = () => {
       scenes,
       cameras,
       layers,
+      floor,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     try {
@@ -658,11 +704,13 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
     futureRef.current = [];
+    suppressLogRef.current = true;       // don't log the bulk state swap
+    setActivityLog([{ time: Date.now(), label: `Projekt geladen: ${data.meta?.name ?? ''}`.trim() }]);
     setFixtures(data.fixtures);
     setShapes(data.shapes);
     setPersons(data.persons);
@@ -677,6 +725,7 @@ const App: React.FC = () => {
     preSceneRef.current = null;
     setCameras(data.cameras ?? []);
     setLayers(data.layers ?? DEFAULT_LAYERS);
+    setFloor(data.floor ?? DEFAULT_FLOOR);
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
     if (data.floorPlan) {
@@ -707,7 +756,7 @@ const App: React.FC = () => {
       meta: { name: 'Neues Projekt', author: '', version: '1.0', createdAt: now, updatedAt: now },
       fixtures: [], shapes: [], persons: [], stageElements: [],
       customFixtures, fixtureGroups: [], trusses: [], walls: [], ceilings: [],
-      scenes: [], cameras: [], layers: DEFAULT_LAYERS, floorPlan: undefined,
+      scenes: [], cameras: [], layers: DEFAULT_LAYERS, floor: DEFAULT_FLOOR, floorPlan: undefined,
     });
   }, [fixtures, persons, stageElements, trusses, walls, ceilings, shapes, floorPlan, customFixtures, handleLoadProject]);
 
@@ -947,6 +996,31 @@ const App: React.FC = () => {
     }
   }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget, host]);
 
+  // The 2D plan's current draw scale (backing px per metre), reported by
+  // PlanCanvas — used to size an accurate scale bar in the printed plot.
+  const planPxPerMeterRef = useRef(40);
+  const handleExportPlot = useCallback(async () => {
+    const srcCanvas = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
+    if (viewMode !== '2d' || !srcCanvas) { window.alert('Lichtplan-Druck: bitte in der 2D-Plan-Ansicht ausführen.'); return; }
+    const out = composePlot(srcCanvas, planPxPerMeterRef.current, fixtures, {
+      projectName: projectMeta?.name || 'Lichtplan', author: projectMeta?.author,
+    });
+    const base = `${projectMeta?.name || 'Lichtplan'} Plan ${String(exportCounterRef.current++).padStart(3, '0')}`;
+    const bytes = dataUrlToBytes(out.toDataURL('image/jpeg', 0.92));
+    await host.exportFile(jpegToPdfBlob(bytes, out.width, out.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
+  }, [viewMode, fixtures, projectMeta, host]);
+
+  // Current project document as a single object (used by version snapshots).
+  const buildCurrentDoc = useCallback((): ProjectData => {
+    const now = new Date().toISOString();
+    const meta: ProjectMeta = projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now };
+    return {
+      meta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
+      trusses, walls, ceilings, scenes, cameras, layers, floor,
+      floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+    };
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan]);
+
   // ── Project save/load to a real file (the host decides where) ──
   const handleSaveToFile = useCallback(async () => {
     const now = new Date().toISOString();
@@ -954,12 +1028,12 @@ const App: React.FC = () => {
     const data: ProjectData = {
       meta: { ...meta, updatedAt: now },
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
-      trusses, walls, ceilings, scenes, cameras, layers,
+      trusses, walls, ceilings, scenes, cameras, layers, floor,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, host]);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan, host]);
 
   const handleLoadFromFile = useCallback(async () => {
     const res = await host.openProjectFile();
@@ -1073,10 +1147,10 @@ const App: React.FC = () => {
   useEffect(() => {
     useProjectStore.getState().setDocument({
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
-      trusses, walls, ceilings, scenes, cameras, layers,
+      trusses, walls, ceilings, scenes, cameras, layers, floor,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     }, projectMeta ?? null);
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floorPlan, projectMeta]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan, projectMeta]);
 
   return (
     <div className="app">
@@ -1088,20 +1162,27 @@ const App: React.FC = () => {
         exposure={exposure}
         haze={haze}
         showBeams={showBeams}
+        ambience={ambience}
+        floor={floor}
         heatMapScale={heatMapScale}
         heatMapTarget={heatMapTarget}
         snapStep={snapStep}
+        showFocusNotes={showFocusNotes}
         onSetMode={handleSetMode}
         onToggleHeatMap={toggleHeatMap}
         onExposureChange={setExposure}
         onHazeChange={setHaze}
         onToggleBeams={toggleBeams}
+        onAmbienceChange={setAmbience}
+        onFloorChange={setFloor}
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
         onToggleSnap={toggleSnap}
+        onToggleFocusNotes={toggleFocusNotes}
         onUploadFloorPlan={handleUploadFloorPlan}
         onOpenSchedule={() => setScheduleOpen(true)}
         onExport={handleExport}
+        onExportPlot={handleExportPlot}
         onNew={handleNew}
         onSave={() => setProjectDialogMode('save')}
         onLoad={() => setProjectDialogMode('load')}
@@ -1109,6 +1190,8 @@ const App: React.FC = () => {
         onLoadFromFile={handleLoadFromFile}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onVersions={() => setVersionOpen(true)}
+        onChanges={() => setChangesOpen(true)}
         onAbout={() => setAboutOpen(true)}
       />
       <div className="app-body">
@@ -1152,6 +1235,7 @@ const App: React.FC = () => {
               showHeatMap={showHeatMap}
               heatMapScale={heatMapScale}
               heatMapTarget={heatMapTarget}
+              showFocusNotes={showFocusNotes}
               onPlaceFixture={handlePlaceFixture}
               onMoveFixture={handleMoveFixture}
               onSelect={handleSelectWithGroups}
@@ -1180,6 +1264,7 @@ const App: React.FC = () => {
               planMode={planMode}
               onUpdateFloorPlan={handleUpdateFloorPlan}
               onCalibrateSegment={handleCalibrateSegment}
+              onViewChange={(s) => { planPxPerMeterRef.current = s; }}
             />
           ) : (
             <Suspense fallback={<div className="loading-3d">3D-Ansicht wird geladen…</div>}>
@@ -1202,6 +1287,8 @@ const App: React.FC = () => {
                 exposure={exposure}
                 haze={haze}
                 showBeams={showBeams}
+                ambience={ambience}
+                floor={floor}
                 onSelect={handleSelectWithGroups}
                 onHoverLux={setCursorLux}
               />
@@ -1328,13 +1415,48 @@ const App: React.FC = () => {
           onCancel={() => setAreaLightOpen(false)}
         />
       )}
+      {versionOpen && (
+        <VersionDialog
+          projectId={projectId}
+          projectName={projectMeta?.name ?? ''}
+          currentDoc={buildCurrentDoc()}
+          onRestore={(doc) => { handleLoadProject(doc); setVersionOpen(false); }}
+          onClose={() => setVersionOpen(false)}
+        />
+      )}
+      {changesOpen && (() => {
+        const states = [...historyRef.current, stateRef.current];
+        const undoSteps = [];
+        for (let t = states.length - 1; t >= 1; t--) undoSteps.push({ count: states.length - t, label: summarizeChange(states[t - 1], states[t]) });
+        const fut = futureRef.current; const redoSteps = []; let prev = stateRef.current;
+        for (let i = fut.length - 1, k = 1; i >= 0; i--, k++) { redoSteps.push({ count: k, label: summarizeChange(prev, fut[i]) }); prev = fut[i]; }
+        return (
+          <ChangesDialog
+            log={activityLog}
+            undoSteps={undoSteps}
+            redoSteps={redoSteps}
+            currentDoc={buildCurrentDoc()}
+            projectId={projectId}
+            projectName={projectMeta?.name ?? ''}
+            onJump={(dir, count) => restoreMany(dir, count)}
+            onSaveVersion={(lbl) => { try { saveVersion(projectId, lbl, buildCurrentDoc()); } catch (e) { window.alert(e instanceof Error ? e.message : String(e)); } }}
+            onClose={() => setChangesOpen(false)}
+          />
+        );
+      })()}
       {scheduleOpen && (
         <ScheduleDialog
           fixtures={fixtures}
-          trussCount={trusses.length}
+          trusses={trusses}
+          walls={walls}
+          ceilings={ceilings}
+          area={lightArea}
+          projectName={projectMeta?.name ?? ''}
           conflicts={patchConflicts}
           onAutoNumber={handleAutoNumber}
           onAutoPatch={handleAutoPatch}
+          onLocate={(ids) => { if (ids.length) { setSelectedIds(new Set(ids)); setViewMode('2d'); setScheduleOpen(false); } }}
+          onUpdateFixture={handleUpdateFixture}
           onClose={() => setScheduleOpen(false)}
         />
       )}
