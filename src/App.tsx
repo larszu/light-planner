@@ -130,6 +130,8 @@ const App: React.FC = () => {
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
   const snapStep = useUiStore((s) => s.snapStep);
   const toggleSnap = useUiStore((s) => s.toggleSnap);
+  const showFocusNotes = useUiStore((s) => s.showFocusNotes);
+  const toggleFocusNotes = useUiStore((s) => s.toggleFocusNotes);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -1112,6 +1114,7 @@ const App: React.FC = () => {
         heatMapScale={heatMapScale}
         heatMapTarget={heatMapTarget}
         snapStep={snapStep}
+        showFocusNotes={showFocusNotes}
         onSetMode={handleSetMode}
         onToggleHeatMap={toggleHeatMap}
         onExposureChange={setExposure}
@@ -1122,6 +1125,7 @@ const App: React.FC = () => {
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
         onToggleSnap={toggleSnap}
+        onToggleFocusNotes={toggleFocusNotes}
         onUploadFloorPlan={handleUploadFloorPlan}
         onOpenSchedule={() => setScheduleOpen(true)}
         onExport={handleExport}
@@ -1176,6 +1180,7 @@ const App: React.FC = () => {
               showHeatMap={showHeatMap}
               heatMapScale={heatMapScale}
               heatMapTarget={heatMapTarget}
+              showFocusNotes={showFocusNotes}
               onPlaceFixture={handlePlaceFixture}
               onMoveFixture={handleMoveFixture}
               onSelect={handleSelectWithGroups}

@@ -23,6 +23,7 @@ interface Props {
   showHeatMap: boolean;
   heatMapScale: number;
   heatMapTarget: number;
+  showFocusNotes: boolean;
   planMode: PlanMode;
   onPlaceFixture: (fixture: Fixture, x: number, y: number) => void;
   onMoveFixture: (id: string, x: number, y: number) => void;
@@ -85,6 +86,7 @@ const PlanCanvas: React.FC<Props> = ({
   showHeatMap,
   heatMapScale,
   heatMapTarget,
+  showFocusNotes,
   planMode,
   onPlaceFixture,
   onMoveFixture,
@@ -804,6 +806,23 @@ const PlanCanvas: React.FC<Props> = ({
         ctx.font = `${8.5 / v.scale}px monospace`;
         ctx.fillText(parts.join(' · '), f.x, f.y + rad + 22 / v.scale);
       }
+      // Focus-note overlay (focus chart): the note tagged at the lantern, plus
+      // a done tick — shown only when the toggle is on, so the plan stays clean.
+      if (showFocusNotes && (f.focusNote || f.focused)) {
+        const tag = (f.focused ? '✓ ' : '') + (f.focusNote || '');
+        const fs = 8.5 / v.scale;
+        ctx.font = `${fs}px sans-serif`;
+        const padX = 3 / v.scale, padY = 2 / v.scale, h = fs + padY * 2;
+        const w = ctx.measureText(tag).width + padX * 2;
+        const bx = f.x - w / 2, by = f.y - rad - 6 / v.scale - 13 / v.scale - h;
+        ctx.fillStyle = f.focused ? 'rgba(52,211,153,0.92)' : 'rgba(245,165,36,0.92)';
+        ctx.beginPath();
+        (ctx.roundRect ? ctx.roundRect(bx, by, w, h, 3 / v.scale) : ctx.rect(bx, by, w, h));
+        ctx.fill();
+        ctx.fillStyle = '#10151c';
+        ctx.textAlign = 'center';
+        ctx.fillText(tag, f.x, by + h - padY - fs * 0.12);
+      }
       // Show aim distance as dimension line annotation
       const aimDist = Math.sqrt((f.aimX - f.x) ** 2 + (f.aimY - f.y) ** 2);
       if (aimDist > 0.3) {
@@ -1002,7 +1021,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, planMode, activeTool, screenToWorld, drawRulers]);
+  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, showFocusNotes, planMode, activeTool, screenToWorld, drawRulers]);
 
   useEffect(() => {
     const container = containerRef.current;

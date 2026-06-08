@@ -18,6 +18,7 @@ interface Props {
   heatMapScale: number;
   heatMapTarget: number;
   snapStep: number;
+  showFocusNotes: boolean;
   // mode + display
   onSetMode: (m: Mode) => void;
   onToggleHeatMap: () => void;
@@ -29,6 +30,7 @@ interface Props {
   onHeatMapScaleChange: (v: number) => void;
   onHeatMapTargetChange: (v: number) => void;
   onToggleSnap: () => void;
+  onToggleFocusNotes: () => void;
   // actions
   onUploadFloorPlan: (f: File) => void;
   onOpenSchedule: () => void;
@@ -149,6 +151,7 @@ const TopBar: React.FC<Props> = (p) => {
               )}
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={p.onToggleSnap}><Icon name="snap" size={15} />Einrasten<span className={`tb-check ${p.snapStep > 0 ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
+              <button className="tb-dd-item" onClick={p.onToggleFocusNotes} title="Fokus-Notizen je Scheinwerfer im 2D-Plan einblenden"><Icon name="tag" size={15} />Fokus-Notizen (Plan)<span className={`tb-check ${p.showFocusNotes ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
             </div>
           )}
         </div>
