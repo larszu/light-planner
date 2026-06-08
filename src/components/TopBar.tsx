@@ -66,7 +66,7 @@ const TopBar: React.FC<Props> = (p) => {
     <header className="topbar" ref={ref}>
       {/* ── left: brand + menu ── */}
       <div className="topbar-left">
-        <div className="brand-logo"><Icon name="lamp" size={16} /></div>
+        <div className="brand-logo"><img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" draggable={false} /></div>
         <b className="brand-name">LightPlanner</b>
         <span className="brand-proj">{p.projectName || 'Unbenannt'}</span>
 

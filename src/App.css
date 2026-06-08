@@ -1984,7 +1984,8 @@ kbd {
 
 /* About dialog */
 .about-modal { width: 380px; max-width: 92vw; text-align: center; }
-.about-logo { font-size: 40px; line-height: 1; margin-bottom: 4px; }
+.about-logo { width: 76px; height: 76px; display: block; margin: 0 auto 10px; border-radius: 18px;
+  box-shadow: 0 10px 26px -10px #000a, 0 0 0 1px #ffffff14; }
 .about-name { margin: 0; font-size: 20px; color: var(--text); }
 .about-version {
   display: inline-block;
@@ -2453,8 +2454,9 @@ kbd {
   border-bottom: 1px solid var(--border); position: relative; z-index: 30;
 }
 .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.brand-logo { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: #fff;
-  background: linear-gradient(135deg, #3b9dff, #7c5cff); box-shadow: inset 0 0 0 1px #ffffff22, 0 4px 12px -5px #3b9dff88; }
+.brand-logo { width: 28px; height: 28px; border-radius: 8px; overflow: hidden; flex: none;
+  box-shadow: 0 2px 8px -3px #000a, 0 0 0 1px #ffffff14; }
+.brand-logo img { width: 100%; height: 100%; display: block; }
 .brand-name { font-size: 14px; font-weight: 700; letter-spacing: .2px; }
 .brand-proj { color: var(--text2); font-size: 12px; padding-left: 12px; border-left: 1px solid var(--line-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }

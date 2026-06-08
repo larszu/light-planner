@@ -1,7 +1,17 @@
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let mainWindow;
+
+// Runtime window / taskbar icon. dist/ and electron/ sit side by side both in
+// dev (after `vite build`) and inside the packaged asar; icon.png is copied
+// there from public/. The installer / .exe / .app icon comes from
+// build/icon.png via electron-builder instead.
+function windowIcon() {
+  const p = path.join(__dirname, '..', 'dist', 'icon.png');
+  return fs.existsSync(p) ? p : undefined;
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -10,7 +20,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'Light Planner',
-    icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    icon: windowIcon(),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

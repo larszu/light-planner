@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Light Planner">
+  <defs>
+    <clipPath id="badge"><rect width="1024" height="1024" rx="224"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#27416a"/><stop offset="0.5" stop-color="#15243d"/><stop offset="1" stop-color="#0b1220"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="512" cy="296" r="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="rgb(120,160,235)" stop-opacity="0.22"/><stop offset="1" stop-color="rgb(120,160,235)" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="beam" x1="0" y1="300" x2="0" y2="858" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="rgb(255,214,140)" stop-opacity="0.55"/>
+      <stop offset="0.7" stop-color="rgb(255,214,140)" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="rgb(255,214,140)" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="pool" cx="512" cy="860" r="300" gradientUnits="userSpaceOnUse"
+      gradientTransform="matrix(1 0 0 0.2667 0 630.67)">
+      <stop offset="0" stop-color="rgb(255,231,178)" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="rgb(255,214,140)" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="rgb(255,214,140)" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="174" x2="0" y2="418" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4a5d80"/><stop offset="1" stop-color="#19233b"/>
+    </linearGradient>
+    <radialGradient id="lens" cx="512" cy="296" r="94" fx="486" fy="266" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffdf4"/><stop offset="0.32" stop-color="#ffe6a6"/>
+      <stop offset="0.68" stop-color="#ffc24d"/><stop offset="1" stop-color="#f59a22"/>
+    </radialGradient>
+  </defs>
+  <g clip-path="url(#badge)">
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#halo)"/>
+    <polygon points="440,300 584,300 800,858 224,858" fill="url(#beam)"/>
+    <ellipse cx="512" cy="860" rx="300" ry="80" fill="url(#pool)"/>
+    <circle cx="512" cy="296" r="122" fill="url(#ring)"/>
+    <circle cx="512" cy="296" r="94" fill="url(#lens)"/>
+  </g>
+</svg>
