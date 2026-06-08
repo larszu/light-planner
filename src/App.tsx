@@ -11,6 +11,7 @@ import PlanCanvas from './components/PlanCanvas';
 import PropertyPanel from './components/PropertyPanel';
 import ThreePointDialog from './components/ThreePointDialog';
 import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from './components/ProjectDialog';
+import VersionDialog from './components/VersionDialog';
 import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
@@ -132,6 +133,7 @@ const App: React.FC = () => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [versionOpen, setVersionOpen] = useState(false);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   // Look present just before a scene was switched on, so it can be switched off.
@@ -953,6 +955,17 @@ const App: React.FC = () => {
     }
   }, [viewMode, projectMeta, showHeatMap, heatMapScale, heatMapTarget, host]);
 
+  // Current project document as a single object (used by version snapshots).
+  const buildCurrentDoc = useCallback((): ProjectData => {
+    const now = new Date().toISOString();
+    const meta: ProjectMeta = projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now };
+    return {
+      meta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
+      trusses, walls, ceilings, scenes, cameras, layers, floor,
+      floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+    };
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan]);
+
   // ── Project save/load to a real file (the host decides where) ──
   const handleSaveToFile = useCallback(async () => {
     const now = new Date().toISOString();
@@ -1119,6 +1132,7 @@ const App: React.FC = () => {
         onLoadFromFile={handleLoadFromFile}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onVersions={() => setVersionOpen(true)}
         onAbout={() => setAboutOpen(true)}
       />
       <div className="app-body">
@@ -1338,6 +1352,15 @@ const App: React.FC = () => {
           trusses={trusses}
           onGenerate={handleAreaLight}
           onCancel={() => setAreaLightOpen(false)}
+        />
+      )}
+      {versionOpen && (
+        <VersionDialog
+          projectId={projectId}
+          projectName={projectMeta?.name ?? ''}
+          currentDoc={buildCurrentDoc()}
+          onRestore={(doc) => { handleLoadProject(doc); setVersionOpen(false); }}
+          onClose={() => setVersionOpen(false)}
         />
       )}
       {scheduleOpen && (
