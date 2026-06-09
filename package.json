@@ -61,6 +61,7 @@
           ]
         }
       ],
+      "icon": "build/icon.png",
       "category": "public.app-category.graphics-design",
       "identity": null,
       "artifactName": "Light-Planner-${version}-${arch}.${ext}"

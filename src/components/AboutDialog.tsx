@@ -10,7 +10,7 @@ const AboutDialog: React.FC<Props> = ({ onClose }) => {
   return (
   <div className="modal-backdrop" onClick={onClose}>
     <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
-      <div className="about-logo">💡</div>
+      <img className="about-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width={76} height={76} />
       <h2 className="about-name">{APP_NAME}</h2>
       <div className="about-version">{t('about.version', 'Version')} {APP_VERSION}</div>
       <p className="about-desc">
