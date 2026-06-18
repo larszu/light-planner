@@ -58,7 +58,13 @@ jobs:
       - name: Build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # No paid signing certificate available. The macOS config requests an
+          # ad-hoc signature ("identity": "-") so Apple Silicon Gatekeeper
+          # accepts the binary instead of rejecting it with "Light Planner is
+          # damaged and can't be opened". We deliberately do NOT set
+          # CSC_IDENTITY_AUTO_DISCOVERY=false here: in electron-builder 26 that
+          # flag short-circuits the explicit ad-hoc identity and falls back to a
+          # fully-unsigned binary, which arm64 macOS refuses to launch.
         run: npm run ${{ matrix.script }}
 
       - name: Upload artifacts

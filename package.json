@@ -12,7 +12,7 @@
     "electron:dev": "vite build && electron .",
     "electron:build": "vite build && electron-builder --win",
     "dist:win": "npm run build && electron-builder --win nsis portable --publish never",
-    "dist:mac": "npm run build && electron-builder --mac zip --x64 --arm64 --publish never"
+    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never"
   },
   "dependencies": {
     "pdfjs-dist": "^4.10.38",
@@ -54,17 +54,20 @@
     "mac": {
       "target": [
         {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "target": "dmg",
+          "arch": "x64"
+        },
+        {
+          "target": "dmg",
+          "arch": "arm64"
         }
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.graphics-design",
-      "identity": null,
-      "artifactName": "Light-Planner-${version}-${arch}.${ext}"
+      "artifactName": "Light-Planner-${version}-${arch}.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "nsis": {
       "oneClick": true,
