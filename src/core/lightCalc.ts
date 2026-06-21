@@ -1,6 +1,6 @@
 import type { PlacedFixture, Attachment, PhotometricData, Wall, Ceiling } from '../types';
 import { combinedTransmission, effectiveBeamAngleWithFrost, frostLevel } from '../core/gelLibrary';
-import { sampleWall, isCurved, pointInPolygon, polygonBounds } from './geometry';
+import { sampleWall, isCurved, pointInPolygon, polygonBounds, wallSegments, normalizedWindows } from './geometry';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -595,6 +595,54 @@ export function totalLux(
   return sum;
 }
 
+// ── Sun / daylight on the floor ──────────────────────────────────────────
+// The sun is a parallel source. A floor point is lit unless a solid wall stands
+// between it and the sun; a window opening lets the light through (attenuated by
+// the glass transmittance), which is how daylight reaches the floor through the
+// room's windows.
+export interface SunInput {
+  dir: { x: number; y: number }; // horizontal unit vector toward the sun (plan space)
+  altitude: number;              // radians above the horizon (> 0)
+  lux: number;                   // horizontal illuminance at an unobstructed point
+}
+
+/**
+ * Horizontal sun illuminance reaching a floor point, accounting for walls
+ * (which cast shadows) and windows (which let daylight through). Returns 0 in
+ * full shadow.
+ */
+export function sunLuxAt(px: number, py: number, sun: SunInput, walls: Wall[]): number {
+  if (sun.altitude <= 0 || sun.lux <= 0) return 0;
+  const tanA = Math.tan(sun.altitude);
+  const dx = sun.dir.x, dy = sun.dir.y;
+  let transmission = 1;
+
+  for (const w of walls) {
+    if (w.height <= 0) continue;
+    const { segs, length } = wallSegments(w);
+    const wins = (w.windows && w.windows.length) ? normalizedWindows(w, length) : [];
+    for (const seg of segs) {
+      // Ray P + s·dir (s ≥ 0) vs. wall segment seg.a→seg.b. Solve for the
+      // crossing; skip near-parallel cases.
+      const ex = seg.b.x - seg.a.x, ey = seg.b.y - seg.a.y;
+      const denom = dx * ey - dy * ex;
+      if (Math.abs(denom) < 1e-9) continue;
+      const diffx = seg.a.x - px, diffy = seg.a.y - py;
+      const s = (diffx * ey - diffy * ex) / denom;       // distance along the ray
+      const u = (diffx * dy - diffy * dx) / denom;        // position along the segment 0..1
+      if (s <= 1e-4 || u < 0 || u > 1) continue;
+      const hCross = s * tanA;                            // ray height where it meets the wall
+      if (hCross >= w.height) continue;                   // ray clears the top of the wall
+      // Is the crossing inside a window opening (then daylight passes through)?
+      const run = seg.r0 + u * (seg.r1 - seg.r0);
+      const win = wins.find((wn) => run >= wn.r0 && run <= wn.r1 && hCross >= wn.sill && hCross <= wn.top);
+      if (win) { transmission *= win.transmittance; if (transmission <= 0.001) return 0; }
+      else return 0;                                      // solid wall → full shadow
+    }
+  }
+  return sun.lux * transmission;
+}
+
 /**
  * Compute a 2D lux grid for the given area.
  */
@@ -608,6 +656,7 @@ export function computeHeatMap(
   resY: number,
   walls: Wall[] = [],
   ceilings: Ceiling[] = [],
+  sun: SunInput | null = null,
 ): { data: Float32Array; maxLux: number } {
   const data = new Float32Array(resX * resY);
   const stepX = widthM / resX;
@@ -619,12 +668,14 @@ export function computeHeatMap(
 
   // Pre-compute the reflecting surface patches once for the whole grid.
   const wallSamples = (walls.length || ceilings.length) ? precomputeSurfaceSamples(walls, ceilings, lit) : [];
+  const sunActive = sun && sun.altitude > 0 && sun.lux > 0;
 
   for (let yi = 0; yi < resY; yi++) {
     const py = originY + (yi + 0.5) * stepY;
     for (let xi = 0; xi < resX; xi++) {
       const px = originX + (xi + 0.5) * stepX;
-      const lux = totalLux(lit, px, py, wallSamples);
+      let lux = totalLux(lit, px, py, wallSamples);
+      if (sunActive) lux += sunLuxAt(px, py, sun!, walls);
       data[yi * resX + xi] = lux;
       if (lux > maxLux) maxLux = lux;
     }

@@ -13,6 +13,7 @@ import { computeHeatMap, surfaceLux, luxToColor, luxToColorTarget, effectiveFiel
 import { getBeamColorHex } from '../core/colorTemp';
 import { sampleWall, isCurved, pointInPolygon, wallSegments, normalizedWindows, type NormWindow } from '../core/geometry';
 import { floorPreset, wallPreset, surfaceCanvas, DEFAULT_FLOOR, type SurfacePreset } from '../core/surfaceTextures';
+import type { ResolvedSun } from '../core/sun';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
@@ -273,11 +274,12 @@ interface Props {
   showBeams: boolean;
   ambience: number;
   floor: FloorMaterial;
+  sun: ResolvedSun | null;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
   onHoverLux?: (lux: number | null) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, floor, onSelect, onHoverLux }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, floor, sun, onSelect, onHoverLux }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -290,6 +292,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     ambient: THREE.AmbientLight;
     hemi: THREE.HemisphereLight;
     dir: THREE.DirectionalLight;
+    sun: THREE.DirectionalLight;
     grid: THREE.GridHelper;
     ground: THREE.Mesh;
     env: THREE.Texture;
@@ -376,6 +379,22 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
+    // Global sun (issue #28). Position/colour/intensity are driven by the
+    // resolved sun in a dedicated effect; it stays invisible until enabled.
+    const sunLight = new THREE.DirectionalLight('#ffffff', 0);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 400;
+    sunLight.shadow.camera.left = -60;
+    sunLight.shadow.camera.right = 60;
+    sunLight.shadow.camera.top = 60;
+    sunLight.shadow.camera.bottom = -60;
+    sunLight.visible = false;
+    scene.add(sunLight);
+    scene.add(sunLight.target);
+
     // ── Post-processing chain for the photo view (bloom around bright sources) ──
     const composer = new EffectComposer(renderer);
     composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -394,7 +413,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     renderer.toneMappingExposure = exposureRef.current;
 
     const animId = 0;
-    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, grid, ground, env, pmrem };
+    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, sun: sunLight, grid, ground, env, pmrem };
 
     // ── WASD keyboard movement ──
     const keys: Record<string, boolean> = {};
@@ -543,6 +562,20 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     s.hemi.intensity = photoMode ? ambience * 1.0 : 0.0;
     s.dir.intensity = photoMode ? ambience * 0.18 : 0.3;
     s.scene.environmentIntensity = photoMode ? ambience * 0.45 : 0;
+    // Global sun (issue #28): place the directional sun light from the resolved
+    // sun position. The light comes from the sun's direction toward the room.
+    if (sun) {
+      const D = 120;
+      s.sun.position.set(sun.dir3D.x * D, Math.max(2, sun.dir3D.y * D), sun.dir3D.z * D);
+      s.sun.target.position.set(0, 0, 0);
+      s.sun.target.updateMatrixWorld();
+      s.sun.color.set(sun.color);
+      s.sun.intensity = (photoMode ? 2.6 : 1.1) * Math.max(0.05, Math.sin(sun.altitude));
+      s.sun.visible = true;
+    } else {
+      s.sun.visible = false;
+      s.sun.intensity = 0;
+    }
     s.grid.visible = !photoMode;
     applyFloorMaterial(s.ground, floor, photoMode);
     const bg = photoMode ? '#15151c' : '#1a1a2e';
@@ -553,7 +586,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const m = (o as THREE.Mesh).material;
       if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { mm.needsUpdate = true; });
     });
-  }, [photoMode, exposure, ambience, floor]);
+  }, [photoMode, exposure, ambience, floor, sun]);
 
   // Update scene objects when data changes
   useEffect(() => {
@@ -847,7 +880,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const hw = Math.max(8, (bMaxX - bMinX) + 2 * pad);
       const hd = Math.max(8, (bMaxY - bMinY) + 2 * pad);
       const hmRes = 180;
-      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls, ceilings);
+      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls, ceilings, sun);
       heatScale = heatMapScale > 0 ? heatMapScale : (maxLux || 1000);
 
       const canvas2d = document.createElement('canvas');
@@ -1430,7 +1463,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, showBeams, personModel]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, showBeams, personModel, sun]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {

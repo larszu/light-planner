@@ -3,6 +3,7 @@ import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Per
 import type { PlanMode } from '../App';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../core/lightCalc';
 import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall, pointInPolygon, wallSegments, normalizedWindows, pointAtRun } from '../core/geometry';
+import type { ResolvedSun } from '../core/sun';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
 import { getBeamColorRgba } from '../core/colorTemp';
 
@@ -14,6 +15,7 @@ interface Props {
   trusses: Truss[];
   walls: Wall[];
   ceilings: Ceiling[];
+  sun: ResolvedSun | null;
   floorPlan: FloorPlan | null;
   layers: Layers;
   snapStep: number;
@@ -78,6 +80,7 @@ const PlanCanvas: React.FC<Props> = ({
   trusses,
   walls,
   ceilings,
+  sun,
   floorPlan,
   layers,
   snapStep,
@@ -612,10 +615,10 @@ const PlanCanvas: React.FC<Props> = ({
       const hmWidth = Math.min(right, planRight) - hmLeft;
       const hmHeight = Math.min(bottom, planBottom) - hmTop;
       if (hmWidth > 0 && hmHeight > 0) {
-        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.bodyRotation}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}:${f.gelPlacement ?? ''}:${f.barnDoors ? `${f.barnDoors.top},${f.barnDoors.bottom},${f.barnDoors.left},${f.barnDoors.right}` : ''}:${f.hidden ? 'h' : ''}`).join('|')}|${walls.map((w) => `${w.x1}:${w.y1}:${w.x2}:${w.y2}:${w.cx ?? ''}:${w.cy ?? ''}:${w.height}:${w.reflectance}`).join('|')}|${ceilings.map((c) => `${c.points.map((p) => `${p.x},${p.y}`).join(';')}:${c.height}:${c.reflectance}`).join('|')}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
+        const cacheKey = `${fixtures.map((f) => `${f.id}:${f.fixture.id}:${f.x}:${f.y}:${f.mountingHeight}:${f.dimming}:${f.aimX}:${f.aimY}:${f.bodyRotation}:${f.currentBeamAngle ?? ''}:${f.currentColorTemp ?? ''}:${f.activeAttachmentId ?? ''}:${(f.gelFilterIds ?? []).join(',')}:${f.gelPlacement ?? ''}:${f.barnDoors ? `${f.barnDoors.top},${f.barnDoors.bottom},${f.barnDoors.left},${f.barnDoors.right}` : ''}:${f.hidden ? 'h' : ''}`).join('|')}|${walls.map((w) => `${w.x1}:${w.y1}:${w.x2}:${w.y2}:${w.cx ?? ''}:${w.cy ?? ''}:${w.height}:${w.reflectance}:${(w.windows ?? []).map((win) => `${win.start},${win.width},${win.sill},${win.top},${win.transmittance}`).join(';')}`).join('|')}|${ceilings.map((c) => `${c.points.map((p) => `${p.x},${p.y}`).join(';')}:${c.height}:${c.reflectance}`).join('|')}|${sun ? `${sun.dir.x.toFixed(3)},${sun.dir.y.toFixed(3)},${sun.altitude.toFixed(3)},${Math.round(sun.lux)}` : 'nosun'}|${heatMapScale}|${heatMapTarget}|${hmLeft.toFixed(1)}|${hmTop.toFixed(1)}|${hmWidth.toFixed(1)}|${hmHeight.toFixed(1)}`;
         let imgData = heatMapCacheRef.current.imageData;
         if (heatMapCacheRef.current.key !== cacheKey || !imgData) {
-          const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY, walls, ceilings);
+          const { data } = computeHeatMap(fixtures, hmLeft, hmTop, hmWidth, hmHeight, hmResX, hmResY, walls, ceilings, sun);
           imgData = new ImageData(hmResX, hmResY);
           const useTarget = heatMapTarget > 0;
           for (let i = 0; i < data.length; i++) {
