@@ -1468,6 +1468,8 @@ const App: React.FC = () => {
           onLoad={handleLoadProject}
           onDelete={handleDeleteProject}
           onCancel={() => setProjectDialogMode(null)}
+          onSaveToFile={handleSaveToFile}
+          onLoadFromFile={handleLoadFromFile}
         />
       )}
       {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
