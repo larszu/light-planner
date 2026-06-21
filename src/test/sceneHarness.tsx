@@ -88,6 +88,7 @@ function Harness() {
         trusses={trusses}
         walls={walls}
         ceilings={ceilings}
+        sun={null}
         floorPlan={null}
         layers={allLayers}
         cameras={cameras}
