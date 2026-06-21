@@ -216,6 +216,22 @@ export interface FloorMaterial {
   color: string; // hex
 }
 
+// ── Window / glass opening cut into a wall ──
+// An opening is positioned by its distance from the wall's (x1,y1) end and its
+// vertical extent above the floor. Light (fixtures and the sun) passes through
+// the opening; the glass pane is drawn translucent in the 3D view. A full-wall
+// opening (start 0, width = wall length, sill 0, top = wall height) makes a
+// glass front ("Glasfront").
+export interface WallWindow {
+  id: string;
+  start: number;          // distance along the wall from (x1,y1) (meters)
+  width: number;          // opening width along the wall run (meters)
+  sill: number;           // bottom edge height above the floor (meters)
+  top: number;            // top edge height above the floor (meters)
+  transmittance: number;  // 0..1 fraction of light let through (clear glass ≈ 0.9)
+  tint: string;           // glass colour (hex)
+}
+
 // ── Wall (architecture) – reflects light back into the room ──
 export interface Wall {
   id: string;
@@ -227,6 +243,8 @@ export interface Wall {
   reflectance: number;      // 0..1 diffuse reflectance (Reflexionsgrad)
   color: string;            // surface colour (hex) – tints the material template
   material?: WallPresetId;  // finish template (Render view); absent = 'plaster'
+  // Window/glass openings cut into the wall. Absent/empty = solid wall.
+  windows?: WallWindow[];
   label: string;
 }
 

@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling, Layers, CameraView } from '../types';
 import type { PlanMode } from '../App';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../core/lightCalc';
-import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall, pointInPolygon } from '../core/geometry';
+import { sampleWall, isCurved, wallControl, wallMidHandle, curveControlForMid, distToWall, pointInPolygon, wallSegments, normalizedWindows, pointAtRun } from '../core/geometry';
 import { drawFixtureSymbol } from '../utils/fixtureSymbols';
 import { getBeamColorRgba } from '../core/colorTemp';
 
@@ -463,6 +463,23 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.stroke();
       if (isSel) { ctx.strokeStyle = '#ffcc33'; ctx.lineWidth = 1.5 / v.scale; ctx.stroke(); }
       ctx.lineCap = 'butt';
+      // Window / glass openings drawn as a light glass-tinted strip over the wall.
+      const wallWins = normalizedWindows(wall);
+      if (wallWins.length) {
+        const { segs } = wallSegments(wall);
+        ctx.lineCap = 'butt';
+        ctx.lineWidth = 0.26;
+        for (const win of wallWins) {
+          ctx.strokeStyle = isSel ? '#ffe08a' : '#9fd0ff';
+          ctx.beginPath();
+          const steps = Math.max(2, Math.ceil((win.r1 - win.r0) / 0.3));
+          for (let k = 0; k <= steps; k++) {
+            const p = pointAtRun(segs, win.r0 + (win.r1 - win.r0) * (k / steps));
+            if (k === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+          }
+          ctx.stroke();
+        }
+      }
       // Curve control handle (drag to bend) while selected
       if (isSel) {
         const hM = wallMidHandle(wall);

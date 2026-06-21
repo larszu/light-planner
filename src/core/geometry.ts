@@ -1,4 +1,4 @@
-import type { Wall } from '../types';
+import type { Wall, WallWindow } from '../types';
 
 export interface Pt { x: number; y: number }
 
@@ -41,6 +41,60 @@ export function sampleWall(w: Wall, n = 16): Pt[] {
   const out: Pt[] = [];
   for (let i = 0; i <= n; i++) out.push(wallPointAt(w, i / n));
   return out;
+}
+
+// ── Windows / openings ───────────────────────────────────────────────────
+// A wall is sampled into straight segments carrying a cumulative "run" distance
+// (meters from the (x1,y1) end). Window openings are expressed in that run space
+// so they work the same on straight and curved walls.
+export interface WallSeg { a: Pt; b: Pt; r0: number; r1: number }
+
+export function wallSegments(w: Wall): { segs: WallSeg[]; length: number } {
+  const pts = sampleWall(w, isCurved(w) ? 18 : 1);
+  const segs: WallSeg[] = [];
+  let run = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len > 1e-6) { segs.push({ a, b, r0: run, r1: run + len }); run += len; }
+  }
+  return { segs, length: run };
+}
+
+export function wallLength(w: Wall): number {
+  return wallSegments(w).length;
+}
+
+// A window clamped to the wall's actual run length and height, sorted by start.
+export interface NormWindow { r0: number; r1: number; sill: number; top: number; transmittance: number; tint: string; src: WallWindow }
+
+export function normalizedWindows(w: Wall, length = wallLength(w)): NormWindow[] {
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  const out: NormWindow[] = [];
+  for (const win of w.windows ?? []) {
+    const r0 = clamp(win.start, 0, length);
+    const r1 = clamp(win.start + win.width, 0, length);
+    if (r1 - r0 < 0.02) continue;
+    const sill = clamp(win.sill, 0, w.height);
+    const top = clamp(win.top, sill, w.height);
+    if (top - sill < 0.02) continue;
+    out.push({ r0, r1, sill, top, transmittance: clamp(win.transmittance, 0, 1), tint: win.tint, src: win });
+  }
+  return out.sort((a, b) => a.r0 - b.r0);
+}
+
+// Position on the wall at a given run distance (walks the sampled segments).
+export function pointAtRun(segs: WallSeg[], run: number): Pt {
+  if (!segs.length) return { x: 0, y: 0 };
+  for (const s of segs) {
+    if (run <= s.r1 || s === segs[segs.length - 1]) {
+      const span = s.r1 - s.r0;
+      const t = span > 1e-6 ? (run - s.r0) / span : 0;
+      return { x: s.a.x + (s.b.x - s.a.x) * t, y: s.a.y + (s.b.y - s.a.y) * t };
+    }
+  }
+  const last = segs[segs.length - 1];
+  return { x: last.b.x, y: last.b.y };
 }
 
 // Shortest distance from a point to a (possibly curved) wall.

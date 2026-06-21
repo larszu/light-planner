@@ -1743,6 +1743,50 @@ kbd {
 }
 .refl-btn:hover { border-color: var(--accent); color: var(--text); }
 
+/* Window / glass-front editor inside the wall property panel (issue #27) */
+.window-edit {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--panel-alt);
+}
+.window-edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.window-del {
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.window-del:hover { color: var(--danger); }
+.window-actions {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.window-actions button {
+  flex: 1;
+  padding: 5px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-alt);
+  color: var(--text2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.window-actions button:hover { border-color: var(--accent); color: var(--text); }
+
 /* Gel-placement toggle (Filterrahmen vs. vor den Flügeltoren) */
 .gel-placement-toggle {
   display: flex;
