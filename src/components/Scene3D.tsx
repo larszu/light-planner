@@ -11,8 +11,9 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPlan, Layers, CameraView, FloorMaterial } from '../types';
 import { computeHeatMap, surfaceLux, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../core/lightCalc';
 import { getBeamColorHex } from '../core/colorTemp';
-import { sampleWall, isCurved, pointInPolygon } from '../core/geometry';
+import { sampleWall, isCurved, pointInPolygon, wallSegments, normalizedWindows, type NormWindow } from '../core/geometry';
 import { floorPreset, wallPreset, surfaceCanvas, DEFAULT_FLOOR, type SurfacePreset } from '../core/surfaceTextures';
+import type { ResolvedSun } from '../core/sun';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
@@ -273,11 +274,12 @@ interface Props {
   showBeams: boolean;
   ambience: number;
   floor: FloorMaterial;
+  sun: ResolvedSun | null;
   onSelect: (id: string | null, ctrlKey?: boolean) => void;
   onHoverLux?: (lux: number | null) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, floor, onSelect, onHoverLux }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, floor, sun, onSelect, onHoverLux }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -290,6 +292,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     ambient: THREE.AmbientLight;
     hemi: THREE.HemisphereLight;
     dir: THREE.DirectionalLight;
+    sun: THREE.DirectionalLight;
     grid: THREE.GridHelper;
     ground: THREE.Mesh;
     env: THREE.Texture;
@@ -376,6 +379,22 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     dirLight.position.set(20, 30, 10);
     scene.add(dirLight);
 
+    // Global sun (issue #28). Position/colour/intensity are driven by the
+    // resolved sun in a dedicated effect; it stays invisible until enabled.
+    const sunLight = new THREE.DirectionalLight('#ffffff', 0);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 400;
+    sunLight.shadow.camera.left = -60;
+    sunLight.shadow.camera.right = 60;
+    sunLight.shadow.camera.top = 60;
+    sunLight.shadow.camera.bottom = -60;
+    sunLight.visible = false;
+    scene.add(sunLight);
+    scene.add(sunLight.target);
+
     // ── Post-processing chain for the photo view (bloom around bright sources) ──
     const composer = new EffectComposer(renderer);
     composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -394,7 +413,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     renderer.toneMappingExposure = exposureRef.current;
 
     const animId = 0;
-    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, grid, ground, env, pmrem };
+    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, sun: sunLight, grid, ground, env, pmrem };
 
     // ── WASD keyboard movement ──
     const keys: Record<string, boolean> = {};
@@ -543,6 +562,20 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     s.hemi.intensity = photoMode ? ambience * 1.0 : 0.0;
     s.dir.intensity = photoMode ? ambience * 0.18 : 0.3;
     s.scene.environmentIntensity = photoMode ? ambience * 0.45 : 0;
+    // Global sun (issue #28): place the directional sun light from the resolved
+    // sun position. The light comes from the sun's direction toward the room.
+    if (sun) {
+      const D = 120;
+      s.sun.position.set(sun.dir3D.x * D, Math.max(2, sun.dir3D.y * D), sun.dir3D.z * D);
+      s.sun.target.position.set(0, 0, 0);
+      s.sun.target.updateMatrixWorld();
+      s.sun.color.set(sun.color);
+      s.sun.intensity = (photoMode ? 2.6 : 1.1) * Math.max(0.05, Math.sin(sun.altitude));
+      s.sun.visible = true;
+    } else {
+      s.sun.visible = false;
+      s.sun.intensity = 0;
+    }
     s.grid.visible = !photoMode;
     applyFloorMaterial(s.ground, floor, photoMode);
     const bg = photoMode ? '#15151c' : '#1a1a2e';
@@ -553,7 +586,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const m = (o as THREE.Mesh).material;
       if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { mm.needsUpdate = true; });
     });
-  }, [photoMode, exposure, ambience, floor]);
+  }, [photoMode, exposure, ambience, floor, sun]);
 
   // Update scene objects when data changes
   useEffect(() => {
@@ -847,7 +880,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const hw = Math.max(8, (bMaxX - bMinX) + 2 * pad);
       const hd = Math.max(8, (bMaxY - bMinY) + 2 * pad);
       const hmRes = 180;
-      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls, ceilings);
+      const { data, maxLux } = computeHeatMap(fixtures, hx0, hz0, hw, hd, hmRes, hmRes, walls, ceilings, sun);
       heatScale = heatMapScale > 0 ? heatMapScale : (maxLux || 1000);
 
       const canvas2d = document.createElement('canvas');
@@ -988,34 +1021,89 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       const preset = wallPreset(w.material);
       const tex = photoMode ? surfaceTexture(preset, w.color, 1) : null;
       const tile = preset.tileMeters;
-      const pts = sampleWall(w, isCurved(w) ? 18 : 1); // floor polyline
+      const { segs, length } = wallSegments(w);
+      const wins = normalizedWindows(w, length);
       const pos: number[] = [];
       const uv: number[] = [];
-      let run = 0; // cumulative distance so the texture flows continuously
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i], b = pts[i + 1];
-        const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-        const ua = run / tile, ub = (run + segLen) / tile, vh = w.height / tile;
-        // two triangles forming the vertical quad a→b, with UVs in tile units
-        pos.push(a.x, 0, a.y, b.x, 0, b.y, b.x, w.height, b.y);
-        uv.push(ua, 0, ub, 0, ub, vh);
-        pos.push(a.x, 0, a.y, b.x, w.height, b.y, a.x, w.height, a.y);
-        uv.push(ua, 0, ub, vh, ua, vh);
-        run += segLen;
+      // Glass panes are grouped per window (one window may span several curve
+      // segments) so each keeps its own transmittance/tint.
+      const glassByWin = new Map<NormWindow, number[]>();
+
+      // Vertical solid quad a→b between heights y0..y1, UVs in tile units so the
+      // texture flows continuously along the run and up the wall.
+      const pushSolid = (pa: { x: number; y: number }, pb: { x: number; y: number }, y0: number, y1: number, u0: number, u1: number) => {
+        if (y1 - y0 < 1e-4) return;
+        const v0 = y0 / tile, v1 = y1 / tile;
+        pos.push(pa.x, y0, pa.y, pb.x, y0, pb.y, pb.x, y1, pb.y);
+        uv.push(u0, v0, u1, v0, u1, v1);
+        pos.push(pa.x, y0, pa.y, pb.x, y1, pb.y, pa.x, y1, pa.y);
+        uv.push(u0, v0, u1, v1, u0, v1);
+      };
+
+      for (const seg of segs) {
+        // Split this segment at any window edge that falls inside it, so each
+        // sub-segment is either fully solid or fully inside one opening.
+        const bps = [seg.r0, seg.r1];
+        for (const win of wins) {
+          if (win.r0 > seg.r0 + 1e-6 && win.r0 < seg.r1 - 1e-6) bps.push(win.r0);
+          if (win.r1 > seg.r0 + 1e-6 && win.r1 < seg.r1 - 1e-6) bps.push(win.r1);
+        }
+        bps.sort((a, b) => a - b);
+        for (let i = 0; i < bps.length - 1; i++) {
+          const s = bps[i], e = bps[i + 1];
+          if (e - s < 1e-4) continue;
+          const span = seg.r1 - seg.r0;
+          const ta = (s - seg.r0) / span, tb = (e - seg.r0) / span;
+          const pa = { x: seg.a.x + (seg.b.x - seg.a.x) * ta, y: seg.a.y + (seg.b.y - seg.a.y) * ta };
+          const pb = { x: seg.a.x + (seg.b.x - seg.a.x) * tb, y: seg.a.y + (seg.b.y - seg.a.y) * tb };
+          const u0 = s / tile, u1 = e / tile;
+          const mid = (s + e) / 2;
+          const win = wins.find((wn) => mid >= wn.r0 && mid <= wn.r1);
+          if (!win) {
+            pushSolid(pa, pb, 0, w.height, u0, u1); // full-height solid wall
+          } else {
+            pushSolid(pa, pb, 0, win.sill, u0, u1);        // below the sill
+            pushSolid(pa, pb, win.top, w.height, u0, u1);  // above the head
+            let g = glassByWin.get(win); if (!g) { g = []; glassByWin.set(win, g); }
+            const y0 = win.sill, y1 = win.top;
+            g.push(pa.x, y0, pa.y, pb.x, y0, pb.y, pb.x, y1, pb.y);
+            g.push(pa.x, y0, pa.y, pb.x, y1, pb.y, pa.x, y1, pa.y);
+          }
+        }
       }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-      geo.computeVertexNormals();
-      const mat = new THREE.MeshStandardMaterial({
-        color: isSel ? '#ffcc33' : (tex ? '#ffffff' : w.color),
-        roughness: tex ? preset.roughness : 0.85, metalness: 0, side: THREE.DoubleSide,
-      });
-      if (tex) { mat.map = tex; (mat as { __keepMap?: boolean }).__keepMap = true; }
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.castShadow = true; mesh.receiveShadow = true;
-      mesh.userData = { dynamic: true, selectId: w.id };
-      scene.add(mesh);
+
+      if (pos.length) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        geo.computeVertexNormals();
+        const mat = new THREE.MeshStandardMaterial({
+          color: isSel ? '#ffcc33' : (tex ? '#ffffff' : w.color),
+          roughness: tex ? preset.roughness : 0.85, metalness: 0, side: THREE.DoubleSide,
+        });
+        if (tex) { mat.map = tex; (mat as { __keepMap?: boolean }).__keepMap = true; }
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.userData = { dynamic: true, selectId: w.id };
+        scene.add(mesh);
+      }
+
+      // Translucent glass panes. They do NOT cast shadows, so fixture light (and
+      // the sun, once added) passes straight through the opening into the room.
+      for (const [win, gpos] of glassByWin) {
+        const ggeo = new THREE.BufferGeometry();
+        ggeo.setAttribute('position', new THREE.Float32BufferAttribute(gpos, 3));
+        ggeo.computeVertexNormals();
+        const gmat = new THREE.MeshStandardMaterial({
+          color: isSel ? '#ffe08a' : win.tint,
+          roughness: 0.06, metalness: 0, side: THREE.DoubleSide,
+          transparent: true, opacity: 0.14 + (1 - win.transmittance) * 0.45, depthWrite: false,
+        });
+        const gmesh = new THREE.Mesh(ggeo, gmat);
+        gmesh.castShadow = false; gmesh.receiveShadow = false;
+        gmesh.userData = { dynamic: true, selectId: w.id };
+        scene.add(gmesh);
+      }
       if (heatOn) addWallHeat(w);
     }
 
@@ -1375,7 +1463,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       s.controls.update();
       framedRef.current = true;
     }
-  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, showBeams, personModel]);
+  }, [fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, haze, showBeams, personModel, sun]);
 
   useImperativeHandle(ref, () => ({
     screenshot: () => {

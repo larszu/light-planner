@@ -23,7 +23,7 @@ const layers = (['fixtures', 'persons', 'trusses', 'stage', 'shapes', 'ceilings'
 const noop = () => {};
 createRoot(document.getElementById('root')!).render(
   <PlanCanvas
-    fixtures={fixtures} shapes={[]} persons={[]} stageElements={[]} trusses={[]} walls={[]} ceilings={[]}
+    fixtures={fixtures} shapes={[]} persons={[]} stageElements={[]} trusses={[]} walls={[]} ceilings={[]} sun={null}
     floorPlan={null} layers={layers} snapStep={0} activeTool="select" fixtureToPlace={null}
     selectedIds={new Set()} showHeatMap={false} heatMapScale={1000} heatMapTarget={0} showFocusNotes
     planMode="none" cameras={[]}

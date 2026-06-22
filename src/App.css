@@ -1743,6 +1743,50 @@ kbd {
 }
 .refl-btn:hover { border-color: var(--accent); color: var(--text); }
 
+/* Window / glass-front editor inside the wall property panel (issue #27) */
+.window-edit {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--panel-alt);
+}
+.window-edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.window-del {
+  border: none;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.window-del:hover { color: var(--danger); }
+.window-actions {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.window-actions button {
+  flex: 1;
+  padding: 5px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-alt);
+  color: var(--text2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.window-actions button:hover { border-color: var(--accent); color: var(--text); }
+
 /* Gel-placement toggle (Filterrahmen vs. vor den Flügeltoren) */
 .gel-placement-toggle {
   display: flex;
@@ -2511,6 +2555,9 @@ kbd {
 .tb-slider input[type=number] { width: 100%; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 6px; font: inherit; }
 .tb-slider em { color: var(--text); font-style: normal; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .tb-slider input[type=color] { width: 100%; height: 24px; padding: 0; background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.tb-slider input[type=date], .tb-slider input[type=time] { width: 100%; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 6px; font: inherit; color-scheme: dark; }
+/* Leading glyph for dropdown items without an icon (e.g. the sun toggle, #28) */
+.tb-glyph { display: inline-flex; width: 15px; justify-content: center; color: var(--warm); font-size: 14px; }
 /* preset chips (floor / wall finishes) */
 .tb-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 10px 8px; }
 .tb-chip { border: 1px solid var(--border); background: var(--bg-2); color: var(--text2); border-radius: 999px;

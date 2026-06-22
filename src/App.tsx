@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView, FloorMaterial } from './types';
+import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView, FloorMaterial, SunSettings } from './types';
 import { DEFAULT_FLOOR } from './core/surfaceTextures';
 import { convexHull } from './core/geometry';
+import { resolveSun, defaultSunSettings } from './core/sun';
 import TopBar from './components/TopBar';
 import ToolRail from './components/ToolRail';
 import Dock from './components/Dock';
@@ -130,6 +131,8 @@ const App: React.FC = () => {
   const [walls, setWalls] = useState<Wall[]>([]);
   const [ceilings, setCeilings] = useState<Ceiling[]>([]);
   const [floor, setFloor] = useState<FloorMaterial>(DEFAULT_FLOOR);
+  const [sun, setSun] = useState<SunSettings>(defaultSunSettings);
+  const resolvedSun = useMemo(() => resolveSun(sun), [sun]);
   const [planMode, setPlanMode] = useState<PlanMode>('none');
   const [pendingCalibration, setPendingCalibration] = useState<{ meters: number; pivotX: number; pivotY: number } | null>(null);
   const snapStep = useUiStore((s) => s.snapStep);
@@ -695,6 +698,7 @@ const App: React.FC = () => {
       cameras,
       layers,
       floor,
+      sun,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     try {
@@ -704,7 +708,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, sun, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData) => {
     historyRef.current = [];
@@ -726,6 +730,7 @@ const App: React.FC = () => {
     setCameras(data.cameras ?? []);
     setLayers(data.layers ?? DEFAULT_LAYERS);
     setFloor(data.floor ?? DEFAULT_FLOOR);
+    setSun(data.sun ?? defaultSunSettings());
     // Restore the building plan + its calibration (rebuild the live image).
     pdfDocRef.current = null;
     if (data.floorPlan) {
@@ -1016,10 +1021,10 @@ const App: React.FC = () => {
     const meta: ProjectMeta = projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now };
     return {
       meta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
-      trusses, walls, ceilings, scenes, cameras, layers, floor,
+      trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan]);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, sun, floorPlan]);
 
   // ── Project save/load to a real file (the host decides where) ──
   const handleSaveToFile = useCallback(async () => {
@@ -1028,12 +1033,12 @@ const App: React.FC = () => {
     const data: ProjectData = {
       meta: { ...meta, updatedAt: now },
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
-      trusses, walls, ceilings, scenes, cameras, layers, floor,
+      trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
     };
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, floorPlan, host]);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, sun, floorPlan, host]);
 
   const handleLoadFromFile = useCallback(async () => {
     const res = await host.openProjectFile();
@@ -1164,6 +1169,8 @@ const App: React.FC = () => {
         showBeams={showBeams}
         ambience={ambience}
         floor={floor}
+        sun={sun}
+        sunInfo={resolvedSun ? { altitudeDeg: resolvedSun.altitudeDeg, azimuthDeg: resolvedSun.azimuthDeg } : null}
         heatMapScale={heatMapScale}
         heatMapTarget={heatMapTarget}
         snapStep={snapStep}
@@ -1175,6 +1182,7 @@ const App: React.FC = () => {
         onToggleBeams={toggleBeams}
         onAmbienceChange={setAmbience}
         onFloorChange={setFloor}
+        onSunChange={setSun}
         onHeatMapScaleChange={setHeatMapScale}
         onHeatMapTargetChange={setHeatMapTarget}
         onToggleSnap={toggleSnap}
@@ -1226,6 +1234,7 @@ const App: React.FC = () => {
               trusses={trusses}
               walls={walls}
               ceilings={ceilings}
+              sun={resolvedSun}
               floorPlan={floorPlan}
               layers={layers}
               snapStep={snapStep}
@@ -1276,6 +1285,7 @@ const App: React.FC = () => {
                 trusses={trusses}
                 walls={walls}
                 ceilings={ceilings}
+                sun={resolvedSun}
                 floorPlan={floorPlan}
                 layers={layers}
                 cameras={cameras}

@@ -43,7 +43,7 @@ function Harness() {
   return (
     <div style={{ width: 1100, height: 560 }}>
       <PlanCanvas
-        fixtures={fixtures} shapes={[]} persons={[]} stageElements={stage} trusses={trusses} walls={[]} ceilings={[]}
+        fixtures={fixtures} shapes={[]} persons={[]} stageElements={stage} trusses={trusses} walls={[]} ceilings={[]} sun={null}
         floorPlan={null} layers={layers} snapStep={0} activeTool="select" fixtureToPlace={null}
         selectedIds={new Set()} showHeatMap={false} heatMapScale={1000} heatMapTarget={0} showFocusNotes={false}
         planMode="none" cameras={[]} onViewChange={(s) => { pxRef.current = s; }}

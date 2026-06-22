@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from './Icon';
-import type { FloorMaterial, FloorPresetId } from '../types';
+import type { FloorMaterial, FloorPresetId, SunSettings } from '../types';
 import { FLOOR_PRESETS, floorPreset } from '../core/surfaceTextures';
 
 type Mode = '2d' | '3d' | 'photo';
@@ -15,6 +15,8 @@ interface Props {
   showBeams: boolean;
   ambience: number;
   floor: FloorMaterial;
+  sun: SunSettings;
+  sunInfo: { altitudeDeg: number; azimuthDeg: number } | null;
   heatMapScale: number;
   heatMapTarget: number;
   snapStep: number;
@@ -27,6 +29,7 @@ interface Props {
   onToggleBeams: () => void;
   onAmbienceChange: (v: number) => void;
   onFloorChange: (f: FloorMaterial) => void;
+  onSunChange: (s: SunSettings) => void;
   onHeatMapScaleChange: (v: number) => void;
   onHeatMapTargetChange: (v: number) => void;
   onToggleSnap: () => void;
@@ -151,6 +154,27 @@ const TopBar: React.FC<Props> = (p) => {
                   <label className="tb-slider"><span>Zielwert</span>
                     <input type="number" min={0} max={100000} step={10} value={p.heatMapTarget} onChange={(e) => p.onHeatMapTargetChange(+e.target.value)} />
                     <em>lx</em></label>
+                </>
+              )}
+              <div className="tb-dd-sec">Sonne / Tageslicht</div>
+              <button className="tb-dd-item" onClick={() => p.onSunChange({ ...p.sun, enabled: !p.sun.enabled })} title="Echte Sonne: Tageslicht & Schatten aus Standort, Datum und Uhrzeit – fällt durch Fenster in den Raum.">
+                <span className="tb-glyph">☀</span>Sonne aktiv<span className={`tb-check ${p.sun.enabled ? 'on' : ''}`}><Icon name="check" size={13} /></span>
+              </button>
+              {p.sun.enabled && (
+                <>
+                  <label className="tb-slider"><span>Datum</span>
+                    <input type="date" value={p.sun.date} onChange={(e) => p.onSunChange({ ...p.sun, date: e.target.value })} /></label>
+                  <label className="tb-slider"><span>Uhrzeit</span>
+                    <input type="time" value={p.sun.time} onChange={(e) => p.onSunChange({ ...p.sun, time: e.target.value })} /></label>
+                  <label className="tb-slider"><span>Breite</span>
+                    <input type="number" min={-90} max={90} step={0.5} value={p.sun.latitude} onChange={(e) => p.onSunChange({ ...p.sun, latitude: +e.target.value })} /><em>°</em></label>
+                  <label className="tb-slider"><span>Länge</span>
+                    <input type="number" min={-180} max={180} step={0.5} value={p.sun.longitude} onChange={(e) => p.onSunChange({ ...p.sun, longitude: +e.target.value })} /><em>°</em></label>
+                  <label className="tb-slider"><span>Norden ↻</span>
+                    <input type="range" min={0} max={359} step={1} value={p.sun.northDeg} onChange={(e) => p.onSunChange({ ...p.sun, northDeg: +e.target.value })} /><em>{Math.round(p.sun.northDeg)}°</em></label>
+                  <label className="tb-slider"><span>Intensität</span>
+                    <input type="number" min={0} max={120000} step={1000} value={p.sun.intensity} onChange={(e) => p.onSunChange({ ...p.sun, intensity: +e.target.value })} /><em>lx</em></label>
+                  <div className="tb-hint">{p.sunInfo ? `Sonnenstand: ${p.sunInfo.altitudeDeg.toFixed(0)}° über dem Horizont · Azimut ${p.sunInfo.azimuthDeg.toFixed(0)}° (0 = N). Fällt durch Fenster in den Raum.` : 'Sonne steht unter dem Horizont – kein direktes Tageslicht.'}</div>
                 </>
               )}
               <div className="tb-dd-div" />

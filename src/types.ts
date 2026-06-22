@@ -216,6 +216,22 @@ export interface FloorMaterial {
   color: string; // hex
 }
 
+// ── Window / glass opening cut into a wall ──
+// An opening is positioned by its distance from the wall's (x1,y1) end and its
+// vertical extent above the floor. Light (fixtures and the sun) passes through
+// the opening; the glass pane is drawn translucent in the 3D view. A full-wall
+// opening (start 0, width = wall length, sill 0, top = wall height) makes a
+// glass front ("Glasfront").
+export interface WallWindow {
+  id: string;
+  start: number;          // distance along the wall from (x1,y1) (meters)
+  width: number;          // opening width along the wall run (meters)
+  sill: number;           // bottom edge height above the floor (meters)
+  top: number;            // top edge height above the floor (meters)
+  transmittance: number;  // 0..1 fraction of light let through (clear glass ≈ 0.9)
+  tint: string;           // glass colour (hex)
+}
+
 // ── Wall (architecture) – reflects light back into the room ──
 export interface Wall {
   id: string;
@@ -227,6 +243,8 @@ export interface Wall {
   reflectance: number;      // 0..1 diffuse reflectance (Reflexionsgrad)
   color: string;            // surface colour (hex) – tints the material template
   material?: WallPresetId;  // finish template (Render view); absent = 'plaster'
+  // Window/glass openings cut into the wall. Absent/empty = solid wall.
+  windows?: WallWindow[];
   label: string;
 }
 
@@ -305,6 +323,21 @@ export interface GelFilter {
   diffusionLevel?: number;
 }
 
+// ── Global sun (daylight) ──
+// Drives a directional "sun" light in the 3D render and casts daylight onto the
+// floor through the room's windows in the heat-map. The sun's position is
+// computed from the location, date and time; `northDeg` says how the plan is
+// oriented relative to true North.
+export interface SunSettings {
+  enabled: boolean;
+  latitude: number;   // degrees (− south)
+  longitude: number;  // degrees (− west)
+  date: string;       // 'YYYY-MM-DD'
+  time: string;       // 'HH:MM' local clock time
+  northDeg: number;   // 0..360 — compass rotation of the plan ("up" = North at 0)
+  intensity: number;  // direct-normal illuminance at full sun (lux)
+}
+
 // ── Project save/load ──
 export interface ProjectMeta {
   name: string;
@@ -330,6 +363,7 @@ export interface ProjectData {
   cameras?: CameraView[];
   layers?: Layers;
   floor?: FloorMaterial; // room floor finish (Render view)
+  sun?: SunSettings;     // global daylight (issue #28)
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
   floorPlan?: Omit<FloorPlan, 'image'>;

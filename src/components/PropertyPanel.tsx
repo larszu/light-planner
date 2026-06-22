@@ -1,6 +1,6 @@
 import React from 'react';
-import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape, CameraView } from '../types';
-import { wallMidHandle, curveControlForMid } from '../core/geometry';
+import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape, CameraView, WallWindow } from '../types';
+import { wallMidHandle, curveControlForMid, wallLength } from '../core/geometry';
 import { luxFromFixture, effectiveFieldAngleDeg, explainLux } from '../core/lightCalc';
 import type { FixtureCategory, BeamShape, LensType, MountType, WallPresetId } from '../types';
 import { WALL_PRESETS, DEFAULT_WALL_MATERIAL, wallPreset } from '../core/surfaceTextures';
@@ -772,6 +772,54 @@ const PropertyPanel: React.FC<Props> = ({
           </label>
           <div className="prop-derived">Oberfläche &amp; Farbe gelten im Render-Modus. Reflektiert Licht diffus in den Raum (Ein-Bounce) – fließt in die Heatmap ein.</div>
         </div>
+        {(() => {
+          const wins = w.windows ?? [];
+          const newId = () => 'win-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          const setWindows = (next: WallWindow[]) => onUpdateWall(w.id, { windows: next });
+          const updateWin = (id: string, patch: Partial<WallWindow>) =>
+            setWindows(wins.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+          const removeWin = (id: string) => setWindows(wins.filter((x) => x.id !== id));
+          const addWin = (glassFront: boolean) => {
+            const L = wallLength(w);
+            const win: WallWindow = glassFront
+              ? { id: newId(), start: 0, width: Math.round(L * 100) / 100, sill: 0, top: w.height, transmittance: 0.9, tint: '#bfe3ff' }
+              : { id: newId(), start: Math.max(0, Math.round((L / 2 - 0.6) * 100) / 100), width: Math.min(1.2, Math.round(L * 100) / 100), sill: 0.9, top: Math.min(2.1, w.height), transmittance: 0.85, tint: '#bfe3ff' };
+            setWindows([...wins, win]);
+          };
+          return (
+            <div className="prop-section">
+              <div className="prop-section-title">Fenster &amp; Glasfront</div>
+              {wins.length === 0 && (
+                <div className="prop-derived">Keine Fenster. Fenster sind echte Öffnungen – Licht (und die Sonne) fällt durch sie in den Raum.</div>
+              )}
+              {wins.map((win, i) => (
+                <div key={win.id} className="window-edit">
+                  <div className="window-edit-head">
+                    <span>Fenster {i + 1}</span>
+                    <button className="window-del" onClick={() => removeWin(win.id)} title="Fenster entfernen">✕</button>
+                  </div>
+                  {numField('Start (m)', win.start, (v) => updateWin(win.id, { start: v }), 0.1, 0)}
+                  {numField('Breite (m)', win.width, (v) => updateWin(win.id, { width: v }), 0.1, 0.1)}
+                  {numField('Brüstung (m)', win.sill, (v) => updateWin(win.id, { sill: v }), 0.1, 0, w.height)}
+                  {numField('Oberkante (m)', win.top, (v) => updateWin(win.id, { top: v }), 0.1, 0, w.height)}
+                  <label className="prop-field">
+                    <span>Lichtdurchlass ({Math.round(win.transmittance * 100)}%)</span>
+                    <input type="range" min={0} max={1} step={0.05} value={win.transmittance}
+                      onChange={(e) => updateWin(win.id, { transmittance: Number(e.target.value) })} />
+                  </label>
+                  <label className="prop-field">
+                    <span>Glasfarbe</span>
+                    <input type="color" value={win.tint} onChange={(e) => updateWin(win.id, { tint: e.target.value })} />
+                  </label>
+                </div>
+              ))}
+              <div className="window-actions">
+                <button onClick={() => addWin(false)}>+ Fenster</button>
+                <button onClick={() => addWin(true)}>Glasfront</button>
+              </div>
+            </div>
+          );
+        })()}
         <button className="delete-btn" onClick={() => onDelete(w.id)}>Wand löschen</button>
       </div>
     );
