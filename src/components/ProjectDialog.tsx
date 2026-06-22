@@ -8,6 +8,10 @@ interface Props {
   onLoad: (project: ProjectData) => void;
   onDelete: (id: string) => void;
   onCancel: () => void;
+  /** Save the current project to a real file at a user-chosen location. */
+  onSaveToFile?: () => void;
+  /** Load a project from a real file the user picks. */
+  onLoadFromFile?: () => void;
 }
 
 interface StoredProject {
@@ -45,7 +49,7 @@ export function deleteProjectFromStorage(id: string) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
-const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onDelete, onCancel }) => {
+const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onDelete, onCancel, onSaveToFile, onLoadFromFile }) => {
   const [name, setName] = useState(currentMeta?.name ?? '');
   const [author, setAuthor] = useState(currentMeta?.author ?? '');
   const [version, setVersion] = useState(currentMeta?.version ?? '1.0');
@@ -93,9 +97,20 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
               <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Beschreibung…" />
             </label>
           </div>
+          <p className="dialog-hint storage-hint">
+            <strong>Wo wird gespeichert?</strong> „Speichern" legt das Projekt im
+            lokalen Speicher dieses Geräts/Browsers ab – ohne sichtbaren Dateipfad
+            und an dieses Gerät gebunden. Für eine echte Datei mit frei wählbarem
+            Speicherort nutze <em>„Als Datei speichern…"</em>.
+          </p>
           <div className="modal-actions">
             <button onClick={onCancel}>Abbrechen</button>
-            <button className="primary" onClick={handleSave} disabled={!name.trim()}>Speichern</button>
+            {onSaveToFile && (
+              <button onClick={() => { onSaveToFile(); onCancel(); }} title="Als Projektdatei an einem selbst gewählten Ort speichern">
+                Als Datei speichern…
+              </button>
+            )}
+            <button className="primary" onClick={handleSave} disabled={!name.trim()}>Speichern (Gerät)</button>
           </div>
         </div>
       </div>
@@ -108,7 +123,10 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
       <div className="modal project-modal" onClick={(e) => e.stopPropagation()}>
         <h3>Projekt laden</h3>
         {projects.length === 0 ? (
-          <p className="dialog-hint">Keine gespeicherten Projekte vorhanden.</p>
+          <p className="dialog-hint">
+            Keine im Gerät gespeicherten Projekte vorhanden.
+            {onLoadFromFile && ' Eine Projektdatei (.lightplan.json) kannst du unten über „Aus Datei laden…" öffnen.'}
+          </p>
         ) : (
           <div className="project-list">
             {projects.map((p) => (
@@ -129,6 +147,11 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
         )}
         <div className="modal-actions">
           <button onClick={onCancel}>Schließen</button>
+          {onLoadFromFile && (
+            <button className="primary" onClick={() => { onLoadFromFile(); onCancel(); }} title="Eine zuvor exportierte Projektdatei öffnen">
+              Aus Datei laden…
+            </button>
+          )}
         </div>
       </div>
     </div>

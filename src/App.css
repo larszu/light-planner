@@ -2378,6 +2378,18 @@ kbd {
   margin-bottom: 12px;
 }
 
+/* Storage explainer inside the project save/load dialog (issue #29). */
+.storage-hint {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  line-height: 1.45;
+}
+.storage-hint strong { color: var(--text); }
+.storage-hint em { color: var(--accent); font-style: normal; }
+
 /* ── Project Dialog ────────────────────────────────────── */
 .project-modal {
   width: 460px;
