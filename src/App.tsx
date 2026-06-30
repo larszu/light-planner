@@ -31,6 +31,7 @@ import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
 import { toVenueExchange, parseVenueExchange, fromVenueExchange } from './core/venueExchange';
+import { makeAvPlan, parseAvPlan, type AvPlan } from './core/avplan';
 import { APP_VERSION } from './version';
 import { useUiStore } from './store/uiStore';
 import { useProjectStore } from './store/projectStore';
@@ -764,6 +765,66 @@ const App: React.FC = () => {
     await host.saveProjectFile(JSON.stringify(ex, null, 2), `${safe}.venue.json`);
   }, [floorPlan, persons, walls, stageElements, projectMeta, host]);
 
+  // ── Gesamtprojekt (.avplan): verlustfreier Austausch aller drei Domaenen.
+  // Light bearbeitet "lighting" nativ, reicht "cameras"/"cabling" 1:1 durch.
+  const preservedDomainsRef = useRef<{ cameras?: unknown; cabling?: unknown }>({});
+
+  const handleExportAvplan = useCallback(async () => {
+    const fp = floorPlan ? (() => { const { image: _img, ...rest } = floorPlan; return rest; })() : null;
+    const now = new Date().toISOString();
+    const venue = toVenueExchange({
+      venueName: projectMeta?.name, persons, walls, stageElements, floorPlan: fp,
+      appVersion: APP_VERSION, exportedAt: now,
+    }).venue;
+    const avplan = makeAvPlan({
+      app: 'light-planner', appVersion: APP_VERSION, exportedAt: now, venue,
+      domains: {
+        lighting: {
+          meta: projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now },
+          fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
+          trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
+          floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+        } satisfies ProjectData,
+        cameras: preservedDomainsRef.current.cameras,
+        cabling: preservedDomainsRef.current.cabling,
+      },
+    });
+    const safe = (projectMeta?.name || 'projekt').replace(/[^a-zA-Z0-9_-]+/g, '_');
+    await host.saveProjectFile(JSON.stringify(avplan, null, 2), `${safe}.avplan`);
+  }, [floorPlan, persons, walls, stageElements, projectMeta, host, fixtures, shapes, customFixtures, fixtureGroups, trusses, ceilings, scenes, cameras, layers, floor, sun]);
+
+  const handleImportAvplan = useCallback(async () => {
+    const res = await host.openProjectFile();
+    if (!res) return;
+    let avplan: AvPlan;
+    try {
+      avplan = parseAvPlan(res.text);
+    } catch (e) {
+      window.alert(`.avplan-Import fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    const r = fromVenueExchange({
+      kind: 'venue-exchange', formatVersion: 1, app: avplan.app,
+      appVersion: avplan.appVersion, exportedAt: avplan.exportedAt, venue: avplan.venue,
+    });
+    const now = new Date().toISOString();
+    const lighting = avplan.domains.lighting as ProjectData | undefined;
+    const base: ProjectData = lighting ?? {
+      meta: { name: avplan.venue.name || 'Projekt', author: '', version: '1.0', createdAt: now, updatedAt: now },
+      fixtures: [], shapes: [], persons: [], stageElements: [], customFixtures,
+      fixtureGroups: [], trusses: [], walls: [], ceilings: [], scenes: [],
+      cameras: [], layers: DEFAULT_LAYERS, floor: DEFAULT_FLOOR, sun: defaultSunSettings(),
+    };
+    // Lighting-Domaene nativ laden (alle Lampen-Details) + geteilten Raum kanonisch ueberlagern.
+    handleLoadProject({
+      ...base,
+      persons: r.persons, walls: r.walls, stageElements: r.stageElements,
+      floorPlan: r.floorPlan ?? undefined,
+    });
+    // Fremde Domaenen verlustfrei fuer die naechste Ausgabe merken.
+    preservedDomainsRef.current = { cameras: avplan.domains.cameras, cabling: avplan.domains.cabling };
+  }, [host, handleLoadProject, customFixtures]);
+
   const handleImportVenue = useCallback(async () => {
     const res = await host.openProjectFile();
     if (!res) return;
@@ -1234,6 +1295,8 @@ const App: React.FC = () => {
         onNew={handleNew}
         onSave={() => setProjectDialogMode('save')}
         onLoad={() => setProjectDialogMode('load')}
+        onExportAvplan={handleExportAvplan}
+        onImportAvplan={handleImportAvplan}
         onExportVenue={handleExportVenue}
         onImportVenue={handleImportVenue}
         onSaveToFile={handleSaveToFile}
