@@ -44,6 +44,8 @@ interface Props {
   onLoad: () => void;
   onSaveToFile: () => void;
   onLoadFromFile: () => void;
+  onExportVenue: () => void;
+  onImportVenue: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onVersions: () => void;
@@ -85,6 +87,9 @@ const TopBar: React.FC<Props> = (p) => {
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={run(p.onSaveToFile)}><Icon name="export" size={15} />Projekt als Datei…</button>
               <button className="tb-dd-item" onClick={run(p.onLoadFromFile)}><Icon name="import" size={15} />Projekt aus Datei…</button>
+              <div className="tb-dd-div" />
+              <button className="tb-dd-item" onClick={run(p.onExportVenue)} title="Geteilten Raum (Wände, Bühne, Personen, Floor-Plan) exportieren — importierbar im MultiCam-Planner"><Icon name="export" size={15} />Venue exportieren (.venue.json)…</button>
+              <button className="tb-dd-item" onClick={run(p.onImportVenue)} title="Geteilten Raum importieren — ersetzt Wände, Bühne, Personen, Floor-Plan; Lampen bleiben"><Icon name="import" size={15} />Venue importieren…</button>
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={run(p.onExportPlot)}><Icon name="schedule" size={15} />Lichtplan drucken (PDF, Titelblock + Legende)…</button>
               <button className="tb-dd-item" onClick={run(() => p.onExport('png'))}>Export als PNG…</button>
