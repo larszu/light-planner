@@ -14,7 +14,8 @@
     "dist:win": "npm run build && electron-builder --win nsis portable --publish never",
     "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never",
     "lint": "eslint .",
-    "venue:check": "node --experimental-strip-types scripts/venue-exchange-check.ts"
+    "venue:check": "node --experimental-strip-types scripts/venue-exchange-check.ts",
+    "avplan:check": "node --experimental-strip-types scripts/avplan-check.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^6.0.227",

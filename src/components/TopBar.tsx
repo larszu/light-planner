@@ -44,6 +44,8 @@ interface Props {
   onLoad: () => void;
   onSaveToFile: () => void;
   onLoadFromFile: () => void;
+  onExportAvplan: () => void;
+  onImportAvplan: () => void;
   onExportVenue: () => void;
   onImportVenue: () => void;
   onUndo: () => void;
@@ -87,6 +89,9 @@ const TopBar: React.FC<Props> = (p) => {
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={run(p.onSaveToFile)}><Icon name="export" size={15} />Projekt als Datei…</button>
               <button className="tb-dd-item" onClick={run(p.onLoadFromFile)}><Icon name="import" size={15} />Projekt aus Datei…</button>
+              <div className="tb-dd-div" />
+              <button className="tb-dd-item" onClick={run(p.onExportAvplan)} title="Gesamtprojekt (Raum + Licht + Kameras + Verkabelung) verlustfrei exportieren — von allen drei Apps lesbar, fremde Daten bleiben erhalten"><Icon name="export" size={15} />Gesamtprojekt exportieren (.avplan)…</button>
+              <button className="tb-dd-item" onClick={run(p.onImportAvplan)} title="Gesamtprojekt (.avplan) importieren — Licht wird bearbeitbar geladen, Kamera-/Verkabelungs-Daten bleiben verlustfrei erhalten"><Icon name="import" size={15} />Gesamtprojekt importieren (.avplan)…</button>
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={run(p.onExportVenue)} title="Geteilten Raum (Wände, Bühne, Personen, Floor-Plan) exportieren — importierbar im MultiCam-Planner"><Icon name="export" size={15} />Venue exportieren (.venue.json)…</button>
               <button className="tb-dd-item" onClick={run(p.onImportVenue)} title="Geteilten Raum importieren — ersetzt Wände, Bühne, Personen, Floor-Plan; Lampen bleiben"><Icon name="import" size={15} />Venue importieren…</button>
