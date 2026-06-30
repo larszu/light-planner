@@ -30,6 +30,8 @@ import { composePlot } from './utils/plotExport';
 import AboutDialog from './components/AboutDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
+import { toVenueExchange, parseVenueExchange, fromVenueExchange } from './core/venueExchange';
+import { APP_VERSION } from './version';
 import { useUiStore } from './store/uiStore';
 import { useProjectStore } from './store/projectStore';
 import type * as pdfjsLib from 'pdfjs-dist';
@@ -749,6 +751,44 @@ const App: React.FC = () => {
     setProjectDialogMode(null);
   }, []);
 
+  // ── Venue-Austausch: exportiert den geteilten Raum (Wände, Bühne, Personen,
+  // Floor-Plan) als neutrale .venue.json, die auch der MultiCam-Planner liest.
+  const handleExportVenue = useCallback(async () => {
+    const fp = floorPlan ? (() => { const { image: _img, ...rest } = floorPlan; return rest; })() : null;
+    const ex = toVenueExchange({
+      venueName: projectMeta?.name,
+      persons, walls, stageElements, floorPlan: fp,
+      appVersion: APP_VERSION, exportedAt: new Date().toISOString(),
+    });
+    const safe = (projectMeta?.name || 'venue').replace(/[^a-zA-Z0-9_-]+/g, '_');
+    await host.saveProjectFile(JSON.stringify(ex, null, 2), `${safe}.venue.json`);
+  }, [floorPlan, persons, walls, stageElements, projectMeta, host]);
+
+  const handleImportVenue = useCallback(async () => {
+    const res = await host.openProjectFile();
+    if (!res) return;
+    let ex;
+    try {
+      ex = parseVenueExchange(res.text);
+    } catch (e) {
+      window.alert(`Venue-Import fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
+    const r = fromVenueExchange(ex);
+    pushHistory(); // undoable
+    setPersons(r.persons);
+    setWalls(r.walls);
+    setStageElements(r.stageElements);
+    if (r.floorPlan) {
+      const stored = r.floorPlan;
+      const img = new Image();
+      img.onload = () => setFloorPlan({ ...stored, image: img });
+      img.src = stored.src;
+    } else {
+      setFloorPlan(null);
+    }
+  }, [host, pushHistory]);
+
   // ── New / empty project ──
   // Clears the scene (keeping the user's custom-fixture library) so you can
   // start fresh. Confirms first when there's unsaved content on the canvas.
@@ -1194,6 +1234,8 @@ const App: React.FC = () => {
         onNew={handleNew}
         onSave={() => setProjectDialogMode('save')}
         onLoad={() => setProjectDialogMode('load')}
+        onExportVenue={handleExportVenue}
+        onImportVenue={handleImportVenue}
         onSaveToFile={handleSaveToFile}
         onLoadFromFile={handleLoadFromFile}
         onUndo={handleUndo}
