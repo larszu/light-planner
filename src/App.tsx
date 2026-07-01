@@ -32,6 +32,7 @@ import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
 import { toVenueExchange, parseVenueExchange, fromVenueExchange } from './core/venueExchange';
 import { makeAvPlan, parseAvPlan, type AvPlan } from './core/avplan';
+import { foreignCamerasFrom, type ForeignCamera } from './core/foreignView';
 import { APP_VERSION } from './version';
 import { useUiStore } from './store/uiStore';
 import { useProjectStore } from './store/projectStore';
@@ -97,6 +98,7 @@ const App: React.FC = () => {
   const [fixtures, setFixtures] = useState<PlacedFixture[]>([]);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [persons, setPersons] = useState<Person[]>([]);
+  const [foreignCameras, setForeignCameras] = useState<ForeignCamera[]>([]);
   const [stageElements, setStageElements] = useState<StageElement[]>([]);
   const [customFixtures, setCustomFixtures] = useState<Fixture[]>([]);
   const [activeTool, setActiveTool] = useState<Tool>('select');
@@ -823,6 +825,8 @@ const App: React.FC = () => {
     });
     // Fremde Domaenen verlustfrei fuer die naechste Ausgabe merken.
     preservedDomainsRef.current = { cameras: avplan.domains.cameras, cabling: avplan.domains.cabling };
+    // Read-only Kameras zum Einsehen im 2D-Plan.
+    setForeignCameras(foreignCamerasFrom(avplan.domains.cameras));
   }, [host, handleLoadProject, customFixtures]);
 
   const handleImportVenue = useCallback(async () => {
@@ -1332,6 +1336,7 @@ const App: React.FC = () => {
         <div className="canvas-area">
           {viewMode === '2d' ? (
             <PlanCanvas
+              foreignCameras={foreignCameras}
               fixtures={fixtures}
               shapes={shapes}
               persons={persons}

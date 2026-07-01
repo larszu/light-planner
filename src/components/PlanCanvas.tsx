@@ -11,6 +11,9 @@ interface Props {
   fixtures: PlacedFixture[];
   shapes: Shape[];
   persons: Person[];
+  /** Read-only Kameras aus der verlustfrei mitgefuehrten .avplan-cameras-Domaene
+   *  (MultiCam-Planner). Nur zur Ansicht, nicht selektierbar. */
+  foreignCameras?: { id: string; x: number; y: number; label?: string; pan?: number }[];
   stageElements: StageElement[];
   trusses: Truss[];
   walls: Wall[];
@@ -73,6 +76,7 @@ function distToSegment(px: number, py: number, ax: number, ay: number, bx: numbe
 }
 
 const PlanCanvas: React.FC<Props> = ({
+  foreignCameras = [],
   fixtures,
   shapes,
   persons,
@@ -670,6 +674,28 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.textAlign = 'center';
       const poseTag = p.pose === 'sitting' ? ' (sitzt)' : '';
       ctx.fillText((p.label || `Person ${p.height}m`) + poseTag, p.x, p.y - r - 6 / v.scale);
+      ctx.textAlign = 'start';
+    }
+
+    // Read-only foreign cameras (MultiCam-Planner via .avplan) — nur Ansicht.
+    for (const cam of foreignCameras) {
+      const pan = ((cam.pan ?? 0) * Math.PI) / 180; // 0 = +x
+      const r = 0.22;
+      ctx.save();
+      ctx.translate(cam.x, cam.y);
+      ctx.rotate(pan);
+      ctx.beginPath(); // Sichtkegel-Andeutung
+      ctx.moveTo(0, 0); ctx.lineTo(0.9, -0.4); ctx.lineTo(0.9, 0.4); ctx.closePath();
+      ctx.fillStyle = 'rgba(56,189,248,0.12)'; ctx.fill();
+      ctx.beginPath(); // Kamera-Koerper
+      ctx.rect(-r, -r * 0.7, r * 1.6, r * 1.4);
+      ctx.fillStyle = 'rgba(56,189,248,0.6)'; ctx.fill();
+      ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 1.5 / v.scale; ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = `${10 / v.scale}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(cam.label || 'CAM', cam.x, cam.y - r - 6 / v.scale);
       ctx.textAlign = 'start';
     }
 
