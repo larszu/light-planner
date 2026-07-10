@@ -28,6 +28,8 @@ import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
 import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
 import { composePlot } from './utils/plotExport';
 import AboutDialog from './components/AboutDialog';
+import { Icon } from './components/Icon';
+import InventoryDialog from './inventory/InventoryDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
 import { toVenueExchange, parseVenueExchange, fromVenueExchange } from './core/venueExchange';
@@ -147,6 +149,7 @@ const App: React.FC = () => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [versionOpen, setVersionOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [scenes, setScenes] = useState<Scene[]>([]);
@@ -1593,6 +1596,15 @@ const App: React.FC = () => {
         />
       )}
       {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
+      <button
+        type="button"
+        onClick={() => setInventoryOpen(true)}
+        title="Lager / Bestand"
+        style={{ position: 'fixed', bottom: 16, left: 16, zIndex: 150, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 999, cursor: 'pointer' }}
+      >
+        <Icon name="library" size={16} /> Lager
+      </button>
+      {inventoryOpen && <InventoryDialog onClose={() => setInventoryOpen(false)} />}
     </div>
   );
 };
