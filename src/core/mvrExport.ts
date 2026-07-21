@@ -46,7 +46,23 @@ function aimMatrix(f: PlacedFixture): string {
   return `${g(x)}${g(y)}${g(z)}${g(pos)}`;
 }
 
-function fixtureXml(f: PlacedFixture, idx: number): string {
+// Maps each distinct fixture *type* to a stable, 1-based integer for a single
+// export. MVR's <FixtureTypeId> groups instances of the same type; importers
+// (grandMA3, Capture, Vectorworks) use it to fold identical fixtures into one
+// patch type. We key on the library id (e.g. "etc-s4-26") so two S4s share an
+// id while an S4 and a Fresnel differ — instead of the old constant 0, which
+// collapsed the whole rig into a single anonymous type.
+function makeTypeIdMap(): (f: PlacedFixture) => number {
+  const ids = new Map<string, number>();
+  return (f) => {
+    const key = f.fixture.id || `${f.fixture.manufacturer}@${f.fixture.name}`;
+    let id = ids.get(key);
+    if (id == null) { id = ids.size + 1; ids.set(key, id); }
+    return id;
+  };
+}
+
+function fixtureXml(f: PlacedFixture, idx: number, typeId: number): string {
   const name = xmlEsc(f.unitNumber ? `${f.unitNumber} ${f.fixture.name}` : f.fixture.name);
   const spec = sanitizeFile(`${f.fixture.manufacturer}@${f.fixture.name}`) + '.gdtf';
   const fid = f.channel ?? (idx + 1);
@@ -62,7 +78,7 @@ function fixtureXml(f: PlacedFixture, idx: number): string {
     `        <Addresses><Address break="0">${addr}</Address></Addresses>`,
     `        <FixtureID>${fid}</FixtureID>`,
     `        <UnitNumber>${xmlEsc(f.unitNumber ?? String(fid))}</UnitNumber>`,
-    `        <FixtureTypeId>0</FixtureTypeId>`,
+    `        <FixtureTypeId>${typeId}</FixtureTypeId>`,
     `        <CustomId>0</CustomId>`,
     `        <CastShadow>true</CastShadow>`,
     `      </Fixture>`,
@@ -71,7 +87,8 @@ function fixtureXml(f: PlacedFixture, idx: number): string {
 
 export function buildSceneDescription(fixtures: PlacedFixture[], _trusses: Truss[], projectName: string): string {
   const layerUuid = uuid();
-  const body = fixtures.map((f, i) => fixtureXml(f, i)).join('\n');
+  const typeIdFor = makeTypeIdMap();
+  const body = fixtures.map((f, i) => fixtureXml(f, i, typeIdFor(f))).join('\n');
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<GeneralSceneDescription verMajor="1" verMinor="6" provider="LightPlanner" providerVersion="1.0">',
