@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/built%20with-Electron%20%2B%20React%20%2B%20Three.js-9cf" />
   <img src="https://img.shields.io/badge/typescript-strongly%20typed-blue" />
   <img src="https://img.shields.io/badge/status-early-orange" />
-  <img src="https://img.shields.io/badge/license-MIT-lightgrey" />
+  <img src="https://img.shields.io/badge/license-proprietär-critical" />
 </p>
 
 ---
@@ -114,10 +114,10 @@ Early. Things will change. Use it for sketches, not for paperwork you have to ha
   </a>
 </p>
 
-Totally optional — the app will be MIT-licensed and free either way.
+Totally optional — the app stays free to use. It is proprietary software, not open source.
 
 ---
 
 ## 📄 License
 
-MIT
+Proprietär — © 2026 Lars Zumpe, alle Rechte vorbehalten. Nutzung der veröffentlichten Builds ist kostenlos; Weiterverbreitung und abgeleitete Werke sind es nicht. Siehe [LICENSE](LICENSE).
