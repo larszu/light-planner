@@ -1,0 +1,44 @@
+name: CI
+
+# Der Merge-Gate. Selbst-Merge ist nur bei gruenem CI erlaubt — auf Pull
+# Requests lief bisher aber gar kein Check, den es haette gruen oder rot
+# machen koennen: release.yml haengt an Tags.
+#
+# Neben Lint und Build laufen hier die drei Austauschformat-Waechter mit.
+# Genau sie halten fest, dass `.avplan`, das Venue-Format und
+# `avplan-inventory` in allen drei Planern identisch bleiben — ein Drift
+# darin faellt sonst erst auf, wenn ein Import beim Nutzer scheitert.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Wire-Contract — avplan-inventory
+        run: npm run inventory:check
+      - name: Wire-Contract — .avplan
+        run: npm run avplan:check
+      - name: Wire-Contract — Venue-Austausch
+        run: npm run venue:check
+      - name: Build (inkl. Type-Check)
+        run: npm run build
