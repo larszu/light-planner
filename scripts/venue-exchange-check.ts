@@ -137,4 +137,60 @@ const foreignOnly = mergeOwnVenueFields(shared, { walls: [], stageElements: [] }
 assert.equal(foreignOnly.walls[0].material, undefined);
 console.log('✓ ADR-005: die Projektion ueberschreibt Material, Fenster und Podest-Typ nicht mehr');
 
+// ── ADR-005 Inkrement 4: Raum-Masse ueberleben den Light-Round-Trip ─────────
+//
+// Light modelliert keine Raumgroesse — es hat Waende, Podeste und einen
+// kalibrierten Gebaeudeplan, aber kein widthM/heightM. Der Export liess die
+// Felder deshalb weg, und MultiCams Import setzt fuer ein fehlendes Mass seinen
+// Standard ein (20 x 12 m). Ein 30 x 18 m grosser Raum schrumpfte damit bei
+// jedem Round-Trip durch light auf die Standardgroesse. Nicht ein fehlender
+// Wert, sondern ein falscher — dieselbe Klasse wie multicam#79.
+const roomIn: VenueExchange = {
+  kind: 'venue-exchange',
+  formatVersion: 1,
+  app: 'multicam-planner',
+  appVersion: '1.0.0',
+  exportedAt: 't',
+  venue: {
+    name: 'Grosse Halle', widthM: 30, heightM: 18,
+    persons: [], walls: [], stageObjects: [],
+  },
+} as never;
+
+const heldRoom = fromVenueExchange(roomIn);
+assert.equal(heldRoom.venueForeign.widthM, 30, 'Raumbreite wird aufgehoben');
+assert.equal(heldRoom.venueForeign.heightM, 18, 'Raumtiefe wird aufgehoben');
+
+const roomOut = toVenueExchange({
+  venueName: 'Grosse Halle', persons: heldRoom.persons, walls: heldRoom.walls,
+  stageElements: heldRoom.stageElements, floorPlan: null,
+  appVersion: '1.0.0', exportedAt: 't2',
+  venueForeign: heldRoom.venueForeign,
+} as never).venue;
+assert.equal(roomOut.widthM, 30, 'Raumbreite kommt unveraendert zurueck');
+assert.equal(roomOut.heightM, 18, 'Raumtiefe kommt unveraendert zurueck');
+
+// Ohne Aufgehobenes bleibt der Export wie bisher stumm: light ERFINDET keine
+// Raumgroesse. Ein Standardwert hier waere derselbe Fehler, nur andersherum.
+const silent = toVenueExchange({
+  venueName: 'X', persons: [], walls: [], stageElements: [], floorPlan: null,
+  appVersion: '1.0.0', exportedAt: 't',
+} as never).venue;
+assert.equal(silent.widthM, undefined, 'ohne Wissen kein Mass');
+assert.equal(silent.heightM, undefined, 'ohne Wissen kein Mass');
+
+// Eine Datei ohne Masse hinterlaesst nichts Aufgehobenes — sonst behauptete die
+// Projektdatei, es habe eines gegeben.
+const nothing = fromVenueExchange({ ...roomIn, venue: { ...roomIn.venue, widthM: undefined, heightM: undefined } } as never);
+assert.deepEqual(nothing.venueForeign, {}, 'nichts da, nichts aufgehoben');
+
+// mergeOwnVenueFields reicht das Aufgehobene durch — sonst ginge es genau auf
+// dem Weg verloren, den der .venue.json-Import nimmt.
+assert.equal(
+  mergeOwnVenueFields(heldRoom, { walls: [], stageElements: [] }).venueForeign.widthM,
+  30,
+  'Zusammenfuehrung verliert die Masse nicht',
+);
+console.log('✓ ADR-005: Raum-Masse ueberleben den Light-Round-Trip');
+
 console.log('\nAlle Venue-Austausch-Checks bestanden.');

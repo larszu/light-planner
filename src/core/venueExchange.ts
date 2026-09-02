@@ -60,6 +60,12 @@ export interface LightVenueInput {
   floorPlan: LightFloorPlan | null;
   appVersion: string;
   exportedAt: string;
+  /**
+   * ADR-005 — Raum-Masse, die light nicht modelliert, aber eingelesen hat.
+   * Fehlen sie, schreibt der Export sie wie bisher nicht: light erfindet keine
+   * Raumgroesse, es gibt nur zurueck, was es bekommen hat.
+   */
+  venueForeign?: { widthM?: number; heightM?: number };
 }
 
 function fpToExchange(fp: LightFloorPlan): VenueExchangeFloorPlan {
@@ -82,6 +88,8 @@ export function toVenueExchange(input: LightVenueInput): VenueExchange {
     exportedAt: input.exportedAt,
     venue: {
       name: input.venueName || 'Venue',
+      ...(input.venueForeign?.widthM !== undefined ? { widthM: input.venueForeign.widthM } : {}),
+      ...(input.venueForeign?.heightM !== undefined ? { heightM: input.venueForeign.heightM } : {}),
       persons: input.persons.map((p) => ({
         id: p.id, x: p.x, y: p.y, height: p.height, label: p.label, pose: p.pose, facing: p.facing,
       })),
@@ -103,6 +111,8 @@ export interface LightVenueResult {
   walls: Wall[];
   stageElements: StageElement[];
   floorPlan: LightFloorPlan | null;
+  /** Siehe LightVenueInput.venueForeign. Leer, wenn die Datei keine Masse trug. */
+  venueForeign: { widthM?: number; heightM?: number };
 }
 
 function exchangeToFp(fp: VenueExchangeFloorPlan): LightFloorPlan {
@@ -135,6 +145,13 @@ export function fromVenueExchange(ex: VenueExchange): LightVenueResult {
       rotation: s.rotation ?? 0, points: s.points, label: s.label ?? '',
     })),
     floorPlan: v.floorPlan ? exchangeToFp(v.floorPlan) : null,
+    // Nur aufheben, was wirklich dastand: ein Feld mit `undefined` in jeder
+    // Datei waere Ballast, und der Export wuerde dann behaupten, light habe
+    // eine Raumgroesse — hat es nicht.
+    venueForeign: {
+      ...(typeof v.widthM === 'number' ? { widthM: v.widthM } : {}),
+      ...(typeof v.heightM === 'number' ? { heightM: v.heightM } : {}),
+    },
   };
 }
 
