@@ -375,6 +375,21 @@ export interface ProjectData {
    * durchgereicht, nie interpretiert.
    */
   avForeign?: { cameras?: unknown; cabling?: unknown };
+  /**
+   * ADR-005 — Raum-Masse aus einem eingelesenen Venue, die light-planner nicht
+   * modelliert.
+   *
+   * Light kennt keine Raumgroesse: es hat Waende, Podeste und einen kalibrierten
+   * Gebaeudeplan, aber kein `widthM`/`heightM`. Der Export liess die beiden
+   * Felder deshalb weg — und MultiCams Import setzt fuer ein fehlendes Mass
+   * seinen Standard ein (20 × 12 m). Ein 30 × 18 m grosser Raum schrumpfte so
+   * bei jedem Round-Trip durch light auf die Standardgroesse.
+   *
+   * Aus demselben Grund in der Datei wie `avForeign`: laege es nur im React-
+   * State, waere jedes Speichern-und-neu-Oeffnen dazwischen genau der Verlust,
+   * den das Feld verhindern soll.
+   */
+  venueForeign?: { widthM?: number; heightM?: number };
 }
 
 export interface FixtureGroup {

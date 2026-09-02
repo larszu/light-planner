@@ -728,6 +728,7 @@ const App: React.FC = () => {
     // ohne sie setzt zurueck: sonst leckten die Domaenen des zuletzt geoeffneten
     // Projekts in das naechste.
     preservedDomainsRef.current = { ...(data.avForeign ?? {}) };
+    preservedVenueRef.current = { ...(data.venueForeign ?? {}) };
     setFixtures(data.fixtures);
     setShapes(data.shapes);
     setPersons(data.persons);
@@ -764,12 +765,20 @@ const App: React.FC = () => {
 
   // ── Venue-Austausch: exportiert den geteilten Raum (Wände, Bühne, Personen,
   // Floor-Plan) als neutrale .venue.json, die auch der MultiCam-Planner liest.
+  // ADR-005 — Raum-Masse, die light nicht modelliert. Light hat Waende, Podeste
+  // und einen kalibrierten Gebaeudeplan, aber kein widthM/heightM. Der Export
+  // liess die beiden Felder weg, MultiCams Import setzt fuer ein fehlendes Mass
+  // seinen Standard (20 x 12 m) ein — ein 30 x 18 m grosser Raum schrumpfte also
+  // bei jedem Round-Trip durch light. Aufheben und unveraendert zurueckgeben.
+  const preservedVenueRef = useRef<{ widthM?: number; heightM?: number }>({});
+
   const handleExportVenue = useCallback(async () => {
     const fp = floorPlan ? (() => { const { image: _img, ...rest } = floorPlan; return rest; })() : null;
     const ex = toVenueExchange({
       venueName: projectMeta?.name,
       persons, walls, stageElements, floorPlan: fp,
       appVersion: APP_VERSION, exportedAt: new Date().toISOString(),
+      venueForeign: preservedVenueRef.current,
     });
     const safe = (projectMeta?.name || 'venue').replace(/[^a-zA-Z0-9_-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(ex, null, 2), `${safe}.venue.json`);
@@ -785,6 +794,7 @@ const App: React.FC = () => {
     const venue = toVenueExchange({
       venueName: projectMeta?.name, persons, walls, stageElements, floorPlan: fp,
       appVersion: APP_VERSION, exportedAt: now,
+      venueForeign: preservedVenueRef.current,
     }).venue;
     const avplan = makeAvPlan({
       app: 'light-planner', appVersion: APP_VERSION, exportedAt: now, venue,
@@ -838,6 +848,7 @@ const App: React.FC = () => {
     });
     // Fremde Domaenen verlustfrei fuer die naechste Ausgabe merken.
     preservedDomainsRef.current = { cameras: avplan.domains.cameras, cabling: avplan.domains.cabling };
+    preservedVenueRef.current = r.venueForeign;
     // Read-only Kameras zum Einsehen im 2D-Plan.
     setForeignCameras(foreignCamerasFrom(avplan.domains.cameras));
   }, [host, handleLoadProject, customFixtures]);
@@ -856,6 +867,7 @@ const App: React.FC = () => {
     // und Geometrie, traegt aber Wand-Material, Fenster und Podest-Typ nicht.
     // Beschreibt die Datei denselben Raum (gleiche Ids), bleiben sie erhalten.
     const r = mergeOwnVenueFields(fromVenueExchange(ex), { walls, stageElements });
+    preservedVenueRef.current = r.venueForeign;
     pushHistory(); // undoable
     setPersons(r.persons);
     setWalls(r.walls);
@@ -1158,6 +1170,11 @@ const App: React.FC = () => {
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
       // ADR-005 — Fremd-Domaenen gehoeren in die Datei, nicht nur in den Ref.
       ...foreignDomainsField(preservedDomainsRef.current),
+      // ADR-005 — dito fuer die Raum-Masse. Nur schreiben, wenn welche da
+      // sind: ein leeres Feld waere die Behauptung, es habe welche gegeben.
+      ...(Object.keys(preservedVenueRef.current).length > 0
+        ? { venueForeign: preservedVenueRef.current }
+        : {}),
     };
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
