@@ -33,7 +33,7 @@ import InventoryDialog from './inventory/InventoryDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
 import { toVenueExchange, parseVenueExchange, fromVenueExchange } from './core/venueExchange';
-import { makeAvPlan, parseAvPlan, type AvPlan } from './core/avplan';
+import { makeAvPlan, parseAvPlan, foreignDomainsField, type AvPlan } from './core/avplan';
 import { foreignCamerasFrom, type ForeignCamera } from './core/foreignView';
 import { APP_VERSION } from './version';
 import { useUiStore } from './store/uiStore';
@@ -723,6 +723,11 @@ const App: React.FC = () => {
     futureRef.current = [];
     suppressLogRef.current = true;       // don't log the bulk state swap
     setActivityLog([{ time: Date.now(), label: `Projekt geladen: ${data.meta?.name ?? ''}`.trim() }]);
+    // ADR-005 — was die Datei an fremden Domaenen mitbringt, kommt zurueck in
+    // den Ref, damit der naechste .avplan-Export sie wieder mitgibt. Eine Datei
+    // ohne sie setzt zurueck: sonst leckten die Domaenen des zuletzt geoeffneten
+    // Projekts in das naechste.
+    preservedDomainsRef.current = { ...(data.avForeign ?? {}) };
     setFixtures(data.fixtures);
     setShapes(data.shapes);
     setPersons(data.persons);
@@ -1143,6 +1148,8 @@ const App: React.FC = () => {
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
       trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+      // ADR-005 — Fremd-Domaenen gehoeren in die Datei, nicht nur in den Ref.
+      ...foreignDomainsField(preservedDomainsRef.current),
     };
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
