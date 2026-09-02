@@ -32,7 +32,7 @@ import { Icon } from './components/Icon';
 import InventoryDialog from './inventory/InventoryDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
-import { toVenueExchange, parseVenueExchange, fromVenueExchange } from './core/venueExchange';
+import { toVenueExchange, parseVenueExchange, fromVenueExchange, mergeOwnVenueFields } from './core/venueExchange';
 import { makeAvPlan, parseAvPlan, foreignDomainsField, type AvPlan } from './core/avplan';
 import { foreignCamerasFrom, type ForeignCamera } from './core/foreignView';
 import { APP_VERSION } from './version';
@@ -825,11 +825,16 @@ const App: React.FC = () => {
       fixtureGroups: [], trusses: [], walls: [], ceilings: [], scenes: [],
       cameras: [], layers: DEFAULT_LAYERS, floor: DEFAULT_FLOOR, sun: defaultSunSettings(),
     };
-    // Lighting-Domaene nativ laden (alle Lampen-Details) + geteilten Raum kanonisch ueberlagern.
+    // Lighting-Domaene nativ laden (alle Lampen-Details) + geteilten Raum
+    // kanonisch ueberlagern. ADR-005, Regel 2: die Projektion ist kanonisch fuer
+    // Existenz und Geometrie, aber sie traegt Wand-Material, Fenster und den
+    // Podest-Typ nicht — die kommen aus dem eigenen Stand derselben Datei
+    // zurueck. Ohne das zerstoerte der Import Daten, die im File standen.
+    const merged = mergeOwnVenueFields(r, { walls: base.walls, stageElements: base.stageElements });
     handleLoadProject({
       ...base,
-      persons: r.persons, walls: r.walls, stageElements: r.stageElements,
-      floorPlan: r.floorPlan ?? undefined,
+      persons: merged.persons, walls: merged.walls, stageElements: merged.stageElements,
+      floorPlan: merged.floorPlan ?? undefined,
     });
     // Fremde Domaenen verlustfrei fuer die naechste Ausgabe merken.
     preservedDomainsRef.current = { cameras: avplan.domains.cameras, cabling: avplan.domains.cabling };
@@ -847,7 +852,10 @@ const App: React.FC = () => {
       window.alert(`Venue-Import fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
-    const r = fromVenueExchange(ex);
+    // ADR-005, Regel 2 — auch hier ist die Projektion kanonisch fuer Existenz
+    // und Geometrie, traegt aber Wand-Material, Fenster und Podest-Typ nicht.
+    // Beschreibt die Datei denselben Raum (gleiche Ids), bleiben sie erhalten.
+    const r = mergeOwnVenueFields(fromVenueExchange(ex), { walls, stageElements });
     pushHistory(); // undoable
     setPersons(r.persons);
     setWalls(r.walls);
@@ -860,7 +868,7 @@ const App: React.FC = () => {
     } else {
       setFloorPlan(null);
     }
-  }, [host, pushHistory]);
+  }, [host, pushHistory, walls, stageElements]);
 
   // ── New / empty project ──
   // Clears the scene (keeping the user's custom-fixture library) so you can

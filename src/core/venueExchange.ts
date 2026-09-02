@@ -150,3 +150,47 @@ export function parseVenueExchange(text: string): VenueExchange {
   if (!data.venue) throw new Error('Venue-Austauschdatei ohne venue-Block.');
   return data as VenueExchange;
 }
+
+/**
+ * ADR-005, Regel 2 — eine Projektion darf den vollen Stand nicht ueberschreiben.
+ *
+ * `fromVenueExchange` liefert den geteilten Raum. Der ist fuer Existenz und
+ * Geometrie kanonisch: hat eine Nachbar-App eine Wand verschoben oder geloescht,
+ * gilt das. Er kann aber nur die Felder tragen, die alle drei Apps teilen —
+ * `Wall.material`, `Wall.windows` und `StageElement.type` gehoeren nicht dazu.
+ *
+ * Ohne diese Zusammenfuehrung zerstoerte light-planner sie beim Oeffnen einer
+ * .avplan, die es selbst geschrieben hatte: der eigene, vollstaendige Stand lag
+ * in `domains.lighting` derselben Datei und wurde von der Projektion
+ * ueberschrieben. Fenster tragen `transmittance` und `tint` und gehen in die
+ * Lichtrechnung ein — das ist kein kosmetischer Verlust.
+ *
+ * Zusammengefuehrt wird ueber die Id. Was die Projektion nicht kennt, existiert
+ * nicht mehr; was sie kennt, behaelt ihre Geometrie und bekommt die eigenen
+ * Felder zurueck, sofern es sie hatte.
+ */
+export function mergeOwnVenueFields(
+  projected: LightVenueResult,
+  own: { walls?: Wall[]; stageElements?: StageElement[] },
+): LightVenueResult {
+  const ownWalls = new Map((own.walls ?? []).map((w) => [w.id, w]));
+  const ownStages = new Map((own.stageElements ?? []).map((s) => [s.id, s]));
+  return {
+    ...projected,
+    walls: projected.walls.map((w) => {
+      const mine = ownWalls.get(w.id);
+      if (!mine) return w;
+      return {
+        ...w,
+        ...(mine.material !== undefined ? { material: mine.material } : {}),
+        ...(mine.windows !== undefined ? { windows: mine.windows } : {}),
+      };
+    }),
+    stageElements: projected.stageElements.map((s) => {
+      const mine = ownStages.get(s.id);
+      // `type` wird in der Projektion auf 'custom' gesetzt, weil das
+      // Austauschformat die Podest-Typen nicht kennt. Der eigene Stand weiss es.
+      return mine ? { ...s, type: mine.type } : s;
+    }),
+  };
+}

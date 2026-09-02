@@ -9,6 +9,7 @@ import {
   toVenueExchange,
   fromVenueExchange,
   parseVenueExchange,
+  mergeOwnVenueFields,
   type VenueExchange,
 } from '../src/core/venueExchange.ts';
 
@@ -75,5 +76,65 @@ console.log('✓ Cross-App: MultiCam-Venue laesst sich in Light importieren');
 assert.throws(() => parseVenueExchange('{"kind":"lightplan"}'));
 assert.throws(() => parseVenueExchange(JSON.stringify({ ...fromMulticam, formatVersion: 99 })));
 console.log('✓ Fremde / inkompatible Dateien werden abgelehnt');
+
+// ── 4) ADR-005 — die Projektion ueberschreibt den eigenen Stand nicht ────────
+//
+//    Das Austauschformat ist der GETEILTE Raum. Es kennt Wand-Material,
+//    Fenster und den Podest-Typ nicht — die sind light-eigen. Vor dieser
+//    Zusammenfuehrung zerstoerte ein .avplan-Import genau diese Felder, obwohl
+//    sie in derselben Datei standen (in domains.lighting). Fenster tragen
+//    transmittance und tint und gehen in die Lichtrechnung ein.
+const ownWalls = [
+  {
+    id: 'w1', x1: 0, y1: 0, x2: 10, y2: 0, height: 4, label: 'Nordwand',
+    reflectance: 0.5, color: '#cccccc',
+    material: 'brick' as never,
+    windows: [
+      { id: 'win1', start: 2, width: 1.4, sill: 1, top: 2.4, transmittance: 0.9, tint: '#ffffff' },
+    ],
+  },
+];
+const ownStages = [
+  { id: 's1', type: 'podest-2x1' as const, x: 1, y: 1, width: 2, depth: 1, height: 0.4, rotation: 0, label: 'A' },
+];
+
+// Der geteilte Raum kommt zurueck — mit verschobener Wand und ohne die
+// light-eigenen Felder.
+const shared = fromVenueExchange(
+  toVenueExchange({
+    venueName: 'Studio 1',
+    persons: [],
+    walls: [{ id: 'w1', x1: 0, y1: 0, x2: 12, y2: 0, height: 4, label: 'Nordwand', reflectance: 0.5, color: '#cccccc' }],
+    stageElements: ownStages,
+    floorPlan: null,
+    appVersion: '1.0.0',
+    exportedAt: 't',
+  } as never),
+);
+assert.equal(shared.walls[0].material, undefined, 'Projektion traegt material nicht');
+assert.equal(shared.walls[0].windows, undefined, 'Projektion traegt windows nicht');
+assert.equal(shared.stageElements[0].type, 'custom', 'Projektion kennt den Podest-Typ nicht');
+
+const merged = mergeOwnVenueFields(shared, { walls: ownWalls as never, stageElements: ownStages });
+// Geometrie: die Projektion gewinnt — eine Nachbar-App hat die Wand verlaengert.
+assert.equal(merged.walls[0].x2, 12, 'Geometrie kommt aus dem geteilten Raum');
+// Eigene Felder: aus dem eigenen Stand zurueck.
+assert.equal(merged.walls[0].material, 'brick', 'Wand-Material ueberlebt');
+assert.equal(merged.walls[0].windows?.length, 1, 'Fenster ueberleben');
+assert.equal(merged.walls[0].windows?.[0].transmittance, 0.9);
+assert.equal(merged.stageElements[0].type, 'podest-2x1', 'Podest-Typ ueberlebt');
+
+// Was die Projektion nicht kennt, existiert nicht mehr — der geteilte Raum ist
+// fuer Existenz kanonisch, sonst kaeme eine geloeschte Wand wieder.
+const afterDelete = mergeOwnVenueFields(
+  { ...shared, walls: [] },
+  { walls: ownWalls as never, stageElements: [] },
+);
+assert.equal(afterDelete.walls.length, 0, 'geloeschte Wand kommt nicht zurueck');
+
+// Eine Wand ohne Gegenstueck im eigenen Stand bleibt, wie die Projektion sie gibt.
+const foreignOnly = mergeOwnVenueFields(shared, { walls: [], stageElements: [] });
+assert.equal(foreignOnly.walls[0].material, undefined);
+console.log('✓ ADR-005: die Projektion ueberschreibt Material, Fenster und Podest-Typ nicht mehr');
 
 console.log('\nAlle Venue-Austausch-Checks bestanden.');
