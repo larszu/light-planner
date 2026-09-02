@@ -68,3 +68,20 @@ export function parseAvPlan(text: string): AvPlan {
   if (!data.venue || !data.domains) throw new Error('.avplan ohne venue/domains.');
   return data as AvPlan;
 }
+
+/**
+ * ADR-005 — Fremde .avplan-Domaenen als Feld fuer die Projektdatei.
+ *
+ * Eine eigene Funktion, weil die Bedingung die eigentliche Entscheidung ist:
+ * geschrieben wird nur, wenn es wirklich etwas zu bewahren gibt. Ein
+ * `avForeign: {}` in jeder Datei waere Ballast — und die Behauptung, es habe
+ * eine Fremd-Domaene gegeben.
+ */
+export function foreignDomainsField(preserved: {
+  cameras?: unknown;
+  cabling?: unknown;
+}): { avForeign?: { cameras?: unknown; cabling?: unknown } } {
+  return preserved.cameras !== undefined || preserved.cabling !== undefined
+    ? { avForeign: { ...preserved } }
+    : {};
+}

@@ -1,7 +1,7 @@
 // Headless-Check fuer das .avplan-Gesamtformat (verlustfrei).
 // Lauf: `npm run avplan:check`  (node --experimental-strip-types).
 import assert from 'node:assert/strict';
-import { makeAvPlan, parseAvPlan, AVPLAN_KIND } from '../src/core/avplan.ts';
+import { makeAvPlan, parseAvPlan, AVPLAN_KIND, foreignDomainsField } from '../src/core/avplan.ts';
 
 // Eine reichhaltige Lighting-Domaene (so wuerde light sie schreiben).
 const lighting = {
@@ -54,5 +54,35 @@ console.log('✓ Passthrough: Lampen mit allen Details ueberstehen die Reise dur
 assert.throws(() => parseAvPlan('{"kind":"lightplan"}'));
 assert.throws(() => parseAvPlan(JSON.stringify({ ...ex, formatVersion: 99 })));
 console.log('✓ Fremde / inkompatible Dateien werden abgelehnt');
+
+// 4) ADR-005 — die App-Ebene, die die Pruefungen 1-3 strukturell NICHT sehen.
+//
+//    Pruefung 2 baut den Re-Export von Hand aus `loaded.domains`. Damit prueft
+//    sie das FORMAT und ueberspringt genau die Stelle, an der der Verlust
+//    passierte: die Fremd-Domaenen lagen in einem React-Ref und nicht in der
+//    Projektdatei, also war jedes Speichern-und-neu-Oeffnen zwischen Import und
+//    Export ein vollstaendiger Verlust des Kamera- und Kabelplans.
+const preserved = { cameras: { mcplan: true }, cabling: { equipment: [{ id: 'e1' }] } };
+
+// 4a) Was zu bewahren ist, wandert ins Feld.
+const field = foreignDomainsField(preserved);
+assert.deepEqual(field.avForeign, preserved);
+
+// 4b) Voller Datei-Round-Trip: speichern, neu laden, exportieren.
+const savedFile = JSON.parse(JSON.stringify({ meta: { name: 'X' }, ...field })) as {
+  avForeign?: { cameras?: unknown; cabling?: unknown };
+};
+const afterReload = foreignDomainsField(savedFile.avForeign ?? {});
+assert.deepEqual(afterReload.avForeign, preserved, 'Fremd-Domaenen ueberleben Speichern und Laden');
+
+// 4c) Nichts zu bewahren heisst: kein Feld. Ein leeres `avForeign` in jeder
+//     Datei waere Ballast — und die Behauptung, es habe eine gegeben.
+assert.equal('avForeign' in foreignDomainsField({}), false);
+
+// 4d) Eine einzelne Domaene erfindet die fehlende nicht.
+assert.deepEqual(foreignDomainsField({ cabling: { equipment: [] } }).avForeign, {
+  cabling: { equipment: [] },
+});
+console.log('✓ ADR-005: Fremd-Domaenen ueberleben das native Speichern');
 
 console.log('\nAlle .avplan-Verlustfreiheits-Checks bestanden.');

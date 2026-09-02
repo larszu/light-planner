@@ -367,6 +367,14 @@ export interface ProjectData {
   // Imported building plan incl. its calibration; the bitmap is stored as a
   // data-URL (`src`) so the live HTMLImageElement can be rebuilt on load.
   floorPlan?: Omit<FloorPlan, 'image'>;
+  /**
+   * ADR-005 — Fremde .avplan-Domaenen (cameras/cabling), die light-planner nicht
+   * bearbeitet. Sie gehoeren in die Projektdatei, nicht nur in einen React-Ref:
+   * lagen sie nur dort, war jedes Speichern-und-neu-Oeffnen zwischen Import und
+   * Export ein vollstaendiger Verlust des Kamera- und Kabelplans. Opak
+   * durchgereicht, nie interpretiert.
+   */
+  avForeign?: { cameras?: unknown; cabling?: unknown };
 }
 
 export interface FixtureGroup {
