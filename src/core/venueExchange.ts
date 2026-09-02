@@ -52,6 +52,25 @@ export interface VenueExchange {
 
 export type LightFloorPlan = Omit<FloorPlan, 'image'>;
 
+/**
+ * ADR-005 — Personen-Felder, die light-planner nicht modelliert.
+ *
+ * Lights `Person` ist eine menschliche Figur: Position, Hoehe, Pose,
+ * Blickrichtung. MultiCam kennt an derselben Stelle ein allgemeines
+ * Buehnen-Objekt — ein Schlagzeug, ein Rednerpult, ein Stuhl — mit `width`,
+ * `objectType` und `color`.
+ *
+ * Light liess die drei beim Import fallen und schrieb sie beim Export nicht.
+ * MultiCams Import setzt dann seine Standards ein (`objectType: 'person'`,
+ * `width: 0.5`): aus einem Schlagzeug wurde nach einem Round-Trip durch light
+ * eine 0,5 m breite Person. Wieder ein falscher Wert, kein fehlender.
+ */
+export interface ForeignPersonFields {
+  width?: number;
+  objectType?: string;
+  color?: string;
+}
+
 export interface LightVenueInput {
   venueName?: string;
   persons: Person[];
@@ -66,6 +85,8 @@ export interface LightVenueInput {
    * Raumgroesse, es gibt nur zurueck, was es bekommen hat.
    */
   venueForeign?: { widthM?: number; heightM?: number };
+  /** Siehe ForeignPersonFields, je Personen-Id. */
+  personForeign?: Record<string, ForeignPersonFields>;
 }
 
 function fpToExchange(fp: LightFloorPlan): VenueExchangeFloorPlan {
@@ -90,9 +111,18 @@ export function toVenueExchange(input: LightVenueInput): VenueExchange {
       name: input.venueName || 'Venue',
       ...(input.venueForeign?.widthM !== undefined ? { widthM: input.venueForeign.widthM } : {}),
       ...(input.venueForeign?.heightM !== undefined ? { heightM: input.venueForeign.heightM } : {}),
-      persons: input.persons.map((p) => ({
-        id: p.id, x: p.x, y: p.y, height: p.height, label: p.label, pose: p.pose, facing: p.facing,
-      })),
+      persons: input.persons.map((p) => {
+        // ADR-005 — was light an dieser Person nicht modelliert, geht
+        // unveraendert wieder mit hinaus.
+        const f = input.personForeign?.[p.id];
+        return {
+          id: p.id, x: p.x, y: p.y, height: p.height, label: p.label,
+          pose: p.pose, facing: p.facing,
+          ...(f?.width !== undefined ? { width: f.width } : {}),
+          ...(f?.objectType !== undefined ? { objectType: f.objectType } : {}),
+          ...(f?.color !== undefined ? { color: f.color } : {}),
+        };
+      }),
       walls: input.walls.map((w) => ({
         id: w.id, x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2, height: w.height,
         label: w.label, cx: w.cx, cy: w.cy, reflectance: w.reflectance, color: w.color,
@@ -113,6 +143,8 @@ export interface LightVenueResult {
   floorPlan: LightFloorPlan | null;
   /** Siehe LightVenueInput.venueForeign. Leer, wenn die Datei keine Masse trug. */
   venueForeign: { widthM?: number; heightM?: number };
+  /** Siehe ForeignPersonFields. Nur Personen mit wirklich fremden Werten. */
+  personForeign: Record<string, ForeignPersonFields>;
 }
 
 function exchangeToFp(fp: VenueExchangeFloorPlan): LightFloorPlan {
@@ -152,7 +184,25 @@ export function fromVenueExchange(ex: VenueExchange): LightVenueResult {
       ...(typeof v.widthM === 'number' ? { widthM: v.widthM } : {}),
       ...(typeof v.heightM === 'number' ? { heightM: v.heightM } : {}),
     },
+    personForeign: collectPersonForeign(v.persons ?? []),
   };
+}
+
+/** Hebt je Person auf, was light nicht modelliert. Eine Person ohne solche
+ *  Werte bekommt keinen Eintrag; `objectType: 'person'` ebenfalls nicht — das
+ *  ist MultiCams Standard und damit nichts, was jemand gesetzt haette. */
+function collectPersonForeign(
+  persons: VenueExchangePerson[],
+): Record<string, ForeignPersonFields> {
+  const out: Record<string, ForeignPersonFields> = {};
+  for (const p of persons) {
+    const f: ForeignPersonFields = {};
+    if (typeof p.width === 'number') f.width = p.width;
+    if (p.objectType !== undefined && p.objectType !== 'person') f.objectType = p.objectType;
+    if (p.color !== undefined) f.color = p.color;
+    if (Object.keys(f).length > 0) out[p.id] = f;
+  }
+  return out;
 }
 
 /** Parst + validiert eine Austauschdatei. Wirft bei falschem Format. */

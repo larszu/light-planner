@@ -193,4 +193,51 @@ assert.equal(
 );
 console.log('✓ ADR-005: Raum-Masse ueberleben den Light-Round-Trip');
 
+// ── ADR-005 Inkrement 4, vierter Naht-Fall: Buehnen-Objekte bleiben, was sie sind ──
+//
+// Lights Person ist eine menschliche Figur. MultiCam kennt an derselben Stelle
+// ein allgemeines Buehnen-Objekt — Schlagzeug, Rednerpult, Stuhl — mit width,
+// objectType und color. Light liess die drei fallen, MultiCams Import setzt
+// dann seine Standards ein: aus dem Schlagzeug wurde eine 0,5 m breite Person.
+const drumKitIn: VenueExchange = {
+  kind: 'venue-exchange', formatVersion: 1, app: 'multicam-planner',
+  appVersion: '1.0.0', exportedAt: 't',
+  venue: {
+    name: 'Halle', persons: [
+      { id: 'o1', x: 3, y: 4, height: 1.2, label: 'Drumkit', width: 1.4, objectType: 'drumkit', color: '#aa5500' },
+      { id: 'p1', x: 1, y: 1, height: 1.75, label: 'Talent' },
+    ],
+    walls: [], stageObjects: [],
+  },
+} as never;
+
+const heldPersons = fromVenueExchange(drumKitIn);
+assert.equal(heldPersons.personForeign['o1']?.objectType, 'drumkit', 'Objekt-Art wird aufgehoben');
+assert.equal(heldPersons.personForeign['o1']?.width, 1.4, 'Breite wird aufgehoben');
+assert.equal(heldPersons.personForeign['o1']?.color, '#aa5500', 'Farbe wird aufgehoben');
+assert.equal(heldPersons.personForeign['p1'], undefined, 'eine blosse Person hinterlaesst nichts');
+
+const personsOut = toVenueExchange({
+  venueName: 'Halle', persons: heldPersons.persons, walls: heldPersons.walls,
+  stageElements: heldPersons.stageElements, floorPlan: null,
+  appVersion: '1.0.0', exportedAt: 't2',
+  personForeign: heldPersons.personForeign,
+} as never).venue.persons;
+
+const drum = personsOut.find((p) => p.id === 'o1');
+assert.equal(drum?.objectType, 'drumkit', 'das Schlagzeug bleibt ein Schlagzeug');
+assert.equal(drum?.width, 1.4, 'die Breite kommt unveraendert zurueck');
+assert.equal(drum?.color, '#aa5500', 'die Farbe kommt unveraendert zurueck');
+
+// Was light MODELLIERT, bleibt fuehrend — Position und Hoehe kommen aus lights
+// eigenem Stand, nicht aus dem Aufgehobenen.
+assert.equal(drum?.x, 3, 'Position kommt aus lights Stand');
+assert.equal(drum?.height, 1.2, 'Hoehe kommt aus lights Stand');
+
+// Eine reine Person bekommt keine erfundenen Felder mit auf den Weg.
+const plain = personsOut.find((p) => p.id === 'p1');
+assert.equal(plain?.objectType, undefined, 'keine erfundene Objekt-Art');
+assert.equal(plain?.width, undefined, 'keine erfundene Breite');
+console.log('✓ ADR-005: Buehnen-Objekte ueberleben den Light-Round-Trip als das, was sie sind');
+
 console.log('\nAlle Venue-Austausch-Checks bestanden.');

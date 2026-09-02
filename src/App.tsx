@@ -729,6 +729,7 @@ const App: React.FC = () => {
     // Projekts in das naechste.
     preservedDomainsRef.current = { ...(data.avForeign ?? {}) };
     preservedVenueRef.current = { ...(data.venueForeign ?? {}) };
+    preservedPersonsRef.current = { ...(data.personForeign ?? {}) };
     setFixtures(data.fixtures);
     setShapes(data.shapes);
     setPersons(data.persons);
@@ -771,6 +772,11 @@ const App: React.FC = () => {
   // seinen Standard (20 x 12 m) ein — ein 30 x 18 m grosser Raum schrumpfte also
   // bei jedem Round-Trip durch light. Aufheben und unveraendert zurueckgeben.
   const preservedVenueRef = useRef<{ widthM?: number; heightM?: number }>({});
+  // ADR-005 — dito je Person: MultiCam kennt an dieser Stelle allgemeine
+  // Buehnen-Objekte (Schlagzeug, Rednerpult, Stuhl) mit Breite, Art und Farbe.
+  // Light kennt nur Figuren; ohne Aufheben wurde aus dem Schlagzeug eine
+  // 0,5 m breite Person.
+  const preservedPersonsRef = useRef<Record<string, import('./core/venueExchange').ForeignPersonFields>>({});
 
   const handleExportVenue = useCallback(async () => {
     const fp = floorPlan ? (() => { const { image: _img, ...rest } = floorPlan; return rest; })() : null;
@@ -779,6 +785,7 @@ const App: React.FC = () => {
       persons, walls, stageElements, floorPlan: fp,
       appVersion: APP_VERSION, exportedAt: new Date().toISOString(),
       venueForeign: preservedVenueRef.current,
+      personForeign: preservedPersonsRef.current,
     });
     const safe = (projectMeta?.name || 'venue').replace(/[^a-zA-Z0-9_-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(ex, null, 2), `${safe}.venue.json`);
@@ -795,6 +802,7 @@ const App: React.FC = () => {
       venueName: projectMeta?.name, persons, walls, stageElements, floorPlan: fp,
       appVersion: APP_VERSION, exportedAt: now,
       venueForeign: preservedVenueRef.current,
+      personForeign: preservedPersonsRef.current,
     }).venue;
     const avplan = makeAvPlan({
       app: 'light-planner', appVersion: APP_VERSION, exportedAt: now, venue,
@@ -849,6 +857,7 @@ const App: React.FC = () => {
     // Fremde Domaenen verlustfrei fuer die naechste Ausgabe merken.
     preservedDomainsRef.current = { cameras: avplan.domains.cameras, cabling: avplan.domains.cabling };
     preservedVenueRef.current = r.venueForeign;
+    preservedPersonsRef.current = r.personForeign;
     // Read-only Kameras zum Einsehen im 2D-Plan.
     setForeignCameras(foreignCamerasFrom(avplan.domains.cameras));
   }, [host, handleLoadProject, customFixtures]);
@@ -868,6 +877,7 @@ const App: React.FC = () => {
     // Beschreibt die Datei denselben Raum (gleiche Ids), bleiben sie erhalten.
     const r = mergeOwnVenueFields(fromVenueExchange(ex), { walls, stageElements });
     preservedVenueRef.current = r.venueForeign;
+    preservedPersonsRef.current = r.personForeign;
     pushHistory(); // undoable
     setPersons(r.persons);
     setWalls(r.walls);
@@ -1174,6 +1184,9 @@ const App: React.FC = () => {
       // sind: ein leeres Feld waere die Behauptung, es habe welche gegeben.
       ...(Object.keys(preservedVenueRef.current).length > 0
         ? { venueForeign: preservedVenueRef.current }
+        : {}),
+      ...(Object.keys(preservedPersonsRef.current).length > 0
+        ? { personForeign: preservedPersonsRef.current }
         : {}),
     };
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
