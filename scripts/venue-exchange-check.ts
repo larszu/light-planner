@@ -181,7 +181,12 @@ assert.equal(silent.heightM, undefined, 'ohne Wissen kein Mass');
 
 // Eine Datei ohne Masse hinterlaesst nichts Aufgehobenes — sonst behauptete die
 // Projektdatei, es habe eines gegeben.
-const nothing = fromVenueExchange({ ...roomIn, venue: { ...roomIn.venue, widthM: undefined, heightM: undefined } } as never);
+// Der Name wird hier mit weggenommen: die Zusicherung gilt dem Fall "die Datei
+// traegt nichts, was light nicht modelliert", nicht nur den Massen.
+const nothing = fromVenueExchange({
+  ...roomIn,
+  venue: { ...roomIn.venue, widthM: undefined, heightM: undefined, name: 'Venue' },
+} as never);
 assert.deepEqual(nothing.venueForeign, {}, 'nichts da, nichts aufgehoben');
 
 // mergeOwnVenueFields reicht das Aufgehobene durch — sonst ginge es genau auf
@@ -239,5 +244,34 @@ const plain = personsOut.find((p) => p.id === 'p1');
 assert.equal(plain?.objectType, undefined, 'keine erfundene Objekt-Art');
 assert.equal(plain?.width, undefined, 'keine erfundene Breite');
 console.log('✓ ADR-005: Buehnen-Objekte ueberleben den Light-Round-Trip als das, was sie sind');
+
+// ── ADR-005: der Raum-Name ueberlebt den Light-Round-Trip ──────────────────
+//
+// Light kennt keinen Raum-Namen — `venueName` ist sein PROJEKTname. Es
+// verwarf den eingelesenen Namen und schrieb beim Export den eigenen: aus
+// „Grosse Halle" wurde „Lichtplan Show A". Letzter Pfad des Venue-Austauschs.
+const namedIn = { ...roomIn, venue: { ...roomIn.venue, name: 'Grosse Halle' } } as never;
+const heldName = fromVenueExchange(namedIn);
+assert.equal(heldName.venueForeign.name, 'Grosse Halle', 'Raum-Name wird aufgehoben');
+
+const nameOut = toVenueExchange({
+  venueName: 'Lichtplan Show A', persons: [], walls: [], stageElements: [], floorPlan: null,
+  appVersion: '1.0.0', exportedAt: 't', venueForeign: heldName.venueForeign,
+} as never).venue;
+assert.equal(nameOut.name, 'Grosse Halle', 'der eingelesene Raum-Name gewinnt');
+
+// Ohne eingelesenen Namen bleibt es beim Projektnamen — light hat dann nichts
+// Besseres, und das ist kein erfundener Wert, sondern der beste verfuegbare.
+const ownName = toVenueExchange({
+  venueName: 'Lichtplan Show A', persons: [], walls: [], stageElements: [], floorPlan: null,
+  appVersion: '1.0.0', exportedAt: 't',
+} as never).venue;
+assert.equal(ownName.name, 'Lichtplan Show A', 'ohne Eingelesenes gilt der Projektname');
+
+// Der Platzhalter 'Venue' wird nicht aufgehoben: den schreiben beide Apps,
+// wenn sie nichts wissen.
+const placeholder = fromVenueExchange({ ...roomIn, venue: { ...roomIn.venue, name: 'Venue' } } as never);
+assert.equal(placeholder.venueForeign.name, undefined, 'der Platzhalter wird nicht aufgehoben');
+console.log('✓ ADR-005: der Raum-Name ueberlebt den Light-Round-Trip');
 
 console.log('\nAlle Venue-Austausch-Checks bestanden.');

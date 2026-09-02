@@ -771,7 +771,7 @@ const App: React.FC = () => {
   // liess die beiden Felder weg, MultiCams Import setzt fuer ein fehlendes Mass
   // seinen Standard (20 x 12 m) ein — ein 30 x 18 m grosser Raum schrumpfte also
   // bei jedem Round-Trip durch light. Aufheben und unveraendert zurueckgeben.
-  const preservedVenueRef = useRef<{ widthM?: number; heightM?: number }>({});
+  const preservedVenueRef = useRef<{ widthM?: number; heightM?: number; name?: string }>({});
   // ADR-005 — dito je Person: MultiCam kennt an dieser Stelle allgemeine
   // Buehnen-Objekte (Schlagzeug, Rednerpult, Stuhl) mit Breite, Art und Farbe.
   // Light kennt nur Figuren; ohne Aufheben wurde aus dem Schlagzeug eine
