@@ -85,6 +85,23 @@ function fixtureXml(f: PlacedFixture, idx: number, typeId: number): string {
   ].join('\n');
 }
 
+/**
+ * ADR-005, Regel 3 — was hier NICHT hineingeht, steht hier.
+ *
+ * Der Parameter heisst `_trusses`, weil er entgegengenommen und nicht benutzt
+ * wird: die Szene enthaelt ausschliesslich Fixtures. Traversen im MVR
+ * abzubilden hiesse, ihre Geometrie und einen GDTF-Bezug zu erzeugen — eine
+ * Erweiterung, keine Reparatur, und sie gehoert entschieden.
+ *
+ * Solange sie fehlt, darf der Export das nicht verschweigen: die Oberflaeche
+ * bewirbt „Rig mit Positionen & Patch", und die Traverse IST das Rig. Der
+ * Export-Dialog nennt die Zahl der nicht enthaltenen Traversen; siehe
+ * ScheduleDialog.
+ *
+ * MVR ist ein reiner Ausgabeweg — es gibt keinen Importer, lights eigene
+ * Traversen bleiben also in der Projektdatei. Das ist eine Grenze, kein
+ * Verlust. Eine Grenze berechtigt aber nicht zum Schweigen.
+ */
 export function buildSceneDescription(fixtures: PlacedFixture[], _trusses: Truss[], projectName: string): string {
   const layerUuid = uuid();
   const typeIdFor = makeTypeIdMap();
