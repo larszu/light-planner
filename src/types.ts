@@ -390,6 +390,12 @@ export interface ProjectData {
    * den das Feld verhindern soll.
    */
   venueForeign?: { widthM?: number; heightM?: number };
+  /**
+   * ADR-005 — Personen-Felder aus einem eingelesenen Raum, die light nicht
+   * modelliert (Breite, Objekt-Art, Farbe), je Personen-Id. Ohne sie wurde aus
+   * einem MultiCam-Schlagzeug nach einem Round-Trip eine 0,5 m breite Person.
+   */
+  personForeign?: Record<string, import('./core/venueExchange').ForeignPersonFields>;
 }
 
 export interface FixtureGroup {
