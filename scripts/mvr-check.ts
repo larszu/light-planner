@@ -52,3 +52,28 @@ assert.equal(uuids.length, 3, 'drei Fixture-uuids');
 assert.equal(new Set(uuids).size, 3, 'alle Fixture-uuids sind eindeutig');
 
 console.log('✓ MVR FixtureTypeId-Identitaet ok (S4↔S4 gleich, Fresnel eigen, 1-basiert, uuids eindeutig)');
+
+// ── ADR-005, Regel 3: der MVR-Export verschweigt die Traversen nicht ─────────
+//
+// `buildSceneDescription` nimmt eine Traversen-Liste entgegen und schreibt
+// nichts davon — der Parameter heisst deshalb `_trusses`. Das ist als Grenze
+// vertretbar (MVR ist ein reiner Ausgabeweg, es gibt keinen Importer, lights
+// eigene Traversen bleiben in der Projektdatei). Nicht vertretbar war die
+// Zusage darueber: die Oberflaeche bewarb „Rig mit Positionen & Patch", und
+// die Traverse IST das Rig.
+//
+// Dieser Check haelt fest, was die Datei WIRKLICH enthaelt, damit die Zusage
+// nicht wieder auseinanderlaeuft.
+{
+  const withTruss = buildSceneDescription(
+    [] as never,
+    [{ id: 't1', x1: 0, y1: 0, x2: 5, y2: 0, height: 6 }] as never,
+    'Testanlage',
+  );
+  assert.ok(!/Truss/i.test(withTruss), 'die Szene behauptet keine Traverse');
+  assert.ok(
+    withTruss.includes('<ChildList>'),
+    'die Szene bleibt strukturell gueltig, auch ohne Traversen',
+  );
+  console.log('✓ ADR-005: der MVR-Export erfindet keine Traversen-Geometrie');
+}
