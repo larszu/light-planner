@@ -80,11 +80,12 @@ export interface LightVenueInput {
   appVersion: string;
   exportedAt: string;
   /**
-   * ADR-005 — Raum-Masse, die light nicht modelliert, aber eingelesen hat.
+   * ADR-005 — Raum-Masse UND Raum-Name, die light nicht modelliert, aber
+   * eingelesen hat.
    * Fehlen sie, schreibt der Export sie wie bisher nicht: light erfindet keine
    * Raumgroesse, es gibt nur zurueck, was es bekommen hat.
    */
-  venueForeign?: { widthM?: number; heightM?: number };
+  venueForeign?: { widthM?: number; heightM?: number; name?: string };
   /** Siehe ForeignPersonFields, je Personen-Id. */
   personForeign?: Record<string, ForeignPersonFields>;
 }
@@ -108,7 +109,11 @@ export function toVenueExchange(input: LightVenueInput): VenueExchange {
     appVersion: input.appVersion,
     exportedAt: input.exportedAt,
     venue: {
-      name: input.venueName || 'Venue',
+      // ADR-005 — Light kennt keinen Raum-Namen: `venueName` ist sein
+      // PROJEKTname. Hat es einen echten Raum-Namen eingelesen, gibt es ihn
+      // unveraendert zurueck, statt ihn mit dem Projektnamen zu ueberschreiben —
+      // aus „Grosse Halle" wurde sonst „Lichtplan Show A".
+      name: input.venueForeign?.name || input.venueName || 'Venue',
       ...(input.venueForeign?.widthM !== undefined ? { widthM: input.venueForeign.widthM } : {}),
       ...(input.venueForeign?.heightM !== undefined ? { heightM: input.venueForeign.heightM } : {}),
       persons: input.persons.map((p) => {
@@ -142,7 +147,7 @@ export interface LightVenueResult {
   stageElements: StageElement[];
   floorPlan: LightFloorPlan | null;
   /** Siehe LightVenueInput.venueForeign. Leer, wenn die Datei keine Masse trug. */
-  venueForeign: { widthM?: number; heightM?: number };
+  venueForeign: { widthM?: number; heightM?: number; name?: string };
   /** Siehe ForeignPersonFields. Nur Personen mit wirklich fremden Werten. */
   personForeign: Record<string, ForeignPersonFields>;
 }
@@ -183,6 +188,9 @@ export function fromVenueExchange(ex: VenueExchange): LightVenueResult {
     venueForeign: {
       ...(typeof v.widthM === 'number' ? { widthM: v.widthM } : {}),
       ...(typeof v.heightM === 'number' ? { heightM: v.heightM } : {}),
+      // 'Venue' ist der Platzhalter, den beide Apps schreiben, wenn sie nichts
+      // wissen — ihn aufzuheben hiesse zu behaupten, jemand habe ihn gewaehlt.
+      ...(v.name && v.name !== 'Venue' ? { name: v.name } : {}),
     },
     personForeign: collectPersonForeign(v.persons ?? []),
   };

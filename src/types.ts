@@ -389,7 +389,7 @@ export interface ProjectData {
    * State, waere jedes Speichern-und-neu-Oeffnen dazwischen genau der Verlust,
    * den das Feld verhindern soll.
    */
-  venueForeign?: { widthM?: number; heightM?: number };
+  venueForeign?: { widthM?: number; heightM?: number; name?: string };
   /**
    * ADR-005 — Personen-Felder aus einem eingelesenen Raum, die light nicht
    * modelliert (Breite, Objekt-Art, Farbe), je Personen-Id. Ohne sie wurde aus
