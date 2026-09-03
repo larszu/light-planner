@@ -25,7 +25,13 @@ assert.equal(isEstimate({ source: 'geschätzt: aus 750 W und Wirkungsgrad' }), t
 assert.equal(isEstimate({ source: 'geschaetzt aus dem Zoombereich' }), true);
 assert.equal(isEstimate({ source: '"Beam angle 19°" (Datenblatt S. 3)' }), false);
 assert.equal(isEstimate(undefined), false);
-console.log('✓ Schaetzung und Ablesung sind unterscheidbar');
+// Englisch ebenfalls: das Datenblatt, das hier hineingereicht wird, ist oft
+// englisch, und ein Modell antwortet gern in der Sprache der Vorlage. Ohne
+// diese Zeile ginge eine englisch formulierte Schaetzung als Beleg durch —
+// genau der Fehler, gegen den das Feld gebaut ist.
+assert.equal(isEstimate({ source: 'estimate: derived from the zoom range' }), true);
+assert.equal(isEstimate({ source: 'Estimated from the beam angle' }), true);
+console.log('✓ Schaetzung und Ablesung sind unterscheidbar, in beiden Sprachen');
 
 // 2) Ein Beleg, dessen Wert nicht mehr stimmt, sagt das.
 //    Der Fall, der sonst still luegt: das Modell las 19°, der Nutzer tippte

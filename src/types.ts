@@ -125,9 +125,24 @@ export const isStaleSource = (
   current: unknown,
 ): boolean => entry !== undefined && String(current) !== entry.value;
 
-/** Ein Beleg, der eine Schaetzung ist und keine Ablesung. */
+/**
+ * Ein Beleg, der eine Schaetzung ist und keine Ablesung.
+ *
+ * BEIDE SCHREIBWEISEN, und das ist kein Schmuck. Der Prompt hier verlangt
+ * „geschaetzt", der im multicam-planner verlangt „estimate:" — aber das
+ * Datenblatt, das hier hineingereicht wird, ist oft englisch, und ein Modell
+ * antwortet gern in der Sprache der Vorlage. Erkennt diese Funktion nur die
+ * deutsche Form, geht eine englisch formulierte Schaetzung als BELEG durch:
+ * genau der Fehler, gegen den das ganze Feld gebaut ist.
+ *
+ * Die Funktion ist mit der im multicam-planner Zeichen fuer Zeichen gleich.
+ * In der Suite haelt `apps/spec-source-vocabulary.test.ts` das fest — die
+ * beiden Kopien sind zweimal dieselbe Wahrheit, und zwei Orte laufen
+ * auseinander, wenn niemand nachsieht. Sie sind es schon einmal: die
+ * englische Haelfte kam zuerst nur im multicam-planner an.
+ */
 export const isEstimate = (entry: { source: string } | undefined): boolean =>
-  entry !== undefined && /gesch(ä|ae)tzt/i.test(entry.source);
+  entry !== undefined && /gesch(ä|ae)tzt|estimat/i.test(entry.source);
 
 export interface PlacedFixture {
   id: string;
