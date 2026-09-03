@@ -33,7 +33,7 @@ import InventoryDialog from './inventory/InventoryDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
 import { toVenueExchange, parseVenueExchange, fromVenueExchange, mergeOwnVenueFields } from './core/venueExchange';
-import { makeAvPlan, parseAvPlan, foreignDomainsField, avPlanImportWarning, type AvPlan } from './core/avplan';
+import { makeAvPlan, parseAvPlan, foreignDomainsField, avPlanImportWarning, pickUnknownDomains, type AvPlan } from './core/avplan';
 import { foreignCamerasFrom, type ForeignCamera } from './core/foreignView';
 import { APP_VERSION } from './version';
 import { useUiStore } from './store/uiStore';
@@ -793,7 +793,14 @@ const App: React.FC = () => {
 
   // ── Gesamtprojekt (.avplan): verlustfreier Austausch aller drei Domaenen.
   // Light bearbeitet "lighting" nativ, reicht "cameras"/"cabling" 1:1 durch.
-  const preservedDomainsRef = useRef<{ cameras?: unknown; cabling?: unknown }>({});
+  // `unknownDomains` sind Slots, die das FORMAT nicht benennt — eine kuenftige
+  // Audio- oder Rigging-Domaene. Sie gingen bisher in jeder Richtung still
+  // verloren; jetzt reisen sie unveraendert mit.
+  const preservedDomainsRef = useRef<{
+    cameras?: unknown;
+    cabling?: unknown;
+    unknownDomains?: Record<string, unknown>;
+  }>({});
 
   const handleExportAvplan = useCallback(async () => {
     const fp = floorPlan ? (() => { const { image: _img, ...rest } = floorPlan; return rest; })() : null;
@@ -813,6 +820,9 @@ const App: React.FC = () => {
           trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
           floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
         } satisfies ProjectData,
+        // Fremde Slots zuerst, damit ein gleichnamiger fremder Slot nie den
+        // eigenen ueberschreiben kann.
+        ...(preservedDomainsRef.current.unknownDomains ?? {}),
         cameras: preservedDomainsRef.current.cameras,
         cabling: preservedDomainsRef.current.cabling,
       },
@@ -864,7 +874,11 @@ const App: React.FC = () => {
       floorPlan: merged.floorPlan ?? undefined,
     });
     // Fremde Domaenen verlustfrei fuer die naechste Ausgabe merken.
-    preservedDomainsRef.current = { cameras: avplan.domains.cameras, cabling: avplan.domains.cabling };
+    preservedDomainsRef.current = {
+      cameras: avplan.domains.cameras,
+      cabling: avplan.domains.cabling,
+      unknownDomains: pickUnknownDomains(avplan),
+    };
     preservedVenueRef.current = r.venueForeign;
     preservedPersonsRef.current = r.personForeign;
     // Read-only Kameras zum Einsehen im 2D-Plan.
