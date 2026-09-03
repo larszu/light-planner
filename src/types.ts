@@ -136,7 +136,7 @@ export const isStaleSource = (
  * genau der Fehler, gegen den das ganze Feld gebaut ist.
  *
  * Die Funktion ist mit der im multicam-planner Zeichen fuer Zeichen gleich.
- * In der Suite haelt `apps/spec-source-vocabulary.test.ts` das fest — die
+ * In der Suite haelt `scripts/spec-source-vocabulary.mjs` das fest — die
  * beiden Kopien sind zweimal dieselbe Wahrheit, und zwei Orte laufen
  * auseinander, wenn niemand nachsieht. Sie sind es schon einmal: die
  * englische Haelfte kam zuerst nur im multicam-planner an.
