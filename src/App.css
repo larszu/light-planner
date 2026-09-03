@@ -2620,3 +2620,14 @@ kbd {
 .dock-body .sidebar-header h2 { display: none; }
 .dock-body .sidebar-header { padding: 8px 12px 2px; }
 .dock-body .sidebar-hint { font-size: 11px; color: var(--text3); }
+
+/* Beleg-Marker an den Kenndaten-Feldern (Datenblatt-Extraktion).
+   Der Wert bleibt der Wert; der Marker sagt, worauf er sich stuetzt. */
+.spec-src {
+  margin-left: 0.3em;
+  font-size: 0.85em;
+  color: #6ab04c;
+  cursor: help;
+}
+.spec-src-est { color: #d9a441; }
+.spec-src-stale { color: #d96a4a; font-weight: 700; }

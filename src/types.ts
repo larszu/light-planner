@@ -96,7 +96,38 @@ export interface Fixture {
   dmxChannels?: number;
   // ── Attachments ──
   compatibleAttachments?: Attachment[];
+  /**
+   * Woher die Kenndaten stammen — Feldname -> Beleg.
+   *
+   * WARUM DAS FELD EXISTIERT. Die Datenblatt-Extraktion verlangt vom Modell
+   * ausdruecklich zu JEDEM gelieferten Wert eine Quelle: ein woertliches
+   * Zitat aus dem Datenblatt oder, wo der Wert nicht dort stand, eine als
+   * „geschaetzt" gekennzeichnete Begruendung. Der Dialog zeigt diese Tabelle
+   * auch an und hebt die Schaetzungen farblich hervor.
+   *
+   * Beim Speichern ging das alles verloren. Danach war eine GESCHAETZTE
+   * Streuwinkel-Angabe nicht mehr von einer abgelesenen und beide nicht von
+   * einer von Hand getippten zu unterscheiden — waehrend genau diese Zahl in
+   * die Lichtberechnung und die 3D-Darstellung eingeht. Der Beleg war da und
+   * wurde im letzten Schritt weggeworfen.
+   *
+   * `value` ist der Wert, DEN DER BELEG STUETZT. Aendert der Nutzer das Feld
+   * danach von Hand, steht hier weiterhin der alte Wert — und die Anzeige
+   * kann sagen, dass der Beleg nicht mehr passt, statt ihn stillschweigend
+   * auf die neue Zahl zu beziehen.
+   */
+  specSource?: Record<string, { value: string; source: string }>;
 }
+
+/** Ein Beleg, dessen Wert nicht mehr zum Feld passt — der Nutzer hat es geaendert. */
+export const isStaleSource = (
+  entry: { value: string; source: string } | undefined,
+  current: unknown,
+): boolean => entry !== undefined && String(current) !== entry.value;
+
+/** Ein Beleg, der eine Schaetzung ist und keine Ablesung. */
+export const isEstimate = (entry: { source: string } | undefined): boolean =>
+  entry !== undefined && /gesch(ä|ae)tzt/i.test(entry.source);
 
 export interface PlacedFixture {
   id: string;

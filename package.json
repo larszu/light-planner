@@ -17,7 +17,8 @@
     "venue:check": "node --experimental-strip-types scripts/venue-exchange-check.ts",
     "avplan:check": "node --experimental-strip-types scripts/avplan-check.ts",
     "inventory:check": "node --experimental-strip-types scripts/inventory-contract-check.ts",
-    "mvr:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/mvr-check.ts"
+    "mvr:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/mvr-check.ts",
+    "spec:check": "node --experimental-strip-types scripts/spec-source-check.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^6.0.227",

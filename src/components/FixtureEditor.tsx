@@ -121,6 +121,15 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
       ipRating: ipRating || undefined,
       dmxChannels: dmxChannels || undefined,
       photometric: hasPhotometric ? { lux: photoLux, distance: photoDistance, beamAngle, colorTemp: colorTemp || 5600 } : undefined,
+      // Den Beleg mitnehmen. Er stand bis hierher in `aiVerification`, wurde
+      // im Dialog angezeigt („bitte pruefen") — und beim Speichern verworfen.
+      // Danach war eine geschaetzte Zahl von einer abgelesenen nicht mehr zu
+      // unterscheiden, obwohl das Modell den Unterschied geliefert hatte.
+      specSource: aiVerification?.length
+        ? Object.fromEntries(
+            aiVerification.map((v) => [v.field, { value: v.value, source: v.source }]),
+          )
+        : initial?.specSource,
     };
     onSave(fixture);
   };
