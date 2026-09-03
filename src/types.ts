@@ -374,7 +374,12 @@ export interface ProjectData {
    * Export ein vollstaendiger Verlust des Kamera- und Kabelplans. Opak
    * durchgereicht, nie interpretiert.
    */
-  avForeign?: { cameras?: unknown; cabling?: unknown };
+  avForeign?: {
+    cameras?: unknown;
+    cabling?: unknown;
+    /** Slots, die das Format nicht benennt — unveraendert mitgefuehrt. */
+    unknownDomains?: Record<string, unknown>;
+  };
   /**
    * ADR-005 — Raum-Masse aus einem eingelesenen Venue, die light-planner nicht
    * modelliert.

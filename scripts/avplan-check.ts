@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   makeAvPlan, parseAvPlan, AVPLAN_KIND, foreignDomainsField,
   avPlanImportWarning, avPlanContentCount,
+  KNOWN_DOMAIN_SLOTS, unknownDomainSlots, pickUnknownDomains,
 } from '../src/core/avplan.ts';
 
 // Eine reichhaltige Lighting-Domaene (so wuerde light sie schreiben).
@@ -127,5 +128,70 @@ for (const key of Object.keys(leer) as Array<keyof typeof leer>) {
   assert.ok(avPlanImportWarning(false, nur), `${key} allein loest keine Rueckfrage aus`);
 }
 console.log('\u2713 Import ohne Licht-Domaene fragt nach, statt still zu leeren');
+
+// ───────────────────────────────────────────────────────────────────────────
+// ADR-005 Design-Frage 4 — ein Slot, den DIESES Format nicht benennt.
+//
+// Gemessener Ausgangszustand: keine der drei Apps reichte einen vierten
+// Domaenen-Slot durch. `parseAvPlan` nahm die Datei trotzdem an — weder
+// bewahrt noch verweigert noch gemeldet, also das einzige der drei denkbaren
+// Verhalten, das nicht vertretbar ist. Entschieden: bewahren.
+// ───────────────────────────────────────────────────────────────────────────
+const mitFremd = makeAvPlan({
+  app: 'irgendwer', appVersion: '9.9.9', exportedAt: 't', venue,
+  domains: { lighting, audio: { channels: 32 }, rigging: { points: 4 } },
+});
+
+assert.deepEqual(unknownDomainSlots(mitFremd), ['audio', 'rigging']);
+assert.deepEqual(pickUnknownDomains(mitFremd), { audio: { channels: 32 }, rigging: { points: 4 } });
+
+// Ein leerer Slot ist keine Aussage und nichts zum Bewahren.
+assert.deepEqual(
+  unknownDomainSlots(makeAvPlan({
+    app: 'x', appVersion: '1', exportedAt: 't', venue,
+    domains: { lighting, audio: undefined },
+  })),
+  [],
+);
+
+// Keiner der drei bekannten Slots darf als fremd gelten.
+for (const slot of KNOWN_DOMAIN_SLOTS) {
+  const nurDieser = makeAvPlan({
+    app: 'x', appVersion: '1', exportedAt: 't', venue, domains: { [slot]: {} },
+  });
+  assert.deepEqual(unknownDomainSlots(nurDieser), [], `${slot} gilt faelschlich als fremd`);
+}
+
+// Der ganze Weg: Datei -> parse -> natives Speichern -> Export -> parse.
+const gelesen = parseAvPlan(JSON.stringify(mitFremd));
+const imFile = foreignDomainsField({
+  cameras: gelesen.domains.cameras,
+  cabling: gelesen.domains.cabling,
+  unknownDomains: pickUnknownDomains(gelesen),
+});
+assert.deepEqual(imFile.avForeign?.unknownDomains, { audio: { channels: 32 }, rigging: { points: 4 } });
+
+const wiederRaus = makeAvPlan({
+  app: 'light-planner', appVersion: '1', exportedAt: 't', venue,
+  domains: {
+    ...(imFile.avForeign?.unknownDomains ?? {}),
+    lighting,
+    cameras: imFile.avForeign?.cameras,
+    cabling: imFile.avForeign?.cabling,
+  },
+});
+const final = parseAvPlan(JSON.stringify(wiederRaus));
+assert.deepEqual(final.domains.audio, { channels: 32 }, 'fremder Slot ueberlebt die Runde nicht');
+assert.deepEqual(final.domains.rigging, { points: 4 });
+// Und der eigene Slot bleibt der eigene.
+assert.ok(final.domains.lighting, 'eigener Slot verloren');
+
+// Ein leeres Fremd-Fach gehoert nicht ins File — sonst steht in jedem
+// Projekt ein `unknownDomains: {}`, das nichts aussagt.
+assert.equal(foreignDomainsField({ unknownDomains: {} }).avForeign, undefined);
+
+// Kein Versionssprung: das Durchreichen ist keine neue Format-Version.
+assert.equal(final.formatVersion, 1);
+console.log('\u2713 ADR-005: unbekannte Domaenen-Slots ueberleben jede Richtung');
 
 console.log('\nAlle .avplan-Verlustfreiheits-Checks bestanden.');
