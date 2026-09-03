@@ -85,3 +85,59 @@ export function foreignDomainsField(preserved: {
     ? { avForeign: { ...preserved } }
     : {};
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// ADR-005, Regel 3 — was der .avplan-Import mit dem aktuellen Stand macht.
+//
+// Der Import ersetzt das offene Projekt. Traegt die Datei KEINE lighting-
+// Domaene, ersetzt er es durch ein LEERES: der Nutzer oeffnet einen geteilten
+// Plan aus dem Cable-Planner, um sich die Verkabelung anzusehen, und sein
+// Rig ist weg. Kein Hinweis, keine Rueckfrage, kein Undo (der Import leert
+// die History).
+//
+// „Datei oeffnen ersetzt das Dokument" ist fuer sich genommen richtig. Falsch
+// war das Schweigen: `handleNew` in derselben Datei fragt seit jeher nach,
+// bevor es Inhalt verwirft — der gefaehrlichere Weg fragte nicht.
+//
+// Als reine Funktion, weil die Entscheidung pruefbar sein muss; der
+// light-planner hat kein vitest, also haengt die Pruefung an
+// scripts/avplan-check.ts (laeuft in ci.yml).
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Was im offenen Projekt steht und beim Import verloren ginge. */
+export interface AvPlanCurrentContent {
+  fixtures: number;
+  trusses: number;
+  scenes: number;
+  walls: number;
+  stageElements: number;
+  shapes: number;
+  ceilings: number;
+  persons: number;
+  hasFloorPlan: boolean;
+}
+
+export const avPlanContentCount = (c: AvPlanCurrentContent): number =>
+  c.fixtures + c.trusses + c.scenes + c.walls + c.stageElements + c.shapes +
+  c.ceilings + c.persons + (c.hasFloorPlan ? 1 : 0);
+
+/**
+ * Der Text, den der Nutzer VOR dem Import sehen muss — oder `null`, wenn es
+ * nichts zu verlieren gibt.
+ *
+ * Zwei Faelle, bewusst unterschiedlich scharf:
+ *  - Die Datei bringt eine lighting-Domaene mit: normales Oeffnen, das
+ *    Dokument wird ersetzt. Nachfrage wie bei `handleNew`.
+ *  - Die Datei bringt KEINE mit: das Ergebnis ist ein leerer Lichtplan. Das
+ *    ist der Fall, den niemand erwartet, und er wird ausdruecklich benannt.
+ */
+export function avPlanImportWarning(
+  hasLightingDomain: boolean,
+  current: AvPlanCurrentContent,
+): string | null {
+  if (avPlanContentCount(current) === 0) return null;
+  const bestand = `${current.fixtures} Lampen, ${current.trusses} Trussen, ${current.scenes} Szenen`;
+  return hasLightingDomain
+    ? `Diese .avplan ersetzt das offene Projekt (${bestand}). Nicht gespeicherte Aenderungen gehen verloren. Fortfahren?`
+    : `Diese .avplan enthaelt KEINE Licht-Domaene. Der offene Lichtplan (${bestand}) wird durch einen leeren ersetzt. Fortfahren?`;
+}
