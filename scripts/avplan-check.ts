@@ -1,7 +1,10 @@
 // Headless-Check fuer das .avplan-Gesamtformat (verlustfrei).
 // Lauf: `npm run avplan:check`  (node --experimental-strip-types).
 import assert from 'node:assert/strict';
-import { makeAvPlan, parseAvPlan, AVPLAN_KIND, foreignDomainsField } from '../src/core/avplan.ts';
+import {
+  makeAvPlan, parseAvPlan, AVPLAN_KIND, foreignDomainsField,
+  avPlanImportWarning, avPlanContentCount,
+} from '../src/core/avplan.ts';
 
 // Eine reichhaltige Lighting-Domaene (so wuerde light sie schreiben).
 const lighting = {
@@ -84,5 +87,45 @@ assert.deepEqual(foreignDomainsField({ cabling: { equipment: [] } }).avForeign, 
   cabling: { equipment: [] },
 });
 console.log('✓ ADR-005: Fremd-Domaenen ueberleben das native Speichern');
+
+
+// ── ADR-005, Regel 3 — der Import ersetzt das offene Projekt ────────────────
+//
+// Traegt die Datei keine lighting-Domaene, ersetzt er es durch ein LEERES:
+// der Nutzer oeffnet einen geteilten Plan aus dem Cable-Planner, um sich die
+// Verkabelung anzusehen, und sein Rig ist weg. Kein Hinweis, keine Rueckfrage,
+// kein Undo — der Import leert die History. `handleNew` in derselben Datei
+// fragt seit jeher nach, bevor es Inhalt verwirft; der gefaehrlichere Weg
+// fragte nicht.
+const leer = {
+  fixtures: 0, trusses: 0, scenes: 0, walls: 0, stageElements: 0,
+  shapes: 0, ceilings: 0, persons: 0, hasFloorPlan: false,
+};
+const rig = { ...leer, fixtures: 12, trusses: 3, scenes: 4 };
+
+// Nichts zu verlieren -> keine Rueckfrage. Der Hinweis darf nicht zur
+// Klickgewohnheit werden, sonst liest ihn niemand mehr.
+assert.equal(avPlanImportWarning(true, leer), null);
+assert.equal(avPlanImportWarning(false, leer), null);
+
+// Datei OHNE Licht-Domaene: der Fall, den niemand erwartet, wird benannt.
+const ohne = avPlanImportWarning(false, rig);
+assert.ok(ohne && ohne.includes('KEINE Licht-Domaene'), 'fehlende Domaene muss benannt werden');
+assert.ok(ohne.includes('12 Lampen'), 'der Bestand muss beziffert sein');
+assert.ok(ohne.includes('leeren'), 'das Ergebnis muss benannt sein');
+
+// Datei MIT Licht-Domaene: normales Oeffnen, aber es ersetzt trotzdem.
+const mit = avPlanImportWarning(true, rig);
+assert.ok(mit && !mit.includes('KEINE Licht-Domaene'));
+assert.ok(mit.includes('ersetzt das offene Projekt'));
+
+// Jedes einzelne Feld zaehlt — sonst rutscht ein Projekt, das nur aus Waenden
+// oder nur aus einem Gebaeudeplan besteht, ungefragt durch.
+for (const key of Object.keys(leer) as Array<keyof typeof leer>) {
+  const nur = { ...leer, [key]: key === 'hasFloorPlan' ? true : 1 };
+  assert.equal(avPlanContentCount(nur), 1, `${key} zaehlt nicht zum Bestand`);
+  assert.ok(avPlanImportWarning(false, nur), `${key} allein loest keine Rueckfrage aus`);
+}
+console.log('\u2713 Import ohne Licht-Domaene fragt nach, statt still zu leeren');
 
 console.log('\nAlle .avplan-Verlustfreiheits-Checks bestanden.');

@@ -33,7 +33,7 @@ import InventoryDialog from './inventory/InventoryDialog';
 import { drawHeatMapLegend } from './utils/heatmapLegend';
 import { useHost } from './integration/hostContext';
 import { toVenueExchange, parseVenueExchange, fromVenueExchange, mergeOwnVenueFields } from './core/venueExchange';
-import { makeAvPlan, parseAvPlan, foreignDomainsField, type AvPlan } from './core/avplan';
+import { makeAvPlan, parseAvPlan, foreignDomainsField, avPlanImportWarning, type AvPlan } from './core/avplan';
 import { foreignCamerasFrom, type ForeignCamera } from './core/foreignView';
 import { APP_VERSION } from './version';
 import { useUiStore } from './store/uiStore';
@@ -835,6 +835,15 @@ const App: React.FC = () => {
       kind: 'venue-exchange', formatVersion: 1, app: avplan.app,
       appVersion: avplan.appVersion, exportedAt: avplan.exportedAt, venue: avplan.venue,
     });
+    // ADR-005, Regel 3 — der Import ersetzt das offene Projekt, und ohne
+    // lighting-Domaene durch ein LEERES. `handleNew` fragt seit jeher nach,
+    // bevor es Inhalt verwirft; der gefaehrlichere Weg fragte nicht.
+    const warnung = avPlanImportWarning(avplan.domains.lighting !== undefined, {
+      fixtures: fixtures.length, trusses: trusses.length, scenes: scenes.length,
+      walls: walls.length, stageElements: stageElements.length, shapes: shapes.length,
+      ceilings: ceilings.length, persons: persons.length, hasFloorPlan: !!floorPlan,
+    });
+    if (warnung && !window.confirm(warnung)) return;
     const now = new Date().toISOString();
     const lighting = avplan.domains.lighting as ProjectData | undefined;
     const base: ProjectData = lighting ?? {
@@ -860,7 +869,8 @@ const App: React.FC = () => {
     preservedPersonsRef.current = r.personForeign;
     // Read-only Kameras zum Einsehen im 2D-Plan.
     setForeignCameras(foreignCamerasFrom(avplan.domains.cameras));
-  }, [host, handleLoadProject, customFixtures]);
+  }, [host, handleLoadProject, customFixtures, fixtures, trusses, scenes, walls,
+      stageElements, shapes, ceilings, persons, floorPlan]);
 
   const handleImportVenue = useCallback(async () => {
     const res = await host.openProjectFile();
