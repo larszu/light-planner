@@ -21,6 +21,7 @@ import {
   type InventorySnapshot,
 } from '../src/inventory/portable.ts';
 import type { InventoryItem, StorageNode, InventorySet, InventoryUnit } from '../src/inventory/types.ts';
+import { mergeById, mergeDefined } from '../src/inventory/merge.ts';
 
 // Eingefrorener Contract — MUSS in allen drei Repos identisch sein.
 const CONTRACT = {
@@ -88,5 +89,45 @@ assert.equal(parseInventory(JSON.stringify({ format: 'something-else', version: 
 assert.equal(parseInventory(JSON.stringify({ format: CONTRACT.format, version: CONTRACT.version + 1 })), null);
 assert.equal(parseInventory('not json'), null);
 console.log('✓ parse lehnt fremdes Format / hoehere Version ab');
+
+// 6) ADR-005, Regel 2 — Zusammenfuehren nimmt nichts weg.
+//
+// Der Import nahm im Modus „merge" den eingehenden Datensatz als GANZES
+// (`byId.set(x.id, x)`). Eine v1-Datei aus der Zeit vor ADR-002 traegt keine
+// `deviceTypeId`; stand im lokalen Lager derselbe Artikel MIT bestaetigter
+// Typ-Identitaet, war sie nach dem Import weg. Diese Pruefungen stehen
+// sinngleich im cable-planner (tests/inventoryMerge.test.ts) und im
+// multicam-planner (src/__tests__/merge.test.ts).
+assert.equal(
+  mergeDefined({ id: 'a', deviceTypeId: 'dt-1' }, { id: 'a', deviceTypeId: undefined }).deviceTypeId,
+  'dt-1',
+);
+// Leerer String ist eine Aussage, undefined ist keine — der Unterschied ist
+// der ganze Punkt.
+assert.equal(mergeDefined({ notes: 'alt' }, { notes: '' }).notes, '');
+assert.deepEqual(mergeDefined({ q: 5, l: true }, { q: 0, l: false }), { q: 0, l: false });
+
+const bestand = [
+  { id: 'i1', model: 'ULXD2', deviceTypeId: 'dt-shure-ulxd2', notes: 'Regal A3' },
+  { id: 'i2', model: 'SM58' },
+];
+const nachV1Import = mergeById(bestand, [
+  { id: 'i1', model: 'ULXD2', deviceTypeId: undefined, notes: undefined },
+]);
+const i1 = nachV1Import.find((x) => x.id === 'i1');
+assert.equal(i1?.deviceTypeId, 'dt-shure-ulxd2');
+assert.equal(i1?.notes, 'Regal A3');
+
+// Der Import bleibt ein Import: was die Datei SAGT, wird uebernommen.
+const nachEchtemImport = mergeById(bestand, [{ id: 'i1', model: 'ULXD2', notes: 'Case 7' }]);
+assert.equal(nachEchtemImport.find((x) => x.id === 'i1')?.notes, 'Case 7');
+assert.equal(nachEchtemImport.find((x) => x.id === 'i1')?.deviceTypeId, 'dt-shure-ulxd2');
+
+// Unbekannte Artikel kommen dazu, die Reihenfolge des Bestands bleibt.
+assert.deepEqual(
+  mergeById(bestand, [{ id: 'i9', model: 'Neu' }]).map((x) => x.id),
+  ['i1', 'i2', 'i9'],
+);
+console.log('✓ Zusammenfuehren nimmt nichts weg (ADR-005 Regel 2)');
 
 console.log('\nAlle avplan-inventory Wire-Contract-Checks bestanden.');
