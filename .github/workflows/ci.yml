@@ -45,7 +45,16 @@ jobs:
       - name: i18n — erreichbare Oberflaeche uebersetzt
         run: npm run i18n:check
 
+      - name: MVR-Export — Fixture-Typ-Identitaet
+        run: npm run mvr:check
+
       - name: Herkunft der Kenndaten
         run: npm run spec:check
+
+      # Zuletzt und bewusst: dieser Lauf prueft, dass die Liste darueber
+      # vollstaendig ist. `mvr:check` fehlte hier bis 2026-09-04 — er
+      # existierte, war gruen, und lief bei keinem Merge.
+      - name: Jeder Pruef-Lauf steht auch im Workflow
+        run: npm run ci:complete
       - name: Build (inkl. Type-Check)
         run: npm run build
