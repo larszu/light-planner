@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { ProjectMeta, ProjectData } from '../types';
+import { useTranslation } from '../i18n';
 
 interface Props {
   mode: 'save' | 'load';
@@ -52,6 +53,7 @@ export function deleteProjectFromStorage(id: string) {
 }
 
 const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onDelete, onCancel, onSaveToFile, onLoadFromFile }) => {
+  const { t, language } = useTranslation();
   const [name, setName] = useState(currentMeta?.name ?? '');
   const [author, setAuthor] = useState(currentMeta?.author ?? '');
   const [version, setVersion] = useState(currentMeta?.version ?? '1.0');
@@ -84,35 +86,38 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
     return (
       <div className="modal-backdrop" onClick={onCancel}>
         <div className="modal project-modal" onClick={(e) => e.stopPropagation()}>
-          <h3>Projekt speichern</h3>
+          <h3>{t('dlg.proj.saveTitle', 'Projekt speichern')}</h3>
           <div className="editor-grid">
-            <label>Projektname*
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mein Lichtplan" />
+            <label>{t('dlg.proj.name', 'Projektname')}*
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('dlg.proj.namePh', 'Mein Lichtplan')} />
             </label>
-            <label>Autor
-              <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Name" />
+            <label>{t('dlg.proj.author', 'Autor')}
+              <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder={t('dlg.proj.authorPh', 'Name')} />
             </label>
-            <label>Version
+            <label>{t('dlg.proj.version', 'Version')}
               <input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="1.0" />
             </label>
-            <label>Notizen
-              <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Beschreibung…" />
+            <label>{t('dlg.proj.notes', 'Notizen')}
+              <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('dlg.proj.notesPh', 'Beschreibung…')} />
             </label>
           </div>
+          {/* Drei Schluessel, weil zwei Auszeichnungen mitten im Absatz stehen
+              (<strong> und <em>). Ein Satz um Markup herum zerschnitten ist die
+              haeufigste Art, eine Uebersetzung unuebersetzbar zu machen -- hier
+              ist jeder Teil fuer sich ein vollstaendiges Satzstueck. */}
           <p className="dialog-hint storage-hint">
-            <strong>Wo wird gespeichert?</strong> „Speichern" legt das Projekt im
-            lokalen Speicher dieses Geräts/Browsers ab – ohne sichtbaren Dateipfad
-            und an dieses Gerät gebunden. Für eine echte Datei mit frei wählbarem
-            Speicherort nutze <em>„Als Datei speichern…"</em>.
+            <strong>{t('dlg.proj.whereHead', 'Wo wird gespeichert?')}</strong>{' '}
+            {t('dlg.proj.whereBody', '„Speichern" legt das Projekt im lokalen Speicher dieses Geräts/Browsers ab – ohne sichtbaren Dateipfad und an dieses Gerät gebunden. Für eine echte Datei mit frei wählbarem Speicherort nutze')}{' '}
+            <em>{t('dlg.proj.whereFile', '„Als Datei speichern…"')}</em>.
           </p>
           <div className="modal-actions">
-            <button onClick={onCancel}>Abbrechen</button>
+            <button onClick={onCancel}>{t('common.cancel', 'Abbrechen')}</button>
             {onSaveToFile && (
-              <button onClick={() => { onSaveToFile(); onCancel(); }} title="Als Projektdatei an einem selbst gewählten Ort speichern">
-                Als Datei speichern…
+              <button onClick={() => { onSaveToFile(); onCancel(); }} title={t('dlg.proj.toFileHint', 'Als Projektdatei an einem selbst gewählten Ort speichern')}>
+                {t('dlg.proj.toFile', 'Als Datei speichern…')}
               </button>
             )}
-            <button className="primary" onClick={handleSave} disabled={!name.trim()}>Speichern (Gerät)</button>
+            <button className="primary" onClick={handleSave} disabled={!name.trim()}>{t('dlg.proj.saveDevice', 'Speichern (Gerät)')}</button>
           </div>
         </div>
       </div>
@@ -123,11 +128,11 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal project-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Projekt laden</h3>
+        <h3>{t('dlg.proj.loadTitle', 'Projekt laden')}</h3>
         {projects.length === 0 ? (
           <p className="dialog-hint">
-            Keine im Gerät gespeicherten Projekte vorhanden.
-            {onLoadFromFile && ' Eine Projektdatei (.lightplan.json) kannst du unten über „Aus Datei laden…" öffnen.'}
+            {t('dlg.proj.empty', 'Keine im Gerät gespeicherten Projekte vorhanden.')}
+            {onLoadFromFile && ` ${t('dlg.proj.emptyFile', 'Eine Projektdatei (.lightplan.json) kannst du unten über „Aus Datei laden…" öffnen.')}`}
           </p>
         ) : (
           <div className="project-list">
@@ -136,22 +141,26 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
                 <div className="project-list-info" onClick={() => onLoad(p.data, p.id)}>
                   <div className="project-list-name">{p.meta.name}</div>
                   <div className="project-list-meta">
-                    v{p.meta.version} · {p.meta.author || 'Kein Autor'}
+                    v{p.meta.version} · {p.meta.author || t('dlg.proj.noAuthor', 'Kein Autor')}
                     {' · '}
-                    {new Date(p.meta.updatedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    {/* Das Gebietsschema war fest auf de-DE: ein englischer
+                        Nutzer bekam sonst 04.09.2026 statt 04/09/2026. Eine
+                        Uebersetzung, die das Datumsformat stehen laesst, ist
+                        halb. */}
+                    {new Date(p.meta.updatedAt).toLocaleDateString(language === 'en' ? 'en-GB' : 'de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </div>
                   {p.meta.notes && <div className="project-list-notes">{p.meta.notes}</div>}
                 </div>
-                <button className="project-delete-btn" onClick={() => handleDelete(p.id)} title="Löschen">✕</button>
+                <button className="project-delete-btn" onClick={() => handleDelete(p.id)} title={t('common.delete', 'Löschen')}>✕</button>
               </div>
             ))}
           </div>
         )}
         <div className="modal-actions">
-          <button onClick={onCancel}>Schließen</button>
+          <button onClick={onCancel}>{t('common.close', 'Schließen')}</button>
           {onLoadFromFile && (
-            <button className="primary" onClick={() => { onLoadFromFile(); onCancel(); }} title="Eine zuvor exportierte Projektdatei öffnen">
-              Aus Datei laden…
+            <button className="primary" onClick={() => { onLoadFromFile(); onCancel(); }} title={t('dlg.proj.fromFileHint', 'Eine zuvor exportierte Projektdatei öffnen')}>
+              {t('dlg.proj.fromFile', 'Aus Datei laden…')}
             </button>
           )}
         </div>

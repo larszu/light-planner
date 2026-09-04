@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from '../i18n';
 import type { Layers, LayerKey } from '../types';
 
 interface Props {
@@ -22,13 +23,14 @@ const ROWS: { key: LayerKey; icon: string; label: string }[] = [
 
 // Floating "Ebenen" overview: toggle visibility (eye) and lock per category.
 const LayersPanel: React.FC<Props> = ({ layers, counts, onToggleVisible, onToggleLocked }) => {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className={`layers-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="lp-header">
         <span className="lp-title">🗂 Ebenen</span>
-        <button className="lp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? 'Aufklappen' : 'Einklappen'}>
+        <button className="lp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Aufklappen') : t('panel.collapse', 'Einklappen')}>
           {collapsed ? '▸' : '▾'}
         </button>
       </div>
@@ -42,12 +44,12 @@ const LayersPanel: React.FC<Props> = ({ layers, counts, onToggleVisible, onToggl
                 <button
                   className="lp-eye"
                   onClick={() => onToggleVisible(key)}
-                  title={l.visible ? 'Ausblenden' : 'Einblenden'}
+                  title={l.visible ? t('panel.layers.hide', 'Ausblenden') : t('panel.layers.show', 'Einblenden')}
                 >{l.visible ? '👁' : '🚫'}</button>
                 <button
                   className={`lp-lock ${l.locked ? 'on' : ''}`}
                   onClick={() => onToggleLocked(key)}
-                  title={l.locked ? 'Entsperren' : 'Sperren (nicht auswählbar)'}
+                  title={l.locked ? t('panel.layers.unlock', 'Entsperren') : t('panel.layers.lock', 'Sperren (nicht auswählbar)')}
                 >{l.locked ? '🔒' : '🔓'}</button>
                 <span className="lp-name"><span className="lp-ico">{icon}</span>{label}</span>
                 <span className="lp-count">{n}</span>

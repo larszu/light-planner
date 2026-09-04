@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { LightSide, LightArea, AreaLightConfig } from '../core/autoLighting';
 import { fixtureLibrary } from '../core/fixtureLibrary';
+import { useTranslation } from '../i18n';
 import type { Fixture, Truss } from '../types';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 const WASH_CATEGORIES = ['fresnel', 'wash', 'flood', 'par', 'cyc', 'led-panel'];
 
 const AreaLightDialog: React.FC<Props> = ({ area, defaultTargetLux, trusses, onGenerate, onCancel }) => {
+  const { t } = useTranslation();
   const [sides, setSides] = useState<Set<LightSide>>(new Set<LightSide>(['N', 'S']));
   const [targetLux, setTargetLux] = useState(defaultTargetLux > 0 ? defaultTargetLux : 1000);
   const washFixtures = fixtureLibrary.filter((f) => WASH_CATEGORIES.includes(f.category));
@@ -34,12 +36,14 @@ const AreaLightDialog: React.FC<Props> = ({ area, defaultTargetLux, trusses, onG
   const setPreset = (arr: LightSide[]) => setSides(new Set(arr));
 
   const submit = () => {
-    const t = trusses.find((tr) => tr.id === trussId);
-    if (!t && sides.size === 0) return;
+    // Hiess frueher `t` -- seit die Uebersetzerfunktion so heisst, waere das
+    // eine Verdeckung, die erst beim naechsten t()-Aufruf hier auffaellt.
+    const sel = trusses.find((tr) => tr.id === trussId);
+    if (!sel && sides.size === 0) return;
     const fixture = fixtureLibrary.find((f) => f.id === fixtureId) as Fixture | undefined;
     onGenerate({
       sides: [...sides], targetLux, fixture, cross,
-      truss: t ? { x1: t.x1, y1: t.y1, x2: t.x2, y2: t.y2, height: t.height } : undefined,
+      truss: sel ? { x1: sel.x1, y1: sel.y1, x2: sel.x2, y2: sel.y2, height: sel.height } : undefined,
       throwDistance: distance,
     });
   };
@@ -49,38 +53,46 @@ const AreaLightDialog: React.FC<Props> = ({ area, defaultTargetLux, trusses, onG
       type="button"
       className={`compass-btn ${cls} ${sides.has(s) ? 'on' : ''}`}
       onClick={() => toggle(s)}
-      title={`Licht von ${label}`}
+      title={`${t('dlg.area.lightFrom', 'Licht von')} ${label}`}
     >{label[0]}</button>
   );
 
   return (
     <div className="modal-overlay" onMouseDown={onCancel}>
       <div className="modal area-light-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h3>🔆 Fläche ausleuchten</h3>
+        <h3>🔆 {t('dlg.area.title', 'Fläche ausleuchten')}</h3>
+        {/* Zwei Schluessel statt einem: die Groesse steht fett MITTEN im Satz.
+            Ein einziger Schluessel mit Platzhalter koennte die Auszeichnung
+            nicht tragen, und ein Satz um das Markup herum zerschnitten ist die
+            haeufigste Art, eine Uebersetzung unuebersetzbar zu machen. */}
         <p className="dialog-hint">
-          Markierte Fläche <strong>{w} × {d} m</strong>. Wähle, von welchen Seiten das Licht kommen soll –
-          der Ziel-Lux-Wert wird unabhängig von der Seitenzahl gleichmäßig erreicht.
+          {t('dlg.area.hintPre', 'Markierte Fläche')} <strong>{w} × {d} m</strong>
+          {t('dlg.area.hintPost', '. Wähle, von welchen Seiten das Licht kommen soll – der Ziel-Lux-Wert wird unabhängig von der Seitenzahl gleichmäßig erreicht.')}
         </p>
 
         <div className="area-light-body">
           <div className="compass">
-            <SideBtn s="N" label="Norden" cls="c-n" />
-            <SideBtn s="W" label="Westen" cls="c-w" />
-            <div className="compass-center">Fläche</div>
-            <SideBtn s="E" label="Osten" cls="c-e" />
-            <SideBtn s="S" label="Süden" cls="c-s" />
+            {/* Der Knopf zeigt den ERSTEN BUCHSTABEN des Labels (label[0]).
+                Uebersetzt wird daraus im Englischen N/W/E/S statt N/W/O/S --
+                die Himmelsrichtung stimmt in beiden Sprachen, weil sie aus
+                demselben Wort kommt. */}
+            <SideBtn s="N" label={t('dlg.area.north', 'Norden')} cls="c-n" />
+            <SideBtn s="W" label={t('dlg.area.west', 'Westen')} cls="c-w" />
+            <div className="compass-center">{t('dlg.area.area', 'Fläche')}</div>
+            <SideBtn s="E" label={t('dlg.area.east', 'Osten')} cls="c-e" />
+            <SideBtn s="S" label={t('dlg.area.south', 'Süden')} cls="c-s" />
           </div>
 
           <div className="area-light-controls">
             <div className="preset-row">
-              <button type="button" className="btn-secondary" onClick={() => setPreset(['N'])}>Einseitig (N)</button>
-              <button type="button" className="btn-secondary" onClick={() => setPreset(['N', 'S'])}>Über Kreuz N–S</button>
-              <button type="button" className="btn-secondary" onClick={() => setPreset(['E', 'W'])}>Über Kreuz O–W</button>
-              <button type="button" className="btn-secondary" onClick={() => setPreset(['N', 'E', 'S', 'W'])}>Alle Seiten</button>
+              <button type="button" className="btn-secondary" onClick={() => setPreset(['N'])}>{t('dlg.area.preset1', 'Einseitig (N)')}</button>
+              <button type="button" className="btn-secondary" onClick={() => setPreset(['N', 'S'])}>{t('dlg.area.presetNS', 'Über Kreuz N–S')}</button>
+              <button type="button" className="btn-secondary" onClick={() => setPreset(['E', 'W'])}>{t('dlg.area.presetEW', 'Über Kreuz O–W')}</button>
+              <button type="button" className="btn-secondary" onClick={() => setPreset(['N', 'E', 'S', 'W'])}>{t('dlg.area.presetAll', 'Alle Seiten')}</button>
             </div>
 
             <label className="area-field">
-              <span>Ziel-Beleuchtung</span>
+              <span>{t('dlg.area.targetLux', 'Ziel-Beleuchtung')}</span>
               <span className="area-input-unit">
                 <input type="number" min={1} step={50} value={targetLux}
                   onChange={(e) => setTargetLux(Number(e.target.value))} />
@@ -89,7 +101,7 @@ const AreaLightDialog: React.FC<Props> = ({ area, defaultTargetLux, trusses, onG
             </label>
 
             <label className="area-field">
-              <span>Leuchtentyp</span>
+              <span>{t('dlg.area.fixtureType', 'Leuchtentyp')}</span>
               <select value={fixtureId} onChange={(e) => setFixtureId(e.target.value)}>
                 {washFixtures.map((f) => (
                   <option key={f.id} value={f.id}>{f.manufacturer} {f.name}</option>
@@ -99,27 +111,27 @@ const AreaLightDialog: React.FC<Props> = ({ area, defaultTargetLux, trusses, onG
 
             {/* Straight vs cross beams */}
             <label className="area-field">
-              <span>Verteilung</span>
+              <span>{t('dlg.area.distribution', 'Verteilung')}</span>
               <span className="dist-toggle">
-                <button type="button" className={!cross ? 'on' : ''} onClick={() => setCross(false)}>Gerade</button>
-                <button type="button" className={cross ? 'on' : ''} onClick={() => setCross(true)}>Über Kreuz</button>
+                <button type="button" className={!cross ? 'on' : ''} onClick={() => setCross(false)}>{t('dlg.area.straight', 'Gerade')}</button>
+                <button type="button" className={cross ? 'on' : ''} onClick={() => setCross(true)}>{t('dlg.area.cross', 'Über Kreuz')}</button>
               </span>
             </label>
 
             {/* Truss & distance so throws aren't random */}
             <label className="area-field">
-              <span>Truss</span>
+              <span>{t('dlg.area.truss', 'Truss')}</span>
               <select value={trussId} onChange={(e) => setTrussId(e.target.value)}>
-                <option value="">Seiten (siehe Kompass)</option>
-                {trusses.map((t, i) => (
-                  <option key={t.id} value={t.id}>{t.label || `Traverse ${i + 1}`} · h={t.height} m</option>
+                <option value="">{t('dlg.area.sidesOption', 'Seiten (siehe Kompass)')}</option>
+                {trusses.map((tr, i) => (
+                  <option key={tr.id} value={tr.id}>{tr.label || `${t('dlg.area.trussN', 'Traverse')} ${i + 1}`} · h={tr.height} m</option>
                 ))}
               </select>
             </label>
 
             {!trussId && (
               <label className="area-field">
-                <span>Abstand / Wurf</span>
+                <span>{t('dlg.area.throw', 'Abstand / Wurf')}</span>
                 <span className="area-input-unit">
                   <input type="number" min={1} step={0.5} value={distance}
                     onChange={(e) => setDistance(Number(e.target.value))} />
@@ -130,20 +142,18 @@ const AreaLightDialog: React.FC<Props> = ({ area, defaultTargetLux, trusses, onG
 
             <div className="area-summary">
               {cross
-                ? '⤬ Über Kreuz: Strahlen kreuzen sich – gleichmäßig & modellierend (McCandless). Geht auch nur von vorne.'
-                : '‖ Gerade: parallele Strahlen, frontaler Look mit stärkerem Helligkeitsabfall.'}
+                ? t('dlg.area.crossHint', '⤬ Über Kreuz: Strahlen kreuzen sich – gleichmäßig & modellierend (McCandless). Geht auch nur von vorne.')
+                : t('dlg.area.straightHint', '‖ Gerade: parallele Strahlen, frontaler Look mit stärkerem Helligkeitsabfall.')}
               <div className="area-physics">
-                Physik: Beleuchtungsstärke fällt mit 1/d² (Abstandsgesetz) und mit cos des Einfallswinkels.
-                Zwei gekreuzte Lichter aus ~45° gleichen den Abfall der jeweils anderen Seite aus → gleichmäßiger
-                und weniger flache Schatten als ein stumpf-frontales Licht.
+                {t('dlg.area.physics', 'Physik: Beleuchtungsstärke fällt mit 1/d² (Abstandsgesetz) und mit cos des Einfallswinkels. Zwei gekreuzte Lichter aus ~45° gleichen den Abfall der jeweils anderen Seite aus → gleichmäßiger und weniger flache Schatten als ein stumpf-frontales Licht.')}
               </div>
             </div>
           </div>
         </div>
 
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={onCancel}>Abbrechen</button>
-          <button className="btn-primary" onClick={submit} disabled={!trussId && sides.size === 0}>Erzeugen</button>
+          <button className="btn-secondary" onClick={onCancel}>{t('common.cancel', 'Abbrechen')}</button>
+          <button className="btn-primary" onClick={submit} disabled={!trussId && sides.size === 0}>{t('dlg.area.generate', 'Erzeugen')}</button>
         </div>
       </div>
     </div>
