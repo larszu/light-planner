@@ -156,14 +156,45 @@ assert.deepEqual(
     'Der Sprachschalter hilft dagegen nicht — der Fallback greift in beiden Sprachen.',
 );
 
-// ── 3. Toter Code wird benannt, nicht uebersehen ────────────────────────────
+// ── 3. Was dieser Check NICHT sagt ──────────────────────────────────────────
 //
-// Keine Zusicherung, sondern ein Bericht: solange MenuBar und Toolbar
-// existieren und uebersetzt sind, ohne gerendert zu werden, soll das bei jedem
-// Lauf sichtbar sein statt in einer Zaehlung zu verschwinden.
+// Er prueft die Abdeckung der Schluessel, die es GIBT. Ueber Text, den nie
+// jemand in `t()` gewickelt hat, sagt er nichts -- und genau so laesst sich
+// seine gruene Zeile missverstehen.
+//
+// Gemessen 2026-09-04: upstream sitzen rund 496 von 497 sichtbaren
+// Textstellen in Dateien mit **null** `t()`-Aufrufen (TopBar, PropertyPanel,
+// ScheduleDialog, FixtureEditor …). „34 von 34 abgedeckt" und „die
+// Oberflaeche ist uebersetzt" sind also zwei sehr verschiedene Aussagen. In
+// der Suite-Kopie, wo weit mehr gewickelt ist, bleiben immer noch 12
+// gerenderte Komponenten ganz ohne `t()` -- und dort ist der Sprachschalter
+// erreichbar, der Schaden also sichtbar.
+//
+// Deshalb steht die Zahl ab jetzt unter jedem Lauf. Zusichern laesst sie sich
+// nicht: es gibt keine Schwelle, die heute schon gilt.
+const SICHTBAR = /(?:>[^<>{}\n]*[A-Za-zÄÖÜäöüß]{3,}[^<>{}\n]*<)|(?:(?:title|placeholder|aria-label|label)="[^"]{3,}")/g;
+const ohneT: Array<[string, number]> = [];
+for (const [f, s] of inhalt) {
+  if (!f.endsWith('.tsx')) continue;
+  if (!(f.endsWith('App.tsx') || wirdImportiert(f))) continue;
+  if (aufrufe(s).length) continue;
+  const stellen = (s.match(SICHTBAR) ?? []).length;
+  if (stellen) ohneT.push([relative(SRC, f), stellen]);
+}
+ohneT.sort((a, b) => b[1] - a[1]);
+const stellenGesamt = ohneT.reduce((n, [, v]) => n + v, 0);
+
 console.log(`✓ i18n: alle ${erreichbar.size} erreichbaren Schluessel haben eine englische Fassung`);
 if (tot.length) {
   console.log('  nicht gerendert, aber uebersetzt (B-13):');
   for (const [f, n] of tot) console.log(`    ${f} — ${n} t()-Aufrufe`);
+}
+if (ohneT.length) {
+  console.log(
+    `  gerendert, aber ganz ohne t(): ${ohneT.length} Komponente(n), ` +
+      `~${stellenGesamt} sichtbare Textstellen bleiben deutsch (grob geschaetzt):`,
+  );
+  for (const [f, n] of ohneT.slice(0, 8)) console.log(`    ${f} — ~${n}`);
+  if (ohneT.length > 8) console.log(`    … ${ohneT.length - 8} weitere`);
 }
 console.log('\nAlle i18n-Erreichbarkeits-Checks bestanden.');
