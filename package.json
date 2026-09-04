@@ -20,7 +20,8 @@
     "mvr:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/mvr-check.ts",
     "spec:check": "node --experimental-strip-types scripts/spec-source-check.ts",
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
-    "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts"
+    "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",
+    "ci:complete": "node --experimental-strip-types scripts/ci-runs-every-check.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^6.0.227",
