@@ -1,6 +1,7 @@
 // Headless-Check fuer das .avplan-Gesamtformat (verlustfrei).
 // Lauf: `npm run avplan:check`  (node --experimental-strip-types).
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   makeAvPlan, parseAvPlan, AVPLAN_KIND, foreignDomainsField,
   avPlanImportWarning, avPlanContentCount,
@@ -193,5 +194,53 @@ assert.equal(foreignDomainsField({ unknownDomains: {} }).avForeign, undefined);
 // Kein Versionssprung: das Durchreichen ist keine neue Format-Version.
 assert.equal(final.formatVersion, 1);
 console.log('\u2713 ADR-005: unbekannte Domaenen-Slots ueberleben jede Richtung');
+
+// ───────────────────────────────────────────────────────────────────────────
+// Die Aufrufer, nicht nur das Format.
+//
+// Alles oben prueft `core/avplan.ts`. Das Format WAR verlustfrei -- und
+// trotzdem gingen Daten verloren, weil ein Aufrufer die Felder nicht
+// mitschrieb: `handleSaveProject` (Speichern aufs Geraet, localStorage) baute
+// dasselbe `ProjectData` wie `handleSaveToFile`, aber ohne die drei
+// ADR-005-Felder. Beim Laden setzt `handleLoadProject` die Refs aus GENAU
+// diesen Feldern zurueck -- ein Speichern-und-Laden loeschte damit still die
+// Kamera-, Kabel- und Raum-Daten, die ueber .avplan hereingekommen waren.
+//
+// Fuenf gruene Checks sagten dazu nichts, weil keiner den Aufrufer ansah.
+// Deshalb steht das hier: die Zusicherung gilt fuer JEDE Stelle, die ein
+// `ProjectData` baut -- auch fuer die dritte, die es noch nicht gibt.
+{
+  const appSrc = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+
+  // Jede Stelle `const data: ProjectData = { ... };` -- der Block bis zur
+  // Zeile, die nur `};` enthaelt (so stehen beide Literale heute da).
+  const stellen = [...appSrc.matchAll(/const\s+data:\s*ProjectData\s*=\s*\{([\s\S]*?)\n\s*\};/g)];
+  assert.ok(
+    stellen.length >= 2,
+    `ProjectData-Literale in App.tsx gefunden: ${stellen.length} -- erwartet mindestens 2 ` +
+      '(Datei- und Geraete-Pfad). Wenn das Muster nicht mehr passt, prueft dieser ' +
+      'Check nichts mehr und muss angepasst werden, nicht geloescht.',
+  );
+
+  for (const [i, m] of stellen.entries()) {
+    const block = m[1];
+    assert.match(
+      block,
+      /foreignDomainsField\(preservedDomainsRef\.current\)/,
+      `ProjectData-Literal #${i + 1} in App.tsx schreibt avForeign nicht (ADR-005)`,
+    );
+    assert.match(
+      block,
+      /venueForeign:\s*preservedVenueRef\.current/,
+      `ProjectData-Literal #${i + 1} in App.tsx schreibt venueForeign nicht (ADR-005)`,
+    );
+    assert.match(
+      block,
+      /personForeign:\s*preservedPersonsRef\.current/,
+      `ProjectData-Literal #${i + 1} in App.tsx schreibt personForeign nicht (ADR-005)`,
+    );
+  }
+  console.log(`\u2713 ADR-005: alle ${stellen.length} ProjectData-Stellen schreiben die Fremd-Felder`);
+}
 
 console.log('\nAlle .avplan-Verlustfreiheits-Checks bestanden.');
