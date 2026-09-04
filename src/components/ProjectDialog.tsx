@@ -5,7 +5,9 @@ interface Props {
   mode: 'save' | 'load';
   currentMeta?: ProjectMeta;
   onSave: (meta: ProjectMeta) => void;
-  onLoad: (project: ProjectData) => void;
+  /** Die gespeicherte Projekt-Id MUSS mitgehen: an ihr haengen die
+   *  Versions-Schnappschuesse und die Zuordnung beim naechsten Speichern. */
+  onLoad: (project: ProjectData, id: string) => void;
   onDelete: (id: string) => void;
   onCancel: () => void;
   /** Save the current project to a real file at a user-chosen location. */
@@ -131,7 +133,7 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
           <div className="project-list">
             {projects.map((p) => (
               <div key={p.id} className="project-list-item">
-                <div className="project-list-info" onClick={() => onLoad(p.data)}>
+                <div className="project-list-info" onClick={() => onLoad(p.data, p.id)}>
                   <div className="project-list-name">{p.meta.name}</div>
                   <div className="project-list-meta">
                     v{p.meta.version} · {p.meta.author || 'Kein Autor'}
