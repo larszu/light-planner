@@ -156,7 +156,33 @@ assert.deepEqual(
     'Der Sprachschalter hilft dagegen nicht — der Fallback greift in beiden Sprachen.',
 );
 
-// ── 3. Was dieser Check NICHT sagt ──────────────────────────────────────────
+// ── 3. Der Sprachschalter ist erreichbar ────────────────────────────────────
+//
+// WARUM ES DAS GIBT (B-13, gemessen 2026-09-04). Die i18n-Infrastruktur war
+// vollstaendig, `setLanguage` existierte, das englische Woerterbuch war
+// gepflegt -- und trotzdem konnte kein Nutzer die Sprache wechseln: der
+// einzige Aufruf stand in `components/MenuBar.tsx`, einer Datei, die niemand
+// importiert und die `App.tsx` nie rendert. Dieselbe Form wie in Abschnitt 1,
+// nur eine Ebene hoeher: gebaut, begruendet, unerreichbar.
+//
+// Geprueft wird deshalb nicht "gibt es `setLanguage`", sondern "ruft es
+// jemand aus einer GERENDERTEN Datei". Ohne diese Unterscheidung waere der
+// Check die ganze Zeit gruen gewesen.
+const schalterStellen: string[] = [];
+for (const [f, s] of inhalt) {
+  if (f.endsWith('store/uiStore.ts') || f.endsWith('i18n/index.ts')) continue; // Definition, nicht Aufruf
+  if (!/setLanguage\s*\(/.test(s)) continue;
+  if (f.endsWith('App.tsx') || wirdImportiert(f)) schalterStellen.push(relative(SRC, f));
+}
+assert.ok(
+  schalterStellen.length > 0,
+  'Kein gerenderter Aufruf von setLanguage gefunden. Der Sprachschalter mag ' +
+    'existieren -- erreichbar ist er dann nicht, und genau dieser Zustand ' +
+    '(Schalter nur in der nicht gerenderten MenuBar.tsx) war B-13.',
+);
+console.log(`  Sprachschalter erreichbar in: ${schalterStellen.join(', ')}`);
+
+// ── 4. Was dieser Check NICHT sagt ──────────────────────────────────────────
 //
 // Er prueft die Abdeckung der Schluessel, die es GIBT. Ueber Text, den nie
 // jemand in `t()` gewickelt hat, sagt er nichts -- und genau so laesst sich
