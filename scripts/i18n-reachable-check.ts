@@ -52,11 +52,59 @@ function wirdImportiert(datei: string): boolean {
 /** Alle t('key', 'Deutsch')-Aufrufe einer Datei. */
 const aufrufe = (s: string) => [...s.matchAll(/\bt\(\s*'([^']+)'/g)].map((m) => m[1]);
 
+/**
+ * Die englischen Schluessel.
+ *
+ * ZWEI FORMEN. Hier steht das Woerterbuch inline in `i18n/index.ts`. Die
+ * Suite-Kopie (`av-planner-suite/apps/light-planner`) hat es dagegen in
+ * Domaenen-Teildicts unter `i18n/en/` zerlegt und komponiert es per Spread --
+ * dort steht in `index.ts` kein einziger Schluessel, sondern nur `...base,
+ * ...topbar, …`.
+ *
+ * Der Check liest deshalb beide Formen. Sonst haette er in der Suite ein
+ * leeres Woerterbuch gesehen und JEDEN erreichbaren Schluessel als fehlend
+ * gemeldet -- ein Guard, der in der einen Kopie das Falsche meldet, ist so
+ * unbrauchbar wie einer, der schweigt.
+ */
 const en = (() => {
+  /** Schluessel -> die Datei(en), die ihn definieren. */
+  const herkunft = new Map<string, string[]>();
+  const merken = (k: string, f: string) => herkunft.set(k, [...(herkunft.get(k) ?? []), f]);
+
   const s = readFileSync(join(SRC, 'i18n/index.ts'), 'utf8');
   const m = /const en[^=]*=\s*\{([\s\S]*?)\n\};/.exec(s);
   assert.ok(m, 'Das en-Woerterbuch wurde nicht gefunden — der Check prueft sonst nichts');
-  return new Set([...m[1].matchAll(/^\s*'([^']+)':/gm)].map((x) => x[1]));
+  for (const x of m[1].matchAll(/^\s*'([^']+)':/gm)) merken(x[1], 'i18n/index.ts');
+  // Teildicts, falls vorhanden.
+  for (const f of dateien) {
+    if (!/\/i18n\/en\/[^/]+\.ts$/.test(f)) continue;
+    for (const x of inhalt.get(f)!.matchAll(/^\s*'([^']+)':/gm)) merken(x[1], relative(SRC, f));
+  }
+
+  // Ein Schluessel in ZWEI Teildicts ist stiller Verlust: `{ ...a, ...b }`
+  // nimmt kommentarlos den aus dem letzten Spread. Innerhalb eines
+  // Objektliterals faengt tsc das ab (TS1117) -- ueber die Spreads hinweg
+  // fangt es niemand, und das ist genau die Luecke, die die Aufteilung in
+  // Teildicts aufgemacht hat. Solange nur ein Woerterbuch existiert, ist
+  // diese Zusicherung inert.
+  const doppelt = [...herkunft.entries()]
+    .filter(([, fs]) => fs.length > 1)
+    .map(([k, fs]) => `${k} (${fs.join(', ')})`)
+    .sort();
+  assert.deepEqual(
+    doppelt,
+    [],
+    `Mehrfach definierte Schluessel: ${doppelt.join(' | ')}. Beim Spread gewinnt der ` +
+      'letzte, die anderen Fassungen sind wirkungslos — ohne dass es jemand meldet.',
+  );
+
+  const keys = new Set(herkunft.keys());
+  assert.ok(
+    keys.size > 20,
+    `Nur ${keys.size} englische Schluessel gefunden — das Muster passt vermutlich nicht mehr, ` +
+      'und der Check wuerde gleich reihenweise Fehltreffer melden.',
+  );
+  return keys;
 })();
 
 const erreichbar = new Set<string>();
