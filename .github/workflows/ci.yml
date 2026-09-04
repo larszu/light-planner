@@ -51,6 +51,12 @@ jobs:
       - name: Herkunft der Kenndaten
         run: npm run spec:check
 
+      # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
+      # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
+      # cable-planner beschreibt.
+      - name: Dokumentation ist auffindbar
+        run: npm run docs:check
+
       # Zuletzt und bewusst: dieser Lauf prueft, dass die Liste darueber
       # vollstaendig ist. `mvr:check` fehlte hier bis 2026-09-04 — er
       # existierte, war gruen, und lief bei keinem Merge.

@@ -94,6 +94,17 @@ Electron · React · TypeScript · Three.js · Vite · electron-builder.
 
 ---
 
+## 📚 Documentation
+
+- [`INTEGRATION.md`](INTEGRATION.md) — how the lighting planner is structured
+  for embedding in a host app (Cable-Planner), and exactly what is done versus
+  what remains.
+
+`npm run docs:check` fails the build if a Markdown document is not reachable by
+links from an entry page. `INTEGRATION.md` was orphaned until 2026-09-04.
+
+---
+
 ## ⚠️ Status
 
 Early. Things will change. Use it for sketches, not for paperwork you have to hand in.
