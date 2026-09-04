@@ -59,7 +59,7 @@ interface Props {
 const mode = (p: Props): Mode => (p.viewMode === '2d' ? '2d' : p.photoMode ? 'photo' : '3d');
 
 const TopBar: React.FC<Props> = (p) => {
-  const { t } = useTranslation();
+  const { t, language, setLanguage } = useTranslation();
   const [open, setOpen] = useState<null | 'menu' | 'render'>(null);
   const ref = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -107,6 +107,22 @@ const TopBar: React.FC<Props> = (p) => {
               <button className="tb-dd-item" onClick={run(p.onRedo)}><Icon name="redo" size={15} />{t('top.redo', 'Wiederholen')}<kbd>{t('top.kbdRedo', 'Strg Y')}</kbd></button>
               <button className="tb-dd-item" onClick={run(p.onChanges)}><Icon name="tag" size={15} />{t('top.changes', 'Verlauf & Änderungen…')}</button>
               <button className="tb-dd-item" onClick={run(p.onVersions)}><Icon name="layers" size={15} />{t('top.versions', 'Versionen & Vergleich…')}</button>
+              <div className="tb-dd-div" />
+              {/* B-13, letzter Schritt. Der Schalter lag bisher NUR in
+                  `MenuBar.tsx` -- einer Datei, die niemand importiert und die
+                  `App.tsx` nie rendert. Die i18n-Infrastruktur war also
+                  vollstaendig, und trotzdem konnte kein Nutzer die Sprache
+                  wechseln.
+                  Er kommt bewusst ZULETZT: waere er vor dem Wickeln
+                  freigelegt worden, haette wer Englisch waehlt eine zu
+                  ~85 % deutsche Oberflaeche bekommen und die Funktion zu
+                  Recht fuer kaputt gehalten. Seit diesem Branch meldet
+                  `i18n:check` 0 ungewickelte Komponenten. */}
+              <button className="tb-dd-item" onClick={run(() => setLanguage(language === 'de' ? 'en' : 'de'))}>
+                <span className="tb-glyph">🌐</span>
+                {/* Der Knopf nennt das ZIEL, nicht den aktuellen Zustand. */}
+                {language === 'de' ? t('top.langToEn', 'Sprache: English') : t('top.langToDe', 'Language: Deutsch')}
+              </button>
               <div className="tb-dd-div" />
               <button className="tb-dd-item" onClick={run(p.onAbout)}><Icon name="info" size={15} />{t('top.about', 'Über LightPlanner')}</button>
             </div>

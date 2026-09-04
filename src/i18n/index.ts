@@ -856,6 +856,20 @@ const en: Record<string, string> = {
   'app.movePlan': 'Drag the floor plan to align it · ESC to finish',
   'app.inventoryTitle': 'Inventory / stock',
   'app.inventory': 'Inventory',
+  // Sprachschalter (B-13, letzter Schritt).
+  //
+  // Der Knopf sagt, WOHIN er wechselt, nicht wo man gerade ist. Jeder der
+  // beiden Schluessel wird deshalb nur in EINER Sprache gerendert:
+  //   - `top.langToEn` nur im deutschen Modus -> es zaehlt der deutsche
+  //     Fallback im JSX ("Sprache: English"); der Eintrag hier ist tot und
+  //     steht nur, damit `i18n:check` nicht ueber eine Luecke stolpert.
+  //   - `top.langToDe` nur im englischen Modus -> es zaehlt DIESER Eintrag.
+  // Ich hatte die beiden zuerst vertauscht: der englische Modus zeigte
+  // "Sprache: Deutsch" statt "Language: Deutsch". Faellt keiner Pruefung auf,
+  // weil `i18n:check` die Existenz eines Schluessels misst, nicht die Sprache
+  // seines Werts.
+  'top.langToEn': 'Language: English',
+  'top.langToDe': 'Language: Deutsch',
 };
 
 export function translate(language: 'de' | 'en', key: string, de: string): string {
