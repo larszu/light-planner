@@ -57,6 +57,61 @@ const en: Record<string, string> = {
   'tool.grid': 'Grid',
   'tool.floorplan': 'Floor plan',
   'tool.export': 'Export',
+  // ── Lager / Bestand (InventoryDialog) ────────────────────────────────────
+  //
+  // WARUM DIESE 33 SCHLUESSEL SPAETER KAMEN ALS DIE UEBRIGEN 42. Von den
+  // vorhandenen englischen Eintraegen bedienten **40 von 42** toten Code:
+  // `MenuBar.tsx` (24 `menu.*`) und `Toolbar.tsx` (12 `tool.*`) werden
+  // nirgends importiert und nirgends gerendert -- `App.tsx` nutzt TopBar und
+  // ToolRail. Der einzige substanzielle Dialog mit uebersetzten Strings,
+  // `inventory/InventoryDialog.tsx` (37 Aufrufe), hatte KEINEN einzigen.
+  //
+  // Die Uebersetzungsarbeit war also vollstaendig in Code geflossen, den
+  // niemand sieht. Deshalb kommen diese hier zuerst und nicht der
+  // Sprachschalter: wer den Schalter freilegt, bevor die erreichbaren Strings
+  // uebersetzt sind, liefert einen sichtbar halb uebersetzten Zustand aus --
+  // und ein Nutzer, der Englisch waehlt und Deutsch bekommt, haelt die
+  // Funktion fuer kaputt, und zwar zu Recht.
+  'inventory.title': 'Inventory',
+  'inventory.item': 'Item',
+  'inventory.add': 'Item',
+  'inventory.new': 'New item',
+  'inventory.edit': 'Edit item',
+  'inventory.empty':
+    'No inventory items yet. Add some, or import an inventory from Cable/MultiCam Planner.',
+  'inventory.model': 'Model',
+  'inventory.manufacturer': 'Manufacturer',
+  'inventory.quantity': 'Quantity',
+  'inventory.code': 'Code',
+  'inventory.location': 'Location',
+  'inventory.locations': 'Locations/cases',
+  'inventory.unit': 'Unit',
+  'inventory.units': 'Units',
+  // `ownership` ist das Feld, `owned` einer seiner Werte. Im Deutschen heissen
+  // beide "Eigentum" -- die Beschriftung und die erste Auswahl sind dort also
+  // wortgleich. Englisch kann das trennen, und tut es hier.
+  'inventory.ownership': 'Ownership',
+  'inventory.owned': 'Owned',
+  'inventory.rented': 'Rented',
+  'inventory.subhire': 'Sub-hire',
+  'inventory.scan': 'Resolve',
+  'inventory.scanPh': 'Scan / enter code…',
+  'inventory.scanNone': 'No match.',
+  'inventory.import': 'Import',
+  'inventory.importErr': 'Not a valid inventory file (avplan-inventory).',
+  'inventory.importConfirm': 'REPLACE the existing inventory? Cancel = merge.',
+  // Der Platzhalter {n} wird vom Aufrufer ersetzt und muss stehen bleiben.
+  'inventory.importDone': '{n} items imported.',
+  'inventory.export': 'Export',
+  'inventory.exportHint': 'Export across apps',
+  'inventory.fromImport': 'from import, preserved losslessly',
+
+  // ── Gemeinsame Schaltflaechen ────────────────────────────────────────────
+  'common.save': 'Save',
+  'common.cancel': 'Cancel',
+  'common.edit': 'Edit',
+  'common.delete': 'Delete',
+  // `about.close` steht bereits weiter oben im About-Block.
 };
 
 export function translate(language: 'de' | 'en', key: string, de: string): string {
