@@ -30,6 +30,7 @@ import { readFileSync } from 'node:fs';
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const dialog = readFileSync(new URL('../src/components/ProjectDialog.tsx', import.meta.url), 'utf8');
+const versionStore = readFileSync(new URL('../src/utils/versionStore.ts', import.meta.url), 'utf8');
 
 // ── 1. Der Dialog reicht die gespeicherte Id durch ──────────────────────────
 assert.match(
@@ -63,10 +64,43 @@ assert.equal(
 );
 
 // ── 3. Version wiederherstellen bleibt dasselbe Projekt ─────────────────────
+//
+// Die erste Fassung dieser Zusicherung war ein Regex auf die EINZEILIGE
+// Schreibweise `onRestore={(doc) => { handleLoadProject(doc, projectId);`.
+// Als der Aufruf beim naechsten Fix mehrzeilig wurde, meldete sie "laedt ohne
+// projectId" -- obwohl die Id uebergeben wurde. Ein Guard, der Formatierung
+// pinnt statt Bedeutung, meldet frueher oder spaeter das Falsche. Deshalb wird
+// jetzt der Block ausgeschnitten und auf seinen Inhalt geprueft.
+const onRestoreBlock = (() => {
+  const i = app.indexOf('onRestore={');
+  assert.notEqual(i, -1, 'onRestore in App.tsx nicht gefunden — der Check prueft sonst nichts');
+  return app.slice(i, i + 900);
+})();
+
 assert.match(
-  app,
-  /onRestore=\{\(doc\) => \{ handleLoadProject\(doc, projectId\);/,
+  onRestoreBlock,
+  /handleLoadProject\(\s*\{[\s\S]*?\}\s*,\s*projectId\s*,?\s*\)|handleLoadProject\(\s*doc\s*,\s*projectId\s*,?\s*\)/,
   'VersionDialog.onRestore laedt ohne die aktuelle projectId — damit macht das Wiederherstellen einer Version daraus ein anderes Projekt und die uebrigen Versionen sind weg',
+);
+
+// ── 3b. Der Grundriss ueberlebt das Wiederherstellen ────────────────────────
+//
+// `versionStore.saveVersion` laesst `floorPlan` BEWUSST aus dem Schnappschuss
+// weg (das Bitmap wuerde den Speicher sprengen). `handleLoadProject` liest ein
+// fehlendes `floorPlan` aber als "keiner vorhanden" und setzt auf null. Beide
+// Entscheidungen sind fuer sich richtig; zusammen loeschten sie bei jedem
+// Wiederherstellen den importierten und kalibrierten Gebaeudeplan. Der
+// Aufrufer fuellt die Auslassung, weil nur er weiss, dass sein Dokument
+// schlank ist.
+assert.match(
+  onRestoreBlock,
+  /serializeFloorPlan\(floorPlan\)/,
+  'onRestore gibt den aktuellen Grundriss nicht mit — dann wirft jedes Wiederherstellen einer Version den importierten und kalibrierten Gebaeudeplan weg',
+);
+assert.match(
+  versionStore,
+  /floorPlan:\s*undefined/,
+  'versionStore legt den Grundriss offenbar doch in den Schnappschuss — dann ist die Ergaenzung in onRestore ueberfluessig und dieser Check irrefuehrend',
 );
 
 // ── 4. Gegenrichtung: echte Importe bekommen KEINE geerbte Id ───────────────
@@ -115,7 +149,14 @@ assert.equal(
   1,
   `Genau EIN handleLoadProject-Aufruf darf eine Id mitgeben (das Wiederherstellen einer Version); gefunden: ${mitId.length} — ${JSON.stringify(mitId)}`,
 );
-assert.match(mitId[0], /^doc,\s*projectId$/, `Der Aufruf mit Id ist nicht der erwartete Restore-Aufruf: ${mitId[0]}`);
+// Geprueft wird das ZWEITE Argument, nicht das erste: seit der Grundriss
+// mitgegeben wird, ist das erste ein Objektliteral. Auch diese Zusicherung war
+// zuerst an die Schreibweise gebunden und meldete daraufhin das Falsche.
+assert.match(
+  mitId[0],
+  /,\s*projectId\s*,?\s*$/,
+  `Der Aufruf mit Id uebergibt nicht projectId als zweites Argument: ${mitId[0]}`,
+);
 
 console.log('✓ Projekt-Identitaet: uebernommen wo dasselbe Projekt, frisch wo ein neues');
 console.log(`  handleLoadProject-Aufrufe: ${importAufrufe.length}, davon mit Id: ${mitId.length}`);

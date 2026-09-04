@@ -212,35 +212,80 @@ console.log('\u2713 ADR-005: unbekannte Domaenen-Slots ueberleben jede Richtung'
 {
   const appSrc = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 
-  // Jede Stelle `const data: ProjectData = { ... };` -- der Block bis zur
-  // Zeile, die nur `};` enthaelt (so stehen beide Literale heute da).
-  const stellen = [...appSrc.matchAll(/const\s+data:\s*ProjectData\s*=\s*\{([\s\S]*?)\n\s*\};/g)];
-  assert.ok(
-    stellen.length >= 2,
-    `ProjectData-Literale in App.tsx gefunden: ${stellen.length} -- erwartet mindestens 2 ` +
-      '(Datei- und Geraete-Pfad). Wenn das Muster nicht mehr passt, prueft dieser ' +
-      'Check nichts mehr und muss angepasst werden, nicht geloescht.',
+  // WIE DIESER CHECK SEINEN EIGENEN BLINDEN FLECK BEKAM. Die erste Fassung
+  // suchte `const data: ProjectData = { ... }` -- die Schreibweise der beiden
+  // Stellen, die ich vor Augen hatte. Es gibt aber FUENF Stellen, die ein
+  // vollstaendiges Dokument bauen, und die dritte schreibt
+  // `return { ... }` in einer Funktion mit `(): ProjectData`. Genau der fehlten
+  // die Felder, und der Check meldete trotzdem "alle 2 Stellen schreiben sie".
+  //
+  // Gesucht wird deshalb nicht mehr nach der Schreibweise, sondern nach dem
+  // MERKMAL eines vollstaendigen Dokuments: der Serialisierung des Grundrisses.
+  // Die steht in jeder der fuenf Stellen und in keiner anderen.
+  const MARKER = /floorPlan: floorPlan \? serializeFloorPlan\(floorPlan\) : undefined,/g;
+  const bauplaetze = [...appSrc.matchAll(MARKER)].map((m) => m.index ?? 0);
+  assert.equal(
+    bauplaetze.length,
+    5,
+    `Dokument-Bauplaetze in App.tsx: ${bauplaetze.length}, erwartet 5. Kommt einer dazu, ` +
+      'gehoert er hier eingeordnet -- entweder mit den ADR-005-Feldern oder mit einem ' +
+      'Eintrag in AUSGENOMMEN samt Begruendung. Diese Zusicherung ist der eigentliche ' +
+      'Schutz: sie zwingt zur Entscheidung, statt eine neue Stelle stillschweigend ' +
+      'durchzulassen.',
   );
 
-  for (const [i, m] of stellen.entries()) {
-    const block = m[1];
-    assert.match(
-      block,
-      /foreignDomainsField\(preservedDomainsRef\.current\)/,
-      `ProjectData-Literal #${i + 1} in App.tsx schreibt avForeign nicht (ADR-005)`,
-    );
-    assert.match(
-      block,
-      /venueForeign:\s*preservedVenueRef\.current/,
-      `ProjectData-Literal #${i + 1} in App.tsx schreibt venueForeign nicht (ADR-005)`,
-    );
-    assert.match(
-      block,
-      /personForeign:\s*preservedPersonsRef\.current/,
-      `ProjectData-Literal #${i + 1} in App.tsx schreibt personForeign nicht (ADR-005)`,
-    );
+  /**
+   * Bauplaetze, die die drei Felder BEWUSST nicht tragen. Der Schluessel ist
+   * ein eindeutiger Textausschnitt kurz davor, der Wert die Begruendung.
+   */
+  const AUSGENOMMEN: Array<[string, string]> = [
+    [
+      "app: 'light-planner'",
+      'Der .avplan-Export. Fremde Domaenen gehen dort als eigene Slots ins ' +
+        '`domains`-Objekt (cameras/cabling/unknownDomains), nicht als avForeign. ' +
+        'Sie doppelt zu schreiben waere falsch.',
+    ],
+    [
+      'useProjectStore.getState().setDocument(',
+      'Live-Publikation an einen Host (Cable-Planner), kein Persistenzweg und ' +
+        'kein vollstaendiges ProjectData (ohne meta). Hier geht nichts verloren, ' +
+        'was nicht im naechsten Render wieder da waere.',
+    ],
+  ];
+
+  let gepruefte = 0;
+  for (const [i, pos] of bauplaetze.entries()) {
+    const kontext = appSrc.slice(Math.max(0, pos - 1200), pos);
+    const ausnahme = AUSGENOMMEN.find(([marke]) => kontext.includes(marke));
+    if (ausnahme) continue;
+    gepruefte += 1;
+    // Der Block reicht vom Marker bis zum naechsten `};` oder `} satisfies`.
+    const rest = appSrc.slice(pos, pos + 1200);
+    for (const [feld, muster] of [
+      ['avForeign', /foreignDomainsField\(preservedDomainsRef\.current\)/],
+      ['venueForeign', /venueForeign:\s*preservedVenueRef\.current/],
+      ['personForeign', /personForeign:\s*preservedPersonsRef\.current/],
+    ] as Array<[string, RegExp]>) {
+      assert.match(
+        rest,
+        muster,
+        `Dokument-Bauplatz #${i + 1} in App.tsx (Zeile ~${appSrc.slice(0, pos).split('\n').length}) ` +
+          `schreibt ${feld} nicht (ADR-005). Wenn das Absicht ist, gehoert es mit Begruendung ` +
+          'in AUSGENOMMEN -- nicht stillschweigend weggelassen.',
+      );
+    }
   }
-  console.log(`\u2713 ADR-005: alle ${stellen.length} ProjectData-Stellen schreiben die Fremd-Felder`);
+  assert.equal(
+    gepruefte,
+    3,
+    `Gepruefte Bauplaetze: ${gepruefte}, erwartet 3 (Geraete-Speichern, ` +
+      'Versions-Schnappschuss, Datei-Speichern). Weicht die Zahl ab, hat sich die ' +
+      'Aufteilung geaendert und will neu bedacht werden.',
+  );
+  console.log(
+    `\u2713 ADR-005: ${gepruefte} von ${bauplaetze.length} Dokument-Bauplaetzen tragen die ` +
+      `Fremd-Felder, ${AUSGENOMMEN.length} sind begruendet ausgenommen`,
+  );
 }
 
 console.log('\nAlle .avplan-Verlustfreiheits-Checks bestanden.');
