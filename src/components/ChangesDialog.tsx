@@ -5,6 +5,7 @@ import { versionsFor, type ProjectVersion } from '../utils/versionStore';
 import DiffView from './DiffView';
 import Icon from './Icon';
 import type { IconName } from './Icon';
+import { useTranslation } from '../i18n';
 
 export interface LogEntry { time: number; label: string }
 export interface Step { count: number; label: string }
@@ -22,33 +23,40 @@ interface Props {
 }
 
 type Tab = 'protokoll' | 'undo' | 'diff';
-const TABS: { id: Tab; label: string; icon: IconName }[] = [
-  { id: 'protokoll', label: 'Protokoll', icon: 'tag' },
-  { id: 'undo', label: 'Rückgängig-Schritte', icon: 'undo' },
-  { id: 'diff', label: 'Seit letzter Version', icon: 'layers' },
+// Modulebene, also ohne Hook: jeder Reiter traegt seinen Schluessel mit und
+// wird beim Rendern uebersetzt.
+const TABS: { id: Tab; key: string; label: string; icon: IconName }[] = [
+  { id: 'protokoll', key: 'dlg.chg.tabLog', label: 'Protokoll', icon: 'tag' },
+  { id: 'undo', key: 'dlg.chg.tabUndo', label: 'Rückgängig-Schritte', icon: 'undo' },
+  { id: 'diff', key: 'dlg.chg.tabDiff', label: 'Seit letzter Version', icon: 'layers' },
 ];
 
-const time = (t: number) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+/** Gebietsschema statt fester de-DE-Formatierung: 14:05:31 gegen 2:05:31 PM. */
+const locale = (language: 'de' | 'en') => (language === 'en' ? 'en-GB' : 'de-DE');
+const time = (ms: number, language: 'de' | 'en') =>
+  new Date(ms).toLocaleTimeString(locale(language), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 // "Verlauf & Änderungen": session activity log, an interactive undo timeline,
 // and the diff to the last saved version — all the "what changed" views.
 const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc, projectId, projectName, onJump, onSaveVersion, onClose }) => {
+  const { t, language } = useTranslation();
   const [tab, setTabState] = useState<Tab>(() => {
-    try { const t = localStorage.getItem('lp-changes-tab'); if (t && TABS.some((x) => x.id === t)) return t as Tab; } catch { /* ignore */ }
+    try { const gespeichert = localStorage.getItem('lp-changes-tab'); if (gespeichert && TABS.some((x) => x.id === gespeichert)) return gespeichert as Tab; } catch { /* ignore */ }
     return 'undo';
   });
-  const setTab = (t: Tab) => { setTabState(t); try { localStorage.setItem('lp-changes-tab', t); } catch { /* ignore */ } };
+  const setTab = (id: Tab) => { setTabState(id); try { localStorage.setItem('lp-changes-tab', id); } catch { /* ignore */ } };
   const [label, setLabel] = useState('');
 
   const latest: ProjectVersion | undefined = versionsFor(projectId)[0];
   const diff = latest ? diffProjects(latest.doc, currentDoc) : null;
-  const activeLabel = TABS.find((t) => t.id === tab)!.label;
+  const aktiv = TABS.find((x) => x.id === tab)!;
+  const activeLabel = t(aktiv.key, aktiv.label);
 
   const protokoll = (
-    log.length === 0 ? <div className="tool-empty">Noch keine Aktivität in dieser Sitzung.</div> : (
+    log.length === 0 ? <div className="tool-empty">{t('dlg.chg.noLog', 'Noch keine Aktivität in dieser Sitzung.')}</div> : (
       <ul className="log-list">
         {[...log].reverse().map((e, i) => (
-          <li key={i} className="log-item"><span className="log-time">{time(e.time)}</span><span className="log-label">{e.label}</span></li>
+          <li key={i} className="log-item"><span className="log-time">{time(e.time, language)}</span><span className="log-label">{e.label}</span></li>
         ))}
       </ul>
     )
@@ -58,22 +66,22 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
     <div className="timeline">
       {redoSteps.length > 0 && (
         <>
-          <div className="tl-head">Wiederherstellbar (Strg Y)</div>
+          <div className="tl-head">{t('dlg.chg.redoHead', 'Wiederherstellbar (Strg Y)')}</div>
           {[...redoSteps].reverse().map((s, i) => (
-            <button key={'r' + i} className="tl-step redo" onClick={() => onJump('redo', s.count)} title="Wiederherstellen">
+            <button key={'r' + i} className="tl-step redo" onClick={() => onJump('redo', s.count)} title={t('dlg.chg.redo', 'Wiederherstellen')}>
               <Icon name="redo" size={13} /><span>{s.label}</span>
             </button>
           ))}
         </>
       )}
-      <div className="tl-current"><span className="tl-dot" /> Aktueller Stand</div>
+      <div className="tl-current"><span className="tl-dot" /> {t('dlg.chg.current', 'Aktueller Stand')}</div>
       {undoSteps.length === 0 ? (
-        <div className="tool-empty">Nichts rückgängig zu machen.</div>
+        <div className="tool-empty">{t('dlg.chg.noUndo', 'Nichts rückgängig zu machen.')}</div>
       ) : (
         <>
-          <div className="tl-head">Letzte Schritte (Strg Z)</div>
+          <div className="tl-head">{t('dlg.chg.undoHead', 'Letzte Schritte (Strg Z)')}</div>
           {undoSteps.map((s, i) => (
-            <button key={'u' + i} className="tl-step undo" onClick={() => onJump('undo', s.count)} title="Bis hierhin rückgängig">
+            <button key={'u' + i} className="tl-step undo" onClick={() => onJump('undo', s.count)} title={t('dlg.chg.undoTo', 'Bis hierhin rückgängig')}>
               <Icon name="undo" size={13} /><span>{s.label}</span>
             </button>
           ))}
@@ -84,19 +92,22 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
 
   const diffPanel = !latest ? (
     <div className="diff-noversion">
-      <div className="tool-empty">Noch keine gespeicherte Version. Sichere den aktuellen Stand, um künftig zu vergleichen.</div>
+      <div className="tool-empty">{t('dlg.chg.noVersion', 'Noch keine gespeicherte Version. Sichere den aktuellen Stand, um künftig zu vergleichen.')}</div>
       <div className="ver-save">
-        <input value={label} placeholder="Version benennen…" onChange={(e) => setLabel(e.target.value)} />
-        <button className="btn-primary" onClick={() => { onSaveVersion(label); setLabel(''); }}><Icon name="save" size={14} /> Sichern</button>
+        <input value={label} placeholder={t('dlg.chg.namePh', 'Version benennen…')} onChange={(e) => setLabel(e.target.value)} />
+        <button className="btn-primary" onClick={() => { onSaveVersion(label); setLabel(''); }}><Icon name="save" size={14} /> {t('dlg.chg.save', 'Sichern')}</button>
       </div>
     </div>
   ) : (
     <>
       <div className="diff-summary">
-        <b>{diff!.total}</b> Änderung{diff!.total === 1 ? '' : 'en'} seit „{latest.label}" ({new Date(latest.savedAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })})
-        <button className="btn-secondary diff-snap" onClick={() => { onSaveVersion(label || `Stand ${new Date().toLocaleString('de-DE')}`); setLabel(''); }}><Icon name="save" size={13} /> Jetzt sichern</button>
+        {/* Der Plural stand als angehaengtes „en" im JSX. Das geht nur im
+            Deutschen auf; Englisch braucht ein anderes Wort, andere Sprachen
+            mehr als zwei Formen. Zwei ganze Woerter statt einer Endung. */}
+        <b>{diff!.total}</b> {diff!.total === 1 ? t('dlg.chg.changeOne', 'Änderung') : t('dlg.chg.changeMany', 'Änderungen')} {t('dlg.chg.since', 'seit')} „{latest.label}" ({new Date(latest.savedAt).toLocaleString(locale(language), { dateStyle: 'short', timeStyle: 'short' })})
+        <button className="btn-secondary diff-snap" onClick={() => { onSaveVersion(label || `${t('dlg.chg.stateAt', 'Stand')} ${new Date().toLocaleString(locale(language))}`); setLabel(''); }}><Icon name="save" size={13} /> {t('dlg.chg.saveNow', 'Jetzt sichern')}</button>
       </div>
-      {diff!.total === 0 ? <div className="rig-clean">✓ Keine Änderungen seit der letzten Version.</div> : <DiffView diff={diff!} />}
+      {diff!.total === 0 ? <div className="rig-clean">✓ {t('dlg.chg.noChanges', 'Keine Änderungen seit der letzten Version.')}</div> : <DiffView diff={diff!} />}
     </>
   );
 
@@ -106,15 +117,15 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal tool-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="tool-head">
-          <h3><Icon name={TABS.find((t) => t.id === tab)!.icon} size={18} /> {activeLabel} <span className="th-sub">· {projectName || 'Lichtplan'}</span></h3>
-          <button className="fp-icon-btn fp-close" onClick={onClose} title="Schließen">✕</button>
+          <h3><Icon name={aktiv.icon} size={18} /> {activeLabel} <span className="th-sub">· {projectName || t('dlg.chg.untitled', 'Lichtplan')}</span></h3>
+          <button className="fp-icon-btn fp-close" onClick={onClose} title={t('common.close', 'Schließen')}>✕</button>
         </div>
         <div className="tool-body">
           <nav className="tool-nav">
-            {TABS.map((t) => (
-              <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-                <Icon name={t.icon} size={16} /><span>{t.label}</span>
-                {t.id === 'diff' && diff && diff.total > 0 && <span className="nav-badge warn">{diff.total}</span>}
+            {TABS.map((reiter) => (
+              <button key={reiter.id} className={tab === reiter.id ? 'on' : ''} onClick={() => setTab(reiter.id)}>
+                <Icon name={reiter.icon} size={16} /><span>{t(reiter.key, reiter.label)}</span>
+                {reiter.id === 'diff' && diff && diff.total > 0 && <span className="nav-badge warn">{diff.total}</span>}
               </button>
             ))}
           </nav>

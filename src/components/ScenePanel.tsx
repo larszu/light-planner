@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from '../i18n';
 import type { Scene } from '../types';
 
 interface Props {
@@ -29,6 +30,7 @@ const ScenePanel: React.FC<Props> = ({
   onDeleteScene,
   onShowAll,
 }) => {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -42,20 +44,20 @@ const ScenePanel: React.FC<Props> = ({
   return (
     <div className={`scene-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="sp-header">
-        <span className="sp-title">🎬 Szenen{scenes.length > 0 ? ` (${scenes.length})` : ''}</span>
-        <button className="sp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? 'Aufklappen' : 'Einklappen'}>
+        <span className="sp-title">🎬 {t('panel.scene.title', 'Szenen')}{scenes.length > 0 ? ` (${scenes.length})` : ''}</span>
+        <button className="sp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Aufklappen') : t('panel.collapse', 'Einklappen')}>
           {collapsed ? '▸' : '▾'}
         </button>
       </div>
 
       {!collapsed && (
         <div className="sp-body">
-          <button className="sp-save-btn" onClick={onSaveScene} disabled={fixtureCount === 0} title="Aktuellen Look als neue Szene sichern">
-            ＋ Aktuellen Look speichern
+          <button className="sp-save-btn" onClick={onSaveScene} disabled={fixtureCount === 0} title={t('panel.scene.saveHint', 'Aktuellen Look als neue Szene sichern')}>
+            ＋ {t('panel.scene.save', 'Aktuellen Look speichern')}
           </button>
 
           {scenes.length === 0 ? (
-            <p className="sp-empty">Noch keine Szenen. Stelle deine Leuchten ein und speichere den Look.</p>
+            <p className="sp-empty">{t('panel.scene.empty', 'Noch keine Szenen. Stelle deine Leuchten ein und speichere den Look.')}</p>
           ) : (
             <ul className="sp-list">
               {scenes.map((s) => {
@@ -78,9 +80,9 @@ const ScenePanel: React.FC<Props> = ({
                       </button>
                     )}
                     <div className="sp-item-actions">
-                      <button className="sp-mini" onClick={() => onUpdateScene(s.id)} title="Mit aktuellem Look überschreiben">⟳</button>
-                      <button className="sp-mini" onClick={() => startRename(s)} title="Umbenennen">✎</button>
-                      <button className="sp-mini sp-del" onClick={() => onDeleteScene(s.id)} title="Szene löschen">🗑</button>
+                      <button className="sp-mini" onClick={() => onUpdateScene(s.id)} title={t('panel.scene.overwrite', 'Mit aktuellem Look überschreiben')}>⟳</button>
+                      <button className="sp-mini" onClick={() => startRename(s)} title={t('panel.scene.rename', 'Umbenennen')}>✎</button>
+                      <button className="sp-mini sp-del" onClick={() => onDeleteScene(s.id)} title={t('panel.scene.delete', 'Szene löschen')}>🗑</button>
                     </div>
                   </li>
                 );
