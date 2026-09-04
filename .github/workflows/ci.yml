@@ -40,6 +40,8 @@ jobs:
         run: npm run avplan:check
       - name: Wire-Contract — Venue-Austausch
         run: npm run venue:check
+      - name: Projekt-Identitaet (Versionen, Geraete-Liste)
+        run: npm run identity:check
 
       - name: Herkunft der Kenndaten
         run: npm run spec:check

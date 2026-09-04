@@ -732,7 +732,7 @@ const App: React.FC = () => {
     }
   }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, sun, floorPlan, projectId]);
 
-  const handleLoadProject = useCallback((data: ProjectData) => {
+  const handleLoadProject = useCallback((data: ProjectData, keepId?: string) => {
     historyRef.current = [];
     futureRef.current = [];
     suppressLogRef.current = true;       // don't log the bulk state swap
@@ -772,8 +772,22 @@ const App: React.FC = () => {
     }
     setPlanMode('none');
     setProjectMeta(data.meta);
-    const newId = 'proj-' + Date.now();
-    setProjectId(newId);
+    // Die Projekt-Identitaet: `keepId` gesetzt heisst "dasselbe Projekt", nur
+    // mit anderem Inhalt (aus der Geraete-Liste geladen, oder eine Version
+    // wiederhergestellt). Ohne `keepId` ist es wirklich ein neues Projekt
+    // (.avplan-Import, Datei-Import) und bekommt eine frische Id.
+    //
+    // WARUM DAS ZAEHLT. Vorher wurde hier IMMER eine neue Id erzeugt. An
+    // `projectId` haengen aber die Versions-Schnappschuesse
+    // (`versionStore.saveVersion(projectId, …)`) und die Zuordnung beim
+    // Speichern (`saveProjectToStorage` dedupliziert ueber die Id). Das kostete
+    // drei Dinge auf einmal:
+    //   1. Eine Version wiederherstellen machte alle uebrigen Versionen
+    //      desselben Projekts sofort unerreichbar -- ohne Neustart.
+    //   2. Nach jedem App-Start waren alle Schnappschuesse verwaist.
+    //   3. Laden + Bearbeiten + Speichern legte einen ZWEITEN Eintrag in der
+    //      Geraete-Liste an, statt den bestehenden zu aktualisieren.
+    setProjectId(keepId ?? 'proj-' + Date.now());
     setSelectedIds(new Set());
     setProjectDialogMode(null);
   }, []);
@@ -1626,7 +1640,9 @@ const App: React.FC = () => {
           projectId={projectId}
           projectName={projectMeta?.name ?? ''}
           currentDoc={buildCurrentDoc()}
-          onRestore={(doc) => { handleLoadProject(doc); setVersionOpen(false); }}
+          // Dieselbe Projekt-Identitaet behalten: eine Version des Projekts
+          // wiederherzustellen macht daraus kein anderes Projekt.
+          onRestore={(doc) => { handleLoadProject(doc, projectId); setVersionOpen(false); }}
           onClose={() => setVersionOpen(false)}
         />
       )}
