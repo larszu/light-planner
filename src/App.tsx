@@ -40,6 +40,7 @@ import { useUiStore } from './store/uiStore';
 import { useProjectStore } from './store/projectStore';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
+import { useTranslation } from './i18n';
 
 export type PlanMode = 'none' | 'calibrate' | 'move';
 
@@ -97,6 +98,7 @@ function serializeFloorPlan(fp: FloorPlan): Omit<FloorPlan, 'image'> {
 }
 
 const App: React.FC = () => {
+  const { t } = useTranslation();
   const [fixtures, setFixtures] = useState<PlacedFixture[]>([]);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [persons, setPersons] = useState<Person[]>([]);
@@ -1500,7 +1502,7 @@ const App: React.FC = () => {
               onViewChange={(s) => { planPxPerMeterRef.current = s; }}
             />
           ) : (
-            <Suspense fallback={<div className="loading-3d">3D-Ansicht wird geladen…</div>}>
+            <Suspense fallback={<div className="loading-3d">{t('app.loading3d', '3D-Ansicht wird geladen…')}</div>}>
               <Scene3D
                 ref={scene3DRef}
                 fixtures={fixtures}
@@ -1549,32 +1551,32 @@ const App: React.FC = () => {
           />
           {fixtureToPlace && viewMode === '2d' && (
             <div className="placing-hint">
-              Klicke auf den Plan um <strong>{fixtureToPlace.name}</strong> zu platzieren · ESC zum Abbrechen
+              {t('app.placePre', 'Klicke auf den Plan um')} <strong>{fixtureToPlace.name}</strong> {t('app.placePost', 'zu platzieren · ESC zum Abbrechen')}
             </div>
           )}
           {activeTool === 'wall' && viewMode === '2d' && (
             <div className="placing-hint">
-              🧱 <strong>Wand-Pfad</strong>: Punkte nacheinander klicken · Startpunkt klicken schließt den Raum · <kbd>Shift</kbd> = 15°-Winkel · Doppelklick/<kbd>ESC</kbd> beendet
+              🧱 <strong>{t('app.wallPath', 'Wand-Pfad')}</strong>{t('app.wallPathHint', ': Punkte nacheinander klicken · Startpunkt klicken schließt den Raum ·')} <kbd>Shift</kbd> {t('app.wallPathAngle', '= 15°-Winkel · Doppelklick/')}<kbd>ESC</kbd> {t('app.ends', 'beendet')}
             </div>
           )}
           {activeTool === 'stagepoly' && viewMode === '2d' && (
             <div className="placing-hint">
-              ⬠ <strong>Bühne (Polygon)</strong>: Eckpunkte klicken · Startpunkt klicken oder Doppelklick/<kbd>Enter</kbd> schließt die Fläche · <kbd>ESC</kbd> bricht ab
+              ⬠ <strong>{t('app.stagePoly', 'Bühne (Polygon)')}</strong>{t('app.stagePolyHint', ': Eckpunkte klicken · Startpunkt klicken oder Doppelklick/')}<kbd>Enter</kbd> {t('app.stagePolyClose', 'schließt die Fläche ·')} <kbd>ESC</kbd> {t('app.cancels', 'bricht ab')}
             </div>
           )}
           {activeTool === 'camera' && viewMode === '2d' && (
             <div className="placing-hint">
-              🎥 <strong>Kamera</strong>: Klicke, um eine Kamera zu setzen · dann Blickziel &amp; Bildwinkel einstellen und „Durch Kamera schauen"
+              🎥 <strong>{t('app.camera', 'Kamera')}</strong>{t('app.cameraHint', ': Klicke, um eine Kamera zu setzen · dann Blickziel & Bildwinkel einstellen und „Durch Kamera schauen"')}
             </div>
           )}
           {planMode === 'calibrate' && viewMode === '2d' && (
             <div className="placing-hint plan-calibrate-hint">
-              📏 Ziehe eine Linie entlang einer <strong>bekannten Strecke</strong> (z.&nbsp;B. eine Wand) · ESC zum Abbrechen
+              📏 {t('app.calibratePre', 'Ziehe eine Linie entlang einer')} <strong>{t('app.calibrateKnown', 'bekannten Strecke')}</strong> {t('app.calibratePost', '(z. B. eine Wand) · ESC zum Abbrechen')}
             </div>
           )}
           {planMode === 'move' && viewMode === '2d' && (
             <div className="placing-hint plan-calibrate-hint">
-              ✋ Ziehe den Grundriss, um ihn auszurichten · ESC zum Beenden
+              ✋ {t('app.movePlan', 'Ziehe den Grundriss, um ihn auszurichten · ESC zum Beenden')}
             </div>
           )}
           {floorPlan && viewMode === '2d' && (
@@ -1729,10 +1731,10 @@ const App: React.FC = () => {
       <button
         type="button"
         onClick={() => setInventoryOpen(true)}
-        title="Lager / Bestand"
+        title={t('app.inventoryTitle', 'Lager / Bestand')}
         style={{ position: 'fixed', bottom: 16, left: 16, zIndex: 150, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 999, cursor: 'pointer' }}
       >
-        <Icon name="library" size={16} /> Lager
+        <Icon name="library" size={16} /> {t('app.inventory', 'Lager')}
       </button>
       {inventoryOpen && <InventoryDialog onClose={() => setInventoryOpen(false)} />}
     </div>
