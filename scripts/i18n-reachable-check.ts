@@ -67,16 +67,38 @@ const aufrufe = (s: string) => [...s.matchAll(/\bt\(\s*'([^']+)'/g)].map((m) => 
  * unbrauchbar wie einer, der schweigt.
  */
 const en = (() => {
-  const keys = new Set<string>();
+  /** Schluessel -> die Datei(en), die ihn definieren. */
+  const herkunft = new Map<string, string[]>();
+  const merken = (k: string, f: string) => herkunft.set(k, [...(herkunft.get(k) ?? []), f]);
+
   const s = readFileSync(join(SRC, 'i18n/index.ts'), 'utf8');
   const m = /const en[^=]*=\s*\{([\s\S]*?)\n\};/.exec(s);
   assert.ok(m, 'Das en-Woerterbuch wurde nicht gefunden — der Check prueft sonst nichts');
-  for (const x of m[1].matchAll(/^\s*'([^']+)':/gm)) keys.add(x[1]);
+  for (const x of m[1].matchAll(/^\s*'([^']+)':/gm)) merken(x[1], 'i18n/index.ts');
   // Teildicts, falls vorhanden.
   for (const f of dateien) {
     if (!/\/i18n\/en\/[^/]+\.ts$/.test(f)) continue;
-    for (const x of inhalt.get(f)!.matchAll(/^\s*'([^']+)':/gm)) keys.add(x[1]);
+    for (const x of inhalt.get(f)!.matchAll(/^\s*'([^']+)':/gm)) merken(x[1], relative(SRC, f));
   }
+
+  // Ein Schluessel in ZWEI Teildicts ist stiller Verlust: `{ ...a, ...b }`
+  // nimmt kommentarlos den aus dem letzten Spread. Innerhalb eines
+  // Objektliterals faengt tsc das ab (TS1117) -- ueber die Spreads hinweg
+  // fangt es niemand, und das ist genau die Luecke, die die Aufteilung in
+  // Teildicts aufgemacht hat. Solange nur ein Woerterbuch existiert, ist
+  // diese Zusicherung inert.
+  const doppelt = [...herkunft.entries()]
+    .filter(([, fs]) => fs.length > 1)
+    .map(([k, fs]) => `${k} (${fs.join(', ')})`)
+    .sort();
+  assert.deepEqual(
+    doppelt,
+    [],
+    `Mehrfach definierte Schluessel: ${doppelt.join(' | ')}. Beim Spread gewinnt der ` +
+      'letzte, die anderen Fassungen sind wirkungslos — ohne dass es jemand meldet.',
+  );
+
+  const keys = new Set(herkunft.keys());
   assert.ok(
     keys.size > 20,
     `Nur ${keys.size} englische Schluessel gefunden — das Muster passt vermutlich nicht mehr, ` +
