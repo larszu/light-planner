@@ -162,23 +162,53 @@ assert.deepEqual(
 // jemand in `t()` gewickelt hat, sagt er nichts -- und genau so laesst sich
 // seine gruene Zeile missverstehen.
 //
-// Gemessen 2026-09-04: upstream sitzen rund 496 von 497 sichtbaren
-// Textstellen in Dateien mit **null** `t()`-Aufrufen (TopBar, PropertyPanel,
-// ScheduleDialog, FixtureEditor …). „34 von 34 abgedeckt" und „die
-// Oberflaeche ist uebersetzt" sind also zwei sehr verschiedene Aussagen. In
-// der Suite-Kopie, wo weit mehr gewickelt ist, bleiben immer noch 12
-// gerenderte Komponenten ganz ohne `t()` -- und dort ist der Sprachschalter
-// erreichbar, der Schaden also sichtbar.
+// Gemessen 2026-09-04: upstream sassen fast alle sichtbaren Textstellen in
+// Dateien mit **null** `t()`-Aufrufen (TopBar, PropertyPanel, ScheduleDialog,
+// FixtureEditor …). „34 von 34 abgedeckt" und „die Oberflaeche ist
+// uebersetzt" sind also zwei sehr verschiedene Aussagen. Nach #62 sind es
+// hier noch 10 Komponenten mit ~365 Stellen; in der Suite-Kopie, wo der
+// Sprachschalter erreichbar ist, noch eine einzige.
 //
 // Deshalb steht die Zahl ab jetzt unter jedem Lauf. Zusichern laesst sie sich
 // nicht: es gibt keine Schwelle, die heute schon gilt.
 const SICHTBAR = /(?:>[^<>{}\n]*[A-Za-zÄÖÜäöüß]{3,}[^<>{}\n]*<)|(?:(?:title|placeholder|aria-label|label)="[^"]{3,}")/g;
+
+/**
+ * Die erste Fassung zaehlte alles zwischen `>` und `<` -- und traf damit
+ * TypeScript-Vergleiche:
+ *
+ *     if (xhr.status >= 200 && xhr.status < 300)
+ *     if (x > bMaxX) bMaxX = x; if (y < bMinY) …
+ *
+ * `Scene3D.tsx` und `PlanCanvas.tsx` standen deshalb mit 7 bzw. 4 angeblich
+ * deutschen Textstellen im Bericht. Sie haben **keine einzige**. Die Zahl,
+ * die eine ueberschaetzende Zusicherung ersetzen sollte, hat selbst
+ * ueberschaetzt.
+ *
+ * Ausgeschlossen wird, was Code-Marken traegt: `=`, `;`, `&&`, `||`, ein
+ * `bezeichner.feld`, oder eine oeffnende Klammer am Anfang. Gegengeprueft an
+ * den 98 Stellen, die #62 gewickelt hat: 97 davon erkennt die Regel weiter,
+ * und alle 11 Falschtreffer sind weg.
+ */
+const CODE_MARKE = /[=;]|&&|\|\||\b\w+\.\w+/;
+const sichtbareStellen = (s: string): number => {
+  let n = 0;
+  for (const treffer of s.match(SICHTBAR) ?? []) {
+    if (treffer.startsWith('>')) {
+      const innen = treffer.slice(1, -1);
+      if (CODE_MARKE.test(innen) || /^\s*\(/.test(innen)) continue;
+    }
+    n++;
+  }
+  return n;
+};
+
 const ohneT: Array<[string, number]> = [];
 for (const [f, s] of inhalt) {
   if (!f.endsWith('.tsx')) continue;
   if (!(f.endsWith('App.tsx') || wirdImportiert(f))) continue;
   if (aufrufe(s).length) continue;
-  const stellen = (s.match(SICHTBAR) ?? []).length;
+  const stellen = sichtbareStellen(s);
   if (stellen) ohneT.push([relative(SRC, f), stellen]);
 }
 ohneT.sort((a, b) => b[1] - a[1]);
