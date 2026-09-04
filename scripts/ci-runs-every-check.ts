@@ -17,12 +17,30 @@
 //
 // Lauf: `npm run ci:complete`
 // ───────────────────────────────────────────────────────────────────────────
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
   scripts?: Record<string, string>;
 };
-const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+// Der Workflow-Pfad ist relativ zum Skript. In einer vendorten Kopie (die
+// Suite legt `scripts/` unter `apps/light-planner/` ab, `.github/` bleibt beim
+// Wirt) gibt es ihn nicht. Ohne diese Abfrage waere die Meldung ein
+// ENOENT-Stacktrace auf einen Pfad, den niemand sucht — mit ihr steht da, was
+// tatsaechlich fehlt. Der Lauf scheitert in beiden Faellen, und das ist
+// Absicht: „Workflow nicht gefunden" heisst „nicht geprueft", und ein nicht
+// geprueftes Versprechen darf nicht gruen aussehen.
+const workflowPfad = new URL('../.github/workflows/ci.yml', import.meta.url);
+
+if (!existsSync(workflowPfad)) {
+  console.error(`FEHLER: ${workflowPfad.pathname} existiert nicht.`);
+  console.error('Dieser Guard vergleicht package.json gegen den CI-Workflow desselben');
+  console.error('Repos. Liegt das Skript in einer vendorten Kopie ohne eigenes');
+  console.error('.github/, hat er nichts zu vergleichen — dann gehoert er dort auch');
+  console.error('nicht in die Pruef-Kette, statt still durchzulaufen.');
+  process.exit(1);
+}
+
+const workflow = readFileSync(workflowPfad, 'utf8');
 
 const checks = Object.keys(pkg.scripts ?? {})
   .filter((name) => name.endsWith(':check'))
