@@ -708,6 +708,20 @@ const App: React.FC = () => {
       floor,
       sun,
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
+      // ADR-005 — dieselben drei Felder wie im Dateipfad (handleSaveToFile).
+      // Sie fehlten hier, und das war kein harmloser Unterschied: beim Laden
+      // setzt handleLoadProject die Refs aus GENAU diesen Feldern zurueck.
+      // Ein Speichern aufs Geraet und spaeteres Laden loeschte damit still
+      // die Kamera-, Kabel- und Raum-Daten, die ueber .avplan hereinkamen --
+      // der naechste Export schrieb sie als undefined. Verlustfrei-oder-laut
+      // heisst: hier verlustfrei.
+      ...foreignDomainsField(preservedDomainsRef.current),
+      ...(Object.keys(preservedVenueRef.current).length > 0
+        ? { venueForeign: preservedVenueRef.current }
+        : {}),
+      ...(Object.keys(preservedPersonsRef.current).length > 0
+        ? { personForeign: preservedPersonsRef.current }
+        : {}),
     };
     try {
       saveProjectToStorage(projectId, meta, data);
