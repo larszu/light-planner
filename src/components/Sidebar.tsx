@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Fixture, FixtureCategory } from '../types';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import FixtureEditor from './FixtureEditor';
+import { useTranslation, translate } from '../i18n';
 
 interface Props {
   customFixtures: Fixture[];
@@ -10,6 +11,10 @@ interface Props {
   onSelectFixtureToPlace: (f: Fixture) => void;
 }
 
+// Die deutschen Formen bleiben hier stehen — sie sind die Quellsprache und
+// zugleich der Fallback. Uebersetzt wird ueber `translate`, nicht ueber eine
+// zweite Map: eine zweite Map liefe auseinander, sobald jemand eine Kategorie
+// ergaenzt und nur eine Seite pflegt.
 const CATEGORY_LABELS: Record<FixtureCategory, string> = {
   profile: 'Profilscheinwerfer',
   fresnel: 'Stufenlinsen',
@@ -28,6 +33,9 @@ const CATEGORY_LABELS: Record<FixtureCategory, string> = {
   custom: 'Eigene',
 };
 
+const categoryLabel = (language: 'de' | 'en', cat: FixtureCategory): string =>
+  translate(language, `fixtureCategory.${cat}`, CATEGORY_LABELS[cat]);
+
 const CATEGORIES: FixtureCategory[] = [
   'profile', 'fresnel', 'par', 'wash', 'spot', 'beam',
   'moving-wash', 'moving-spot', 'moving-beam',
@@ -40,6 +48,7 @@ const Sidebar: React.FC<Props> = ({
   fixtureToPlace,
   onSelectFixtureToPlace,
 }) => {
+  const { t, language } = useTranslation();
   const [search, setSearch] = useState('');
   const [expandedCat, setExpandedCat] = useState<FixtureCategory | null>(null); // all categories collapsed by default
   const [showEditor, setShowEditor] = useState(false);
@@ -70,14 +79,14 @@ const Sidebar: React.FC<Props> = ({
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h2>Leuchten-Bibliothek</h2>
-        <span className="sidebar-hint">Drag & Drop oder Klick</span>
+        <h2>{t('sidebar.title', 'Leuchten-Bibliothek')}</h2>
+        <span className="sidebar-hint">{t('sidebar.hint', 'Drag & Drop oder Klick')}</span>
       </div>
 
       <div className="sidebar-search">
         <input
           type="text"
-          placeholder="Suchen…"
+          placeholder={t('sidebar.search', 'Suchen…')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -93,7 +102,7 @@ const Sidebar: React.FC<Props> = ({
               onClick={() => setExpandedCat(expandedCat === g.category ? null : g.category)}
             >
               <span className="group-arrow">{expanded ? '▾' : '▸'}</span>
-              <span>{CATEGORY_LABELS[g.category]}</span>
+              <span>{categoryLabel(language, g.category)}</span>
               <span className="group-count">{g.fixtures.length}</span>
             </button>
             {expanded && (
@@ -125,7 +134,8 @@ const Sidebar: React.FC<Props> = ({
                     </div>
                     {f.compatibleAttachments && f.compatibleAttachments.length > 0 && (
                       <div className="fixture-item-info attachment-hint">
-                        🔧 {f.compatibleAttachments.length} Vorsätze verfügbar
+                        🔧 {f.compatibleAttachments.length}{' '}
+                        {t('sidebar.attachments', 'Vorsätze verfügbar')}
                       </div>
                     )}
                   </button>
@@ -139,7 +149,7 @@ const Sidebar: React.FC<Props> = ({
 
       <div className="sidebar-footer">
         <button className="add-fixture-btn" onClick={() => setShowEditor(true)}>
-          + Eigene Leuchte anlegen
+          {t('sidebar.addCustom', '+ Eigene Leuchte anlegen')}
         </button>
       </div>
 
