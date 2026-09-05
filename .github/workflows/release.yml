@@ -15,10 +15,13 @@ on:
 permissions:
   contents: write
 
-env:
-  # Opt the bundled actions into Node 24 to silence the Node 20 deprecation
-  # notice (deadline 2026-06-02). Drop this once checkout/setup-node ship v5.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+# Kein FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 mehr. Hier stand "Drop this once
+# checkout/setup-node ship v5" -- die gibt es laengst, und upload-artifact,
+# download-artifact und action-gh-release haben inzwischen ebenfalls
+# node24-Majors. Die Sha-Pins zeigten weiter auf v4.x: ein Sha ist gut gegen
+# Tag-Verschiebung und schlecht gegen Vergessen, denn man sieht ihm nicht an,
+# wie alt er ist. `npm run actions:check` sieht deshalb in jeder action.yml
+# nach, statt sich auf den Kommentar daneben zu verlassen.
 
 jobs:
   build:
@@ -32,11 +35,11 @@ jobs:
             script: dist:mac
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '22'
           cache: 'npm'
@@ -68,7 +71,7 @@ jobs:
         run: npm run ${{ matrix.script }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: release-${{ matrix.os }}
           path: |
@@ -81,7 +84,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: artifacts
           merge-multiple: true
@@ -90,7 +93,7 @@ jobs:
         run: ls -la artifacts
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: Light Planner ${{ github.event.inputs.tag || github.ref_name }}
