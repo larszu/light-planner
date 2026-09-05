@@ -60,6 +60,14 @@ jobs:
       # Zuletzt und bewusst: dieser Lauf prueft, dass die Liste darueber
       # vollstaendig ist. `mvr:check` fehlte hier bis 2026-09-04 — er
       # existierte, war gruen, und lief bei keinem Merge.
+      # Fragt die action.yml jedes Pins nach ihrer Node-Version, statt sie in
+      # einem Kommentar zu behaupten. `release.yml` pinnt per Sha -- gut gegen
+      # Tag-Verschiebung, schlecht gegen Vergessen: am 2026-09-05 zeigten alle
+      # vier Shas noch auf v4.x, also node20, und der Kommentar daneben sagte
+      # "Drop this once checkout/setup-node ship v5", die es laengst gab.
+      - name: Actions laufen auf einer unterstuetzten Node-Version
+        run: npm run actions:check
+
       - name: Jeder Pruef-Lauf steht auch im Workflow
         run: npm run ci:complete
       - name: Build (inkl. Type-Check)

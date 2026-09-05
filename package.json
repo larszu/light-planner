@@ -22,7 +22,8 @@
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
     "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",
     "ci:complete": "node --experimental-strip-types scripts/ci-runs-every-check.ts",
-    "docs:check": "node --experimental-strip-types scripts/docs-reachable-check.ts"
+    "docs:check": "node --experimental-strip-types scripts/docs-reachable-check.ts",
+    "actions:check": "node --experimental-strip-types scripts/actions-node-runtime.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^6.0.227",
