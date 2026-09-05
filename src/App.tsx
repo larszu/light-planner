@@ -15,7 +15,8 @@ import ProjectDialog, { saveProjectToStorage, deleteProjectFromStorage } from '.
 import VersionDialog from './components/VersionDialog';
 import ChangesDialog from './components/ChangesDialog';
 import { summarizeChange } from './core/diff';
-import { saveVersion } from './utils/versionStore';
+import { saveVersion, versionsFor } from './utils/versionStore';
+import { planContentFingerprint, stampForStand } from './core/documentStamp';
 import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
 import ScheduleDialog from './components/ScheduleDialog';
@@ -1204,13 +1205,35 @@ const App: React.FC = () => {
   const handleExportPlot = useCallback(async () => {
     const srcCanvas = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
     if (viewMode !== '2d' || !srcCanvas) { window.alert('Lichtplan-Druck: bitte in der 2D-Plan-Ansicht ausführen.'); return; }
+    // Stand-Angabe fuer das Blatt (ADR-004). Fuer den PLAN-Ausdruck zaehlen
+    // auch Positionen — sie sind darauf zu sehen; eine verschobene Leuchte
+    // macht ein anderes Blatt. Der Vergleichswert kommt aus dem juengsten
+    // Versions-Schnappschuss, mit derselben Rechnung ueber dessen Inhalt.
+    const stand = versionsFor(projectId)[0];
+    const stamp = stampForStand({
+      project: projectMeta?.name || 'Lichtplan',
+      current: planContentFingerprint({ fixtures, trusses, walls, persons, stageElements }),
+      committed: stand
+        ? {
+            label: stand.label,
+            fingerprint: planContentFingerprint({
+              fixtures: stand.doc.fixtures ?? [],
+              trusses: stand.doc.trusses ?? [],
+              walls: stand.doc.walls ?? [],
+              persons: stand.doc.persons ?? [],
+              stageElements: stand.doc.stageElements ?? [],
+            }),
+          }
+        : undefined,
+      now: new Date(),
+    });
     const out = composePlot(srcCanvas, planPxPerMeterRef.current, fixtures, {
-      projectName: projectMeta?.name || 'Lichtplan', author: projectMeta?.author,
+      projectName: projectMeta?.name || 'Lichtplan', author: projectMeta?.author, stamp,
     });
     const base = `${projectMeta?.name || 'Lichtplan'} Plan ${String(exportCounterRef.current++).padStart(3, '0')}`;
     const bytes = dataUrlToBytes(out.toDataURL('image/jpeg', 0.92));
     await host.exportFile(jpegToPdfBlob(bytes, out.width, out.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
-  }, [viewMode, fixtures, projectMeta, host]);
+  }, [viewMode, fixtures, trusses, walls, persons, stageElements, projectId, projectMeta, host]);
 
   // Current project document as a single object (used by version snapshots).
   const buildCurrentDoc = useCallback((): ProjectData => {
@@ -1707,6 +1730,7 @@ const App: React.FC = () => {
           ceilings={ceilings}
           area={lightArea}
           projectName={projectMeta?.name ?? ''}
+          projectId={projectId}
           conflicts={patchConflicts}
           onAutoNumber={handleAutoNumber}
           onAutoPatch={handleAutoPatch}

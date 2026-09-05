@@ -19,6 +19,7 @@
     "inventory:check": "node --experimental-strip-types scripts/inventory-contract-check.ts",
     "mvr:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/mvr-check.ts",
     "spec:check": "node --experimental-strip-types scripts/spec-source-check.ts",
+    "stamp:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/stamp-check.ts",
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
     "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",
     "ci:complete": "node --experimental-strip-types scripts/ci-runs-every-check.ts",

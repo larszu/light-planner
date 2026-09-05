@@ -18,3 +18,11 @@ export * from './colorTemp';
 export * from './patch';
 export * from './gelLibrary';
 export * from './fixtureLibrary';
+
+// Der Stand-Stempel gehoert in diese Flaeche, nicht daneben: ein Wirt, der den
+// Planer einbettet (siehe INTEGRATION.md), druckt dieselben Listen und muss
+// denselben Fingerabdruck rechnen koennen. Zwei Apps, die verschiedene Staende
+// desselben Projekts verschieden benennen, waeren schlimmer als gar kein
+// Stempel.
+export * from './documentStamp';
+export * from './documentTables';

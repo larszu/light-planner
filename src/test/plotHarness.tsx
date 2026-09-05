@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import PlanCanvas from '../components/PlanCanvas';
 import { composePlot } from '../utils/plotExport';
+import { planContentFingerprint, stampForStand } from '../core/documentStamp';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import type { PlacedFixture, Layers, Truss, StageElement } from '../types';
 import '../App.css';
@@ -32,7 +33,16 @@ function Harness() {
     const t = setTimeout(() => {
       const c = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
       if (c) {
-        const out = composePlot(c, pxRef.current, fixtures, { projectName: 'Demo-Show', author: 'L. Z.' });
+        // Mit Stempel und mit ABWEICHUNG: das ist der Fall, den man sehen
+        // koennen muss. Ein Blatt, das „Stand Montag" sagt, obwohl seither
+        // etwas verschoben wurde, ist genau der Schaden, den ADR-004 abwendet.
+        const stamp = stampForStand({
+          project: 'Demo-Show',
+          current: planContentFingerprint({ fixtures, trusses, stageElements: [] }),
+          committed: { label: 'Stand Montag', fingerprint: 'aaaaaaaa' },
+          now: new Date(),
+        });
+        const out = composePlot(c, pxRef.current, fixtures, { projectName: 'Demo-Show', author: 'L. Z.', stamp });
         setUrl(out.toDataURL('image/png'));
         (window as Window & { __plotReady?: boolean }).__plotReady = true;
       }

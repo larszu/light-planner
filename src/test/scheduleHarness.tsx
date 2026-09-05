@@ -51,6 +51,7 @@ function Harness() {
       ceilings={[]}
       area={{ minX: 2, minY: 4, maxX: 10, maxY: 8 }}
       projectName="Demo-Show"
+      projectId="harness"
       conflicts={findPatchConflicts(fixtures)}
       onAutoNumber={() => {}}
       onAutoPatch={() => {}}

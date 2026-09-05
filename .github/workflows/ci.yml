@@ -51,6 +51,13 @@ jobs:
       - name: Herkunft der Kenndaten
         run: npm run spec:check
 
+      # Ein Ausdruck sagt seinen Stand (ADR-004). Der Waechter haelt vor allem
+      # zwei Dinge fest, die man nicht sieht: dass der Fingerabdruck derselbe
+      # ist wie im cable-planner, und dass eine CSV OHNE Stempel zeichengleich
+      # bleibt wie vor der Einfuehrung.
+      - name: Stand-Stempel auf den Ausdrucken
+        run: npm run stamp:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.
