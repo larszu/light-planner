@@ -66,6 +66,7 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 - Auto-number the rig and auto-patch DMX (universe / address, footprint-aware, with clash detection)
 - Equipment list, instrument schedule and an electrical-load summary (kW, A per phase, 16 A circuits) — export to CSV
 - Trusses / hanging positions you can draw and label
+- **Return from the console**: load the desk's patch export (CSV/TSV) and hold it against the plan — re-addressed, renamed, retyped, only-on-the-desk, only-in-the-plan. One-way on purpose: nothing is written back, because the plan carries the intent and the desk the state after load-in
 
 ### 🎬 Auto-place helpers
 - One-click 3-point lighting around a person
