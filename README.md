@@ -13,6 +13,10 @@
   <img src="https://img.shields.io/badge/license-proprietär-critical" />
 </p>
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="LightPlanner – 2D-Plan mit Leuchten-Bibliothek und Eigenschaften-Panel" />
+</p>
+
 ---
 
 ## ✨ What it is
