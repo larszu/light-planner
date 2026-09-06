@@ -316,6 +316,45 @@ export interface CameraView {
   label: string;
 }
 
+// ── Arbeits-Notizen aus der Technischen Probe (Bedarf 71) ────────────
+//
+//   > Entering notes on the console during a live rehearsal is 'cumbersome',
+//   > so a separate desktop app exists purely to write notes into an Eos show
+//   > file over OSC […]. An open request asks for the opposite — store notes
+//   > locally rather than in the show file.
+//
+// Belege: douglasfinlay/cue-note (README) und dessen Issues #11 und #7
+// (2023-2024).
+//
+// WARUM NEBEN `focusNote` UND NICHT STATT DESSEN. `PlacedFixture.focusNote`
+// ist die BESCHREIBUNG des Fokus („Gesicht Solist, harte Kante") mit einem
+// Erledigt-Haken; sie gehoert zur Leuchte wie ihr Aim und wird beim
+// Einleuchten ueberschrieben. Eine Arbeits-Notiz ist etwas anderes: sie ist
+// ein VORGANG, es gibt mehrere davon je Leuchte, sie entstehen zu
+// verschiedenen Zeiten, und sie haben einen Autor. Die eine in die andere zu
+// pressen hiesse, beim zweiten Zuruf den ersten zu ueberschreiben.
+//
+// UND SIE BLEIBT IM EIGENEN PROJEKT. Das ist der Punkt des Belegs: cue-note
+// schreibt in die Show-Datei des Pults. Diese Notizen gehen in KEINEN
+// Fremdformat-Export (MVR, Venue-Austausch) -- `scripts/work-notes-check.ts`
+// haelt das fest.
+export type WorkNoteTarget =
+  | { kind: 'fixture'; fixtureId: string }
+  | { kind: 'truss'; trussId: string }
+  | { kind: 'plan' };
+
+export interface WorkNote {
+  id: string;
+  text: string;
+  /** ISO-Zeitpunkt. Ohne ihn ist „was war zuerst" nach der Probe verloren. */
+  at: string;
+  /** Wer sie geschrieben hat. Optional -- geraten wird niemand. */
+  by?: string;
+  /** Abgearbeitet. Getrennt vom Text: der Text bleibt lesbar. */
+  done?: boolean;
+  target: WorkNoteTarget;
+}
+
 // ── Truss / hanging position (rigging) ──
 export interface Truss {
   id: string;
@@ -397,6 +436,11 @@ export interface ProjectMeta {
 export interface ProjectData {
   meta: ProjectMeta;
   fixtures: PlacedFixture[];
+  /**
+   * Bedarf 71 — Arbeits-Notizen aus der Probe. Optional: alte Projekte laden
+   * sauber, und ein leeres Feld in jeder Datei waere Ballast.
+   */
+  workNotes?: WorkNote[];
   shapes: Shape[];
   persons: Person[];
   stageElements: StageElement[];
