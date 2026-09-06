@@ -85,6 +85,14 @@ jobs:
       - name: Gruppen haben Namen, ein Blatt und einen Weg
         run: npm run groups:check
 
+      # Bedarf 144 — Austauschdateien, die an einer Umbenennung nicht
+      # zerbrechen. Zwei gemessene Defekte stehen dahinter: derselbe Plan ergab
+      # zweimal verschiedene UUIDs (ein Nachimport war damit keine
+      # Aktualisierung, sondern eine Verdopplung), und zwei Geraetetypen fielen
+      # auf denselben GDTF-Dateinamen. Beides sah man der Datei nicht an.
+      - name: MVR-Identitaeten sind stabil und kollisionsfrei
+        run: npm run identity:mvr
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

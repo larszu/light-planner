@@ -10,21 +10,17 @@
 // readable transfer of the plot layout and patch, which is the high-value part.
 import type { PlacedFixture, Truss } from '../types';
 import { footprint } from './patch';
+import { fixtureUuid, gdtfSpecNames, layerUuid } from './mvrIdentity';
 
-// ── RFC-4122 v4 UUID (crypto where available, Math.random fallback) ──
-function uuid(): string {
-  const b = new Uint8Array(16);
-  const c = (globalThis as { crypto?: Crypto }).crypto;
-  if (c?.getRandomValues) c.getRandomValues(b);
-  else for (let i = 0; i < 16; i++) b[i] = (Math.random() * 256) | 0;
-  b[6] = (b[6] & 0x0f) | 0x40;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  const h = [...b].map((x) => x.toString(16).padStart(2, '0'));
-  return `${h.slice(0, 4).join('')}-${h.slice(4, 6).join('')}-${h.slice(6, 8).join('')}-${h.slice(8, 10).join('')}-${h.slice(10, 16).join('')}`;
-}
+// BEDARF 144 — hier stand ein Zufalls-UUID-Erzeuger, und er war der Defekt.
+// Jeder Export vergab neue UUIDs, also beschrieb dieselbe Anlage bei jedem Mal
+// andere Objekte: wer eine geaenderte `.mvr` nachimportierte, bekam keine
+// Aktualisierung, sondern lauter neue Lampen neben den alten. Die Identitaet
+// wird jetzt aus der Projekt- und Leuchten-id ABGELEITET und ueberlebt damit
+// Speichern, Neuladen und den Export von einem anderen Rechner; siehe
+// `mvrIdentity.ts`.
 
 const xmlEsc = (s: string) => s.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]!));
-const sanitizeFile = (s: string) => s.replace(/[\\/:*?"<>|@]+/g, '_').trim() || 'Fixture';
 
 // 4×3 MVR matrix (mm, Z-up): columns are the fixture's local X/Y/Z axes in world
 // space, then its position. The local −Z (GDTF beam axis) is aimed at the focus
@@ -62,16 +58,21 @@ function makeTypeIdMap(): (f: PlacedFixture) => number {
   };
 }
 
-function fixtureXml(f: PlacedFixture, idx: number, typeId: number): string {
+function fixtureXml(
+  f: PlacedFixture,
+  idx: number,
+  typeId: number,
+  projectId: string,
+  spec: string,
+): string {
   const name = xmlEsc(f.unitNumber ? `${f.unitNumber} ${f.fixture.name}` : f.fixture.name);
-  const spec = sanitizeFile(`${f.fixture.manufacturer}@${f.fixture.name}`) + '.gdtf';
   const fid = f.channel ?? (idx + 1);
   const fp = footprint(f);
   const addr = (fp > 0 && f.universe != null && f.dmxAddress != null)
     ? (f.universe - 1) * 512 + f.dmxAddress
     : (idx + 1);
   return [
-    `      <Fixture name="${name}" uuid="${uuid()}">`,
+    `      <Fixture name="${name}" uuid="${fixtureUuid(projectId, f.id)}">`,
     `        <Matrix>${aimMatrix(f)}</Matrix>`,
     `        <GDTFSpec>${xmlEsc(spec)}</GDTFSpec>`,
     `        <GDTFMode>Default</GDTFMode>`,
@@ -102,17 +103,36 @@ function fixtureXml(f: PlacedFixture, idx: number, typeId: number): string {
  * Traversen bleiben also in der Projektdatei. Das ist eine Grenze, kein
  * Verlust. Eine Grenze berechtigt aber nicht zum Schweigen.
  */
-export function buildSceneDescription(fixtures: PlacedFixture[], _trusses: Truss[], projectName: string): string {
-  const layerUuid = uuid();
+export function buildSceneDescription(
+  fixtures: PlacedFixture[],
+  _trusses: Truss[],
+  projectName: string,
+  /**
+   * BEDARF 144 — der Namensraum der Identitaeten. Zwei Projekte mit derselben
+   * Leuchten-id bekaemen sonst dieselbe UUID, und wer beide in einen
+   * Visualisierer laedt, sieht eine Leuchte statt zweier. Vorbelegt, damit
+   * bestehende Aufrufer nicht brechen; der Dialog reicht die echte
+   * Projekt-Kennung durch.
+   */
+  projectId = 'lightplanner',
+): string {
+  const ebene = layerUuid(projectId, projectName || 'Lichtplan');
   const typeIdFor = makeTypeIdMap();
-  const body = fixtures.map((f, i) => fixtureXml(f, i, typeIdFor(f))).join('\n');
+  // Ein Dateiname je Typ, kollisionsfrei und in der Reihenfolge des ersten
+  // Auftretens vergeben: „Source/Four" und „Source:Four" fielen vorher beide
+  // auf `ETC_Source_Four.gdtf`, und der Importer bekam fuer zwei Geraete
+  // denselben Bezug.
+  const specs = gdtfSpecNames(fixtures.map((f) => f.fixture));
+  const specOf = (f: PlacedFixture): string =>
+    specs.byType.get(`${f.fixture.manufacturer}@${f.fixture.name}`) ?? 'Fixture.gdtf';
+  const body = fixtures.map((f, i) => fixtureXml(f, i, typeIdFor(f), projectId, specOf(f))).join('\n');
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<GeneralSceneDescription verMajor="1" verMinor="6" provider="LightPlanner" providerVersion="1.0">',
     '  <Scene>',
     '    <AUXData/>',
     '    <Layers>',
-    `      <Layer name="${xmlEsc(projectName || 'Lichtplan')}" uuid="${layerUuid}">`,
+    `      <Layer name="${xmlEsc(projectName || 'Lichtplan')}" uuid="${ebene}">`,
     '        <ChildList>',
     body,
     '        </ChildList>',
@@ -142,11 +162,23 @@ function crc32(bytes: Uint8Array): number {
 
 interface ZipEntry { name: string; data: Uint8Array }
 
+/**
+ * BEDARF 144 — der Zeitstempel im Archiv ist FEST.
+ *
+ * 1980-01-01 ist der kleinste Wert, den das DOS-Datumsfeld darstellen kann,
+ * und die uebliche Wahl fuer reproduzierbare ZIPs. Mit der Uhr darin ergaebe
+ * derselbe Plan zweimal verschiedene Bytes — und damit liesse sich nicht mehr
+ * pruefen, ob zwei Exporte dieselbe Anlage beschreiben. Gelesen wird das Feld
+ * von keinem MVR-Programm; wann eine Datei entstanden ist, sagt das
+ * Dateisystem.
+ */
+const DOS_EPOCH_TIME = 0;
+const DOS_EPOCH_DATE = (1 << 5) | 1; // Jahr 1980, Monat 1, Tag 1
+
 export function zipStore(entries: ZipEntry[]): Uint8Array {
   const enc = new TextEncoder();
-  const now = new Date();
-  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xffff;
-  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xffff;
+  const dosTime = DOS_EPOCH_TIME;
+  const dosDate = DOS_EPOCH_DATE;
 
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
@@ -214,8 +246,20 @@ export function zipStore(entries: ZipEntry[]): Uint8Array {
   return out;
 }
 
-// Build a complete .mvr archive (Uint8Array) for the rig.
-export function buildMvr(fixtures: PlacedFixture[], trusses: Truss[], projectName: string): Uint8Array {
-  const xml = buildSceneDescription(fixtures, trusses, projectName);
+/**
+ * Ein vollstaendiges `.mvr`-Archiv.
+ *
+ * REPRODUZIERBAR (Bedarf 144): derselbe Plan ergibt dieselben Bytes. Das ist
+ * keine Kosmetik — nur so laesst sich sagen, ob zwei Dateien dieselbe Anlage
+ * beschreiben, und nur so bleibt ein Nachimport ein Abgleich statt einer
+ * Verdopplung.
+ */
+export function buildMvr(
+  fixtures: PlacedFixture[],
+  trusses: Truss[],
+  projectName: string,
+  projectId = 'lightplanner',
+): Uint8Array {
+  const xml = buildSceneDescription(fixtures, trusses, projectName, projectId);
   return zipStore([{ name: 'GeneralSceneDescription.xml', data: new TextEncoder().encode(xml) }]);
 }

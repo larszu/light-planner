@@ -807,6 +807,10 @@ const en: Record<string, string> = {
   'sch.exp.omit.gels': 'fixture(s) with gel',
   'sch.exp.omit.purposes': 'fixture(s) with a purpose',
   'sch.exp.omit.notes': 'note(s)',
+  // Bedarf 144 — Austauschdateien, die an einer Umbenennung nicht zerbrechen.
+  'sch.exp.specClash': 'Same GDTF file name',
+  'sch.exp.specClashNote':
+    '\u2013 the names differ only in characters a file name cannot carry. They get distinct references, but your GDTF library may know only one of them.',
   // Bedarf 137 — der Rueckweg vom Pult.
   'sch.tab.return': 'Return from console',
   'sch.return.load': 'Load console patch export (CSV)',

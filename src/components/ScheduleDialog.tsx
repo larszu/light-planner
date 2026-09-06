@@ -14,6 +14,7 @@ import { buildMvr } from '../core/mvrExport';
 import {
   groupTable, mvrOmissions, resolveGroups, UNNAMED_GROUP, type OmissionKind,
 } from '../core/fixtureGroups';
+import { gdtfSpecNames } from '../core/mvrIdentity';
 import { groupNotes, staleNotes } from '../core/workNotes';
 import { gelLibrary } from '../core/gelLibrary';
 import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
@@ -185,7 +186,11 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const exportColors = () => exportTable('farbliste.csv', colorTable);
 
   const exportMvr = () => {
-    const data = buildMvr(fixtures, trusses, projectName);
+    // Bedarf 144: die Projekt-Kennung geht mit — sie ist der Namensraum der
+    // MVR-Identitaeten. Ohne sie bekaemen zwei Projekte mit derselben
+    // Leuchten-id dieselbe UUID, und wer beide in einen Visualisierer laedt,
+    // sieht eine Leuchte statt zweier.
+    const data = buildMvr(fixtures, trusses, projectName, projectId);
     triggerDownload(new Blob([data as BlobPart], { type: 'application/octet-stream' }), `${safe}.mvr`);
   };
 
@@ -237,6 +242,13 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   };
   const gruppen = resolveGroups(fixtureGroups, fixtures, trussLabelOf);
   const auslassungen = mvrOmissions(fixtures, trusses, fixtureGroups, workNotes.length);
+
+  // BEDARF 144 — zwei Typen, ein Dateiname. „Source/Four" und „Source:Four"
+  // fielen beide auf `ETC_Source_Four.gdtf`, und der Importer bekam fuer zwei
+  // Geraete denselben Bezug — ohne ein Wort. Sie bekommen jetzt eindeutige
+  // Namen, und der Fall steht trotzdem da: wer seine GDTF-Bibliothek nach dem
+  // Namen durchsucht, findet nur einen von beiden wieder.
+  const specKollisionen = gdtfSpecNames(fixtures.map((f) => f.fixture)).collisions;
 
   const exportGroups = () => {
     const tb = groupTable(gruppen);
@@ -785,6 +797,17 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
               daneben genauso verloren, ohne ein Wort. Was fehlt, rechnet jetzt
               `mvrOmissions` aus; diese Liste ist damit kein Kenntnisstand,
               sondern ein Ergebnis. */}
+          {specKollisionen.length > 0 && (
+            <ul className="rig-issues">
+              {specKollisionen.map((c) => (
+                <li key={c.file} className="rig-issue sev-warning">
+                  <span className="rig-dot" />
+                  <b>{t('sch.exp.specClash', 'Gleicher GDTF-Dateiname')}</b> — {c.types.join(', ')}{' '}
+                  {t('sch.exp.specClashNote', '– die Namen unterscheiden sich nur in Zeichen, die ein Dateiname nicht führen kann. Sie bekommen eindeutige Bezüge; deine GDTF-Bibliothek kennt aber womöglich nur einen davon.')}
+                </li>
+              ))}
+            </ul>
+          )}
           {auslassungen.length > 0 && (
             <ul className="rig-issues">
               {auslassungen.map((o) => (
