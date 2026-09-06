@@ -98,13 +98,18 @@ const leuchte = (
   // Fuer die DEUTUNG faengt `normHeader` sie schon ab (das Zeichen faellt aus
   // dem erlaubten Satz). Nicht abgefangen ist, was der Mensch LIEST: die
   // Ueberschrift wird woertlich zurueckgegeben — in `mapping` und in
-  // `ignored` — und ein unsichtbares Zeichen in „nicht gedeutet: ﻿Gobo" macht
+  // `ignored` — und ein unsichtbares Zeichen in „nicht gedeutet: <BOM>Gobo" macht
   // aus einer klaren Auskunft ein Raetsel. Deshalb wird beides geprueft.
-  const mitBom = parseConsolePatch('﻿Channel,Address\n5,1/9\n');
+  // Die BOM steht als ESCAPE im Quelltext, nicht als Zeichen. Ein
+  // unsichtbares Zeichen in einer Datei, die gegen unsichtbare Zeichen
+  // prueft, ist zu komisch, um es stehen zu lassen — und `eslint` verbietet
+  // es ohnehin (`no-irregular-whitespace`).
+  const BOM = '\uFEFF';
+  const mitBom = parseConsolePatch(`${BOM}Channel,Address\n5,1/9\n`);
   assert.ok(mitBom.mapping.some((m) => m.column === 'channel'), 'BOM macht die Kanal-Spalte unsichtbar');
   assert.equal(mitBom.mapping[0].header, 'Channel', 'die gemeldete Ueberschrift traegt noch die BOM');
 
-  const bomFremd = parseConsolePatch('﻿Gobo,Channel\n-,5\n');
+  const bomFremd = parseConsolePatch(`${BOM}Gobo,Channel\n-,5\n`);
   assert.deepEqual(bomFremd.ignored, ['Gobo'], 'die nicht gedeutete Ueberschrift traegt noch die BOM');
 
   // Was nicht gedeutet wurde, wird BENANNT statt geschluckt.
