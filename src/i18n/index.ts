@@ -788,6 +788,29 @@ const en: Record<string, string> = {
   'sch.notes.hint':
     'The notes stay in this project file. They go into no foreign-format export (MVR, venue exchange) \u2014 they belong to you, not to a console\u2019s show file.',
   'sch.tab.check': 'Check',
+  // Bedarf 139 — Gruppen, die die Uebergabe ueberleben.
+  'sch.groups': 'Groups',
+  'sch.groups.csv': 'Group sheet (CSV)',
+  'sch.groups.name': 'Name',
+  'sch.groups.namePh': 'Group name (e.g. \u201cFront warm\u201d)',
+  'sch.groups.members': 'Fixtures',
+  'sch.groups.channels': 'Channels',
+  'sch.groups.missing': 'deleted',
+  'sch.groups.locate': 'Show in plan',
+  'sch.groups.hint':
+    'The MVR format has no groups \u2014 this sheet is how they reach the console, the visualiser and the media server.',
+  'sch.exp.groups': 'Group sheet (CSV)',
+  'sch.exp.groupsNote':
+    'One row per group member with channel, unit, type and position \u2014 what otherwise gets rebuilt by hand on the console, in the visualiser and in the media server.',
+  'sch.exp.omit.trusses': 'truss(es)',
+  'sch.exp.omit.groups': 'group(s)',
+  'sch.exp.omit.gels': 'fixture(s) with gel',
+  'sch.exp.omit.purposes': 'fixture(s) with a purpose',
+  'sch.exp.omit.notes': 'note(s)',
+  // Bedarf 144 — Austauschdateien, die an einer Umbenennung nicht zerbrechen.
+  'sch.exp.specClash': 'Same GDTF file name',
+  'sch.exp.specClashNote':
+    '\u2013 the names differ only in characters a file name cannot carry. They get distinct references, but your GDTF library may know only one of them.',
   // Bedarf 137 — der Rueckweg vom Pult.
   'sch.tab.return': 'Return from console',
   'sch.return.load': 'Load console patch export (CSV)',

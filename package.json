@@ -21,6 +21,8 @@
     "spec:check": "node --experimental-strip-types scripts/spec-source-check.ts",
     "notes:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/work-notes-check.ts",
     "patch:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/console-patch-check.ts",
+    "groups:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/fixture-groups-check.ts",
+    "identity:mvr": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/mvr-identity-check.ts",
     "stamp:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/stamp-check.ts",
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
     "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",
