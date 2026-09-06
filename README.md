@@ -67,6 +67,7 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 - Equipment list, instrument schedule and an electrical-load summary (kW, A per phase, 16 A circuits) — export to CSV
 - Trusses / hanging positions you can draw and label
 - **Return from the console**: load the desk's patch export (CSV/TSV) and hold it against the plan — re-addressed, renamed, retyped, only-on-the-desk, only-in-the-plan. One-way on purpose: nothing is written back, because the plan carries the intent and the desk the state after load-in
+- **Fixture groups that survive the handover**: name a group, print the group sheet (CSV) with channel, unit, type and position — MVR has no group entity, so the export says so instead of letting you find out at the console. Everything an `.mvr` cannot carry is listed there, computed rather than remembered
 
 ### 🎬 Auto-place helpers
 - One-click 3-point lighting around a person

@@ -76,6 +76,15 @@ jobs:
       - name: Rueckweg vom Pult schreibt nichts zurueck
         run: npm run patch:check
 
+      # Bedarf 139 — Gruppen ueberleben die Uebergabe. Der Lauf haelt vor allem
+      # zwei Dinge fest, die man nicht sieht: dass ein geloeschtes Mitglied
+      # nicht still aus der Gruppe faellt, und dass die Liste dessen, was eine
+      # .mvr NICHT traegt, BERECHNET ist statt aufgezaehlt -- eine Aufzaehlung
+      # waere der Kenntnisstand ihres Autors, und die naechste Auslassung
+      # fiele wieder niemandem auf.
+      - name: Gruppen haben Namen, ein Blatt und einen Weg
+        run: npm run groups:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

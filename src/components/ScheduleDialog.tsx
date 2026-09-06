@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import type { PlacedFixture, Truss, Wall, Ceiling, WorkNote, WorkNoteTarget } from '../types';
+import type { FixtureGroup, PlacedFixture, Truss, Wall, Ceiling, WorkNote, WorkNoteTarget } from '../types';
 import { computePower, fixtureCounts, footprint, trussLoads, circuitBreakdown, colorCounts, nearestTrussId } from '../core/patch';
 import { documentFingerprint, stampForStand, type DocumentStamp } from '../core/documentStamp';
 import { colorTable, gelCodes, inventoryTable, scheduleOrder, scheduleTable, tableToCsv, type DocumentTable } from '../core/documentTables';
@@ -11,6 +11,9 @@ import { versionsFor } from '../utils/versionStore';
 import { rigCheck, issueCounts } from '../core/rigCheck';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
+import {
+  groupTable, mvrOmissions, resolveGroups, UNNAMED_GROUP, type OmissionKind,
+} from '../core/fixtureGroups';
 import { groupNotes, staleNotes } from '../core/workNotes';
 import { gelLibrary } from '../core/gelLibrary';
 import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
@@ -32,6 +35,10 @@ interface Props {
   onAutoPatch: () => void;
   onLocate: (ids: string[]) => void;
   onUpdateFixture: (id: string, updates: Partial<PlacedFixture>) => void;
+  // ── Bedarf 139 — Gruppen, die die Uebergabe ueberleben ──
+  fixtureGroups: FixtureGroup[];
+  /** Umbenennen. Die History haengt am Wirt, nicht hier. */
+  onRenameGroup: (id: string, label: string) => void;
   // ── Bedarf 71 — Arbeits-Notizen aus der Probe ──
   workNotes: WorkNote[];
   /** Legt eine Notiz an. Id und Zeitpunkt kommen vom Wirt, nicht von hier. */
@@ -53,6 +60,20 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'load', label: 'Last & Strom', icon: 'truss' },
   { id: 'export', label: 'Export', icon: 'export' },
 ];
+
+// Bedarf 139 — dasselbe Muster wie `tabLabel` darunter, aus demselben Grund:
+// literale Schluessel, damit `i18n:check` sie sieht. Ein
+// `t(\`sch.exp.omit.${kind}\`)` waere fuer den Guard unsichtbar, und die
+// englische Fassung fehlte, ohne dass es jemand meldet.
+const omissionNoun = (t: (k: string, de: string) => string, kind: OmissionKind): string => {
+  switch (kind) {
+    case 'trusses': return t('sch.exp.omit.trusses', 'Traverse(n)');
+    case 'groups': return t('sch.exp.omit.groups', 'Gruppe(n)');
+    case 'gels': return t('sch.exp.omit.gels', 'Lampe(n) mit Folie');
+    case 'purposes': return t('sch.exp.omit.purposes', 'Lampe(n) mit Zweck');
+    case 'notes': return t('sch.exp.omit.notes', 'Notiz(en)');
+  }
+};
 
 // Literale Schluessel statt `t(\`tab.${id}\`)` -- der Guard `i18n:check` sieht
 // nur literale Aufrufe, und ein dynamisch gebauter Schluessel faellt ihm
@@ -94,7 +115,7 @@ const utilClass = (u: number) => (u >= 1 ? 'util-over' : u >= 0.8 ? 'util-warn' 
 
 // A focused multi-tool hub for paperwork, validation, analysis and interchange.
 // Each tab is one job, so no single view is overloaded.
-const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, projectId, conflicts, onAutoNumber, onAutoPatch, onLocate, onUpdateFixture, workNotes, onAddNote, onToggleNote, onRemoveNote, onClose }) => {
+const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, projectId, conflicts, onAutoNumber, onAutoPatch, onLocate, onUpdateFixture, fixtureGroups, onRenameGroup, workNotes, onAddNote, onToggleNote, onRemoveNote, onClose }) => {
   const { t } = useTranslation();
   const [tab, setTabState] = useState<Tab>(() => {
     try { const saved = localStorage.getItem('lp-tool-tab'); if (saved && TABS.some((x) => x.id === saved)) return saved as Tab; } catch { /* ignore */ }
@@ -203,6 +224,27 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
 
   const activeLabel = tabLabel(t, tab);
 
+  // ── BEDARF 139 — Gruppen ────────────────────────────────────────────────
+  //
+  // Aufgeloest EINMAL, hier: das Blatt, die Liste im Reiter und die
+  // Auslassungs-Meldung im Export lesen dieselbe Aufloesung. Zwei Aufloesungen
+  // waeren zwei Wahrheiten darueber, wer in einer Gruppe steckt.
+  const trussLabelOf = (fixtureId: string): string | undefined => {
+    const f = fixtures.find((x) => x.id === fixtureId);
+    if (!f) return undefined;
+    const tid = nearestTrussId(f, trusses);
+    return tid ? (trusses.find((x) => x.id === tid)?.label || undefined) : undefined;
+  };
+  const gruppen = resolveGroups(fixtureGroups, fixtures, trussLabelOf);
+  const auslassungen = mvrOmissions(fixtures, trusses, fixtureGroups, workNotes.length);
+
+  const exportGroups = () => {
+    const tb = groupTable(gruppen);
+    downloadCsv('gruppen.csv', [tb.header, ...tb.rows]
+      .map((r) => r.map((v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))).join(';'))
+      .join('\r\n'));
+  };
+
   // ── per-tool panels ──
   const listPanel = (
     <>
@@ -210,6 +252,66 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         <button className="btn-secondary" onClick={onAutoNumber}>① {t('sch.autoNumber', 'Auto-Nummerieren')}</button>
         <button className="btn-secondary" onClick={onAutoPatch}>② {t('sch.autoPatch', 'Auto-Patch (DMX)')}</button>
       </div>
+      {/* BEDARF 139 — Gruppen bekommen einen Namen und ein Blatt. Bis hierher
+          hiessen sie „Gruppe 3" und existierten nur auf der Zeichenflaeche;
+          wer sie am Pult brauchte, baute sie von Hand nach. */}
+      {gruppen.length > 0 && (
+        <>
+          <h4 className="schedule-subhead">
+            {t('sch.groups', 'Gruppen')} ({gruppen.length})
+            <button className="btn-secondary" style={{ marginLeft: 8 }} onClick={exportGroups}>
+              ⬇ {t('sch.groups.csv', 'Gruppen-Blatt (CSV)')}
+            </button>
+          </h4>
+          <table className="schedule-table">
+            <thead>
+              <tr>
+                <th>{t('sch.groups.name', 'Name')}</th>
+                <th>{t('sch.groups.members', 'Leuchten')}</th>
+                <th>{t('sch.groups.channels', 'Kanäle')}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {gruppen.map((g) => (
+                <tr key={g.id}>
+                  <td>
+                    <input
+                      value={g.label === UNNAMED_GROUP ? '' : g.label}
+                      placeholder={t('sch.groups.namePh', 'Name der Gruppe (z. B. „Front warm")')}
+                      onChange={(e) => onRenameGroup(g.id, e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </td>
+                  <td>
+                    {g.members.length}
+                    {/* Ein verschwundenes Mitglied verschwindet nicht still:
+                        eine Gruppe, die von acht auf sechs schrumpft, ohne
+                        dass es jemand sagt, ist am Pult ein Raetsel. */}
+                    {g.missing.length > 0 && (
+                      <span className="rig-pill warn" style={{ marginLeft: 6 }}>
+                        {g.missing.length} {t('sch.groups.missing', 'gelöscht')}
+                      </span>
+                    )}
+                  </td>
+                  <td>{g.members.map((m) => m.channel ?? '–').join(', ')}</td>
+                  <td>
+                    <button
+                      className="btn-secondary"
+                      onClick={() => onLocate(g.members.map((m) => m.fixtureId))}
+                    >
+                      {t('sch.groups.locate', 'Im Plan zeigen')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="prop-derived">
+            {t('sch.groups.hint', 'Das MVR-Format kennt keine Gruppen — dieses Blatt ist der Weg, sie an Pult, Visualisierer und Medienserver zu übergeben.')}
+          </div>
+        </>
+      )}
       <h4 className="schedule-subhead">{t('sch.inventory', 'Inventar')} ({fixtures.length} {t('sch.fixtures', 'Leuchten')}, {counts.length} {t('sch.types', 'Typen')})</h4>
       <table className="schedule-table">
         <thead><tr><th>{t('sch.qty', 'Anz.')}</th><th>{t('sch.manufacturer', 'Hersteller')}</th><th>{t('sch.type', 'Typ')}</th><th>{t('sch.wEach', 'W/Stk')}</th><th>{t('sch.wTotal', 'W ges.')}</th><th>{t('sch.kgTotal', 'kg ges.')}</th></tr></thead>
@@ -663,22 +765,36 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         <button className="btn-secondary" onClick={exportColors} disabled={colors.length === 0}>⬇ CSV</button>
       </div>
       <div className="export-row">
+        <Icon name="tag" size={22} className="er-icon" />
+        <div className="er-text">
+          <b>{t('sch.exp.groups', 'Gruppen-Blatt (CSV)')}</b>
+          <span>{t('sch.exp.groupsNote', 'Gruppe je Zeile mit Kanal, Unit, Typ und Position – das, was am Pult, im Visualisierer und im Medienserver sonst von Hand nachgebaut wird.')}</span>
+        </div>
+        <button className="btn-secondary" onClick={exportGroups} disabled={gruppen.length === 0}>⬇ CSV</button>
+      </div>
+      <div className="export-row">
         <Icon name="cube3d" size={22} className="er-icon" />
         <div className="er-text">
           <b>MVR (GDTF/MVR)</b>
           <span>
             {t('sch.exp.mvrNote', 'Lampen mit Positionen & Patch – öffnet in Capture, grandMA3, WYSIWYG, Vectorworks, BlenderDMX.')}
-            {/* ADR-005, Regel 3 — die Szene enthaelt nur Fixtures. Vorher stand
-                hier „Rig", und die Traverse IST das Rig: der Nutzer bekam eine
-                Zusage, die die Datei nicht haelt. */}
-            {trusses.length > 0 && (
-              <>
-                {' '}
-                <b>{trusses.length} {t('sch.exp.mvrNoTruss', 'Traverse(n) sind nicht enthalten')}</b>{' '}
-                {t('sch.exp.mvrOnlyFixtures', '– MVR bildet hier nur die Lampen ab.')}
-              </>
-            )}
           </span>
+          {/* ADR-005, Regel 3 UND Bedarf 139. Hier stand die Ehrlichkeit
+              frueher fuer genau EINEN Fall — die Traversen —, weil den einmal
+              jemand bemerkt hatte. Gruppen, Farben, Zwecke und Notizen gingen
+              daneben genauso verloren, ohne ein Wort. Was fehlt, rechnet jetzt
+              `mvrOmissions` aus; diese Liste ist damit kein Kenntnisstand,
+              sondern ein Ergebnis. */}
+          {auslassungen.length > 0 && (
+            <ul className="rig-issues">
+              {auslassungen.map((o) => (
+                <li key={o.kind} className="rig-issue sev-warning">
+                  <span className="rig-dot" />
+                  <b>{o.count} {omissionNoun(t, o.kind)}</b> — {o.message}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <button className="btn-secondary" onClick={exportMvr}>⬇ .mvr</button>
       </div>

@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client';
 import ScheduleDialog from '../components/ScheduleDialog';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import { autoPatch, findPatchConflicts } from '../core/patch';
-import type { PlacedFixture, Truss, Wall, WorkNote } from '../types';
+import type { FixtureGroup, PlacedFixture, Truss, Wall, WorkNote } from '../types';
 import '../App.css';
 
 const lib = (pred: (f: typeof fixtureLibrary[number]) => boolean) => fixtureLibrary.find(pred) ?? fixtureLibrary[0];
@@ -49,8 +49,16 @@ function Harness() {
     { id: 'n1', text: 'zu heiß auf der SL-Wand', at: '2026-09-06T18:00:00.000Z', target: { kind: 'fixture', fixtureId: initial[0].id } },
     { id: 'n2', text: 'hängt 20 cm zu tief', at: '2026-09-06T18:02:00.000Z', target: { kind: 'truss', trussId: trusses[0].id } },
   ]);
+  // Bedarf 139 — die Gruppen liegen im Harness echt, damit die Kachel
+  // „Gruppen" im Bild dasselbe zeigt wie in der App.
+  const [groups, setGroups] = React.useState<FixtureGroup[]>([
+    { id: 'g1', label: 'Front warm', fixtureIds: initial.slice(0, 2).map((f) => f.id) },
+    { id: 'g2', label: '', fixtureIds: initial.slice(2, 4).map((f) => f.id) },
+  ]);
   return (
     <ScheduleDialog
+      fixtureGroups={groups}
+      onRenameGroup={(id, label) => setGroups((g) => g.map((x) => (x.id === id ? { ...x, label } : x)))}
       fixtures={fixtures}
       trusses={trusses}
       walls={walls}

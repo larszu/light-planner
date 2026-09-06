@@ -595,6 +595,21 @@ const App: React.FC = () => {
     setFixtureGroups((prev) => [...prev, group]);
   }, [fixtures, selectedIds, fixtureGroups.length]);
 
+  /**
+   * BEDARF 139 — eine Gruppe bekommt einen Namen.
+   *
+   * Bis hierher hiessen Gruppen „Gruppe 3" — durchnummeriert, nie benannt,
+   * ausserhalb der Zeichenflaeche unsichtbar. Genau das beschreibt der Beleg
+   * (`mvrdevelopment/spec#295`): die Struktur ist da, sie ueberlebt die
+   * Uebergabe nicht, und dann tippt sie jemand am Pult, im Visualisierer und
+   * im Medienserver noch einmal. Ein Name ist die Haelfte davon; die andere
+   * ist das Gruppen-Blatt im Ablauf-Dialog.
+   */
+  const handleRenameGroup = useCallback((id: string, label: string) => {
+    pushHistory();
+    setFixtureGroups((prev) => prev.map((g) => (g.id === id ? { ...g, label } : g)));
+  }, [pushHistory]);
+
   const handleUngroupSelection = useCallback(() => {
     pushHistory();
     setFixtureGroups((prev) => prev.filter((g) => !g.fixtureIds.some((id) => selectedIds.has(id))));
@@ -1764,6 +1779,8 @@ const App: React.FC = () => {
           projectName={projectMeta?.name ?? ''}
           projectId={projectId}
           conflicts={patchConflicts}
+          fixtureGroups={fixtureGroups}
+          onRenameGroup={handleRenameGroup}
           workNotes={workNotes}
           onAddNote={handleAddNote}
           onToggleNote={handleToggleNote}
