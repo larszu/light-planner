@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView, FloorMaterial, SunSettings } from './types';
+import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, StageElement, ProjectMeta, ProjectData, FixtureGroup, Truss, Wall, Ceiling, Scene, SceneFixtureState, Layers, LayerKey, CameraView, FloorMaterial, SunSettings , WorkNote, WorkNoteTarget } from './types';
 import { DEFAULT_FLOOR } from './core/surfaceTextures';
+import { addNote, normalizeWorkNotes, removeNote, toggleNote } from './core/workNotes';
 import { convexHull } from './core/geometry';
 import { resolveSun, defaultSunSettings } from './core/sun';
 import TopBar from './components/TopBar';
@@ -156,6 +157,9 @@ const App: React.FC = () => {
   const [versionOpen, setVersionOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [scenes, setScenes] = useState<Scene[]>([]);
+  // BEDARF 71 — Arbeits-Notizen aus der Probe. Sie gehoeren in die EIGENE
+  // Projektdatei, nicht in die Show-Datei eines Pults (cue-note #11/#7).
+  const [workNotes, setWorkNotes] = useState<WorkNote[]>([]);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   // Look present just before a scene was switched on, so it can be switched off.
   const preSceneRef = useRef<Record<string, SceneFixtureState> | null>(null);
@@ -692,6 +696,25 @@ const App: React.FC = () => {
   const handleDistributeH = useCallback(() => distributeFixtures('x'), [distributeFixtures]);
   const handleDistributeV = useCallback(() => distributeFixtures('y'), [distributeFixtures]);
 
+  // ── BEDARF 71 — Arbeits-Notizen ──
+  //
+  // Id und Zeitpunkt entstehen HIER und nicht im Dialog: der Dialog ist rein,
+  // und eine Uhr in einer reinen Funktion waere ein Test, der morgen anders
+  // ausgeht. `by` bleibt leer, solange niemand einen Namen genannt hat --
+  // geraten wird kein Autor.
+  const handleAddNote = useCallback((target: WorkNoteTarget, text: string) => {
+    setWorkNotes((prev) =>
+      addNote(prev, {
+        id: `wn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        text,
+        at: new Date().toISOString(),
+        target,
+      }),
+    );
+  }, []);
+  const handleToggleNote = useCallback((id: string) => setWorkNotes((prev) => toggleNote(prev, id)), []);
+  const handleRemoveNote = useCallback((id: string) => setWorkNotes((prev) => removeNote(prev, id)), []);
+
   // ── Project save/load ──
   const handleSaveProject = useCallback((meta: ProjectMeta) => {
     const data: ProjectData = {
@@ -706,6 +729,9 @@ const App: React.FC = () => {
       walls,
       ceilings,
       scenes,
+      // BEDARF 71 — nur schreiben, wenn es welche gibt: ein leeres Feld in
+      // jeder Datei waere Ballast (dieselbe Regel wie bei den Fremd-Domaenen).
+      ...(workNotes.length > 0 ? { workNotes } : {}),
       cameras,
       layers,
       floor,
@@ -733,7 +759,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, sun, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, cameras, layers, floor, sun, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData, keepId?: string) => {
     historyRef.current = [];
@@ -757,6 +783,7 @@ const App: React.FC = () => {
     setWalls(data.walls ?? []);
     setCeilings(data.ceilings ?? []);
     setScenes(data.scenes ?? []);
+    setWorkNotes(normalizeWorkNotes(data.workNotes));
     setActiveSceneId(null);
     preSceneRef.current = null;
     setCameras(data.cameras ?? []);
@@ -849,6 +876,9 @@ const App: React.FC = () => {
           meta: projectMeta ?? { name: 'Lichtplan', author: '', version: '1.0', createdAt: now, updatedAt: now },
           fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
           trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
+          // BEDARF 71 — die .avplan ist die EIGENE Datei-Familie der Suite,
+          // nicht die Show-Datei eines Pults. Hier gehoeren die Notizen hin.
+          ...(workNotes.length > 0 ? { workNotes } : {}),
           floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
         } satisfies ProjectData,
         // Fremde Slots zuerst, damit ein gleichnamiger fremder Slot nie den
@@ -1242,6 +1272,7 @@ const App: React.FC = () => {
     return {
       meta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
       trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
+      ...(workNotes.length > 0 ? { workNotes } : {}),
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
       // ADR-005 — dritter Bauplatz fuer ein vollstaendiges ProjectData, und
       // der einzige, dem die Felder fehlten. Was hier gebaut wird, geht in den
@@ -1258,7 +1289,7 @@ const App: React.FC = () => {
         ? { personForeign: preservedPersonsRef.current }
         : {}),
     };
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, sun, floorPlan]);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, cameras, layers, floor, sun, floorPlan]);
 
   // ── Project save/load to a real file (the host decides where) ──
   const handleSaveToFile = useCallback(async () => {
@@ -1268,6 +1299,7 @@ const App: React.FC = () => {
       meta: { ...meta, updatedAt: now },
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
       trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
+      ...(workNotes.length > 0 ? { workNotes } : {}),
       floorPlan: floorPlan ? serializeFloorPlan(floorPlan) : undefined,
       // ADR-005 — Fremd-Domaenen gehoeren in die Datei, nicht nur in den Ref.
       ...foreignDomainsField(preservedDomainsRef.current),
@@ -1282,7 +1314,7 @@ const App: React.FC = () => {
     };
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, cameras, layers, floor, sun, floorPlan, host]);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, cameras, layers, floor, sun, floorPlan, host]);
 
   const handleLoadFromFile = useCallback(async () => {
     const res = await host.openProjectFile();
@@ -1732,6 +1764,10 @@ const App: React.FC = () => {
           projectName={projectMeta?.name ?? ''}
           projectId={projectId}
           conflicts={patchConflicts}
+          workNotes={workNotes}
+          onAddNote={handleAddNote}
+          onToggleNote={handleToggleNote}
+          onRemoveNote={handleRemoveNote}
           onAutoNumber={handleAutoNumber}
           onAutoPatch={handleAutoPatch}
           onLocate={(ids) => { if (ids.length) { setSelectedIds(new Set(ids)); setViewMode('2d'); setScheduleOpen(false); } }}

@@ -58,6 +58,14 @@ jobs:
       - name: Stand-Stempel auf den Ausdrucken
         run: npm run stamp:check
 
+      # Bedarf 71 — die Arbeits-Notizen aus der Probe. Der Lauf haelt zwei
+      # Dinge fest, die man nicht sieht: dass eine Notiz nie still
+      # verschwindet (auch nicht, wenn ihre Leuchte geloescht wird), und dass
+      # sie in KEINEN Fremdformat-Export geraet — am Ergebnis geprueft, nicht
+      # an der Absicht.
+      - name: Arbeits-Notizen bleiben im eigenen Projekt
+        run: npm run notes:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.
