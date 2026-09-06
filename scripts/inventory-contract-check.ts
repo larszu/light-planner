@@ -18,6 +18,8 @@ import {
   INVENTORY_FORMAT_VERSION,
   serializeInventory,
   parseInventory,
+  resolveInventoryCode,
+  unitLabel,
   type InventorySnapshot,
 } from '../src/inventory/portable.ts';
 import type { InventoryItem, StorageNode, InventorySet, InventoryUnit } from '../src/inventory/types.ts';
@@ -26,12 +28,12 @@ import { mergeById, mergeDefined } from '../src/inventory/merge.ts';
 // Eingefrorener Contract — MUSS in allen drei Repos identisch sein.
 const CONTRACT = {
   format: 'avplan-inventory',
-  version: 2,
+  version: 3,
   envelopeKeys: ['app', 'exportedAt', 'format', 'items', 'nodes', 'sets', 'units', 'version'],
   itemKeys: ['category', 'code', 'codeType', 'createdAt', 'deviceTypeId', 'dimensions', 'id', 'locationId', 'manufacturer', 'materialKinds', 'model', 'notes', 'ownership', 'quantity', 'rentPricePerDay', 'returnDue', 'stockLocation', 'supplier', 'updatedAt'],
   nodeKeys: ['code', 'codeType', 'createdAt', 'dimensions', 'id', 'kind', 'name', 'notes', 'parentId', 'updatedAt'],
   setKeys: ['components', 'createdAt', 'id', 'name', 'notes', 'updatedAt'],
-  unitKeys: ['code', 'codeType', 'condition', 'createdAt', 'history', 'id', 'itemId', 'locationId', 'notes', 'serial', 'updatedAt'],
+  unitKeys: ['code', 'codeType', 'condition', 'createdAt', 'history', 'houseRef', 'id', 'itemId', 'locationId', 'notes', 'serial', 'updatedAt'],
 } as const;
 
 // Voll besetzte Muster-Entitaeten (jedes Feld gesetzt) — TS erzwingt, dass sie
@@ -54,7 +56,7 @@ const set: InventorySet = {
   notes: 'x', createdAt: 't', updatedAt: 't',
 };
 const unit: InventoryUnit = {
-  id: 'u1', itemId: 'i1', serial: 'SN-1', code: 'UNI-1', codeType: 'qr', locationId: 'n1',
+  id: 'u1', itemId: 'i1', serial: 'SN-1', houseRef: 'AV-0421', code: 'UNI-1', codeType: 'qr', locationId: 'n1',
   condition: 'ok', notes: 'x', history: [{ at: 't', kind: 'created', detail: 'x' }],
   createdAt: 't', updatedAt: 't',
 };
@@ -130,5 +132,46 @@ assert.deepEqual(
   ['i1', 'i2', 'i9'],
 );
 console.log('✓ Zusammenfuehren nimmt nichts weg (ADR-005 Regel 2)');
+
+// 7) Bedarf 107 — zwei Identitaeten je Einheit.
+//
+//   > Systems with a single code field force the warehouse to choose which
+//   > identity to store; the other one is then needed for insurance, sub-hire
+//   > to third parties and maintenance history, and gets kept in a spreadsheet
+//   > or ON THE CASE WITH A MARKER.
+//
+// Dieser Planer druckt keine Versicherungsblaetter; er zeigt Einheiten nur
+// intern. Deshalb steht hier nur die HAUS-Sicht — und deshalb muss trotzdem
+// BEIDES ankommen: eine Datei aus dem cable-planner traegt beide Nummern, und
+// keine davon darf auf dem Weg durch diesen Planer verloren gehen.
+assert.equal(unitLabel({ ...unit, houseRef: 'AV-0421', serial: 'S0134-77' }), 'AV-0421');
+// Springt die Herstellernummer ein, wird sie BENANNT: nackt saehe sie aus wie
+// eine Hausnummer, und das waere eine Verwechslung statt einer Auskunft.
+assert.equal(
+  unitLabel({ ...unit, houseRef: undefined, serial: 'S0134-77' }),
+  'S0134-77 (Herstellernummer)',
+);
+// Leerzeichen sind kein Wert.
+assert.equal(unitLabel({ ...unit, houseRef: '  ', serial: 'S1' }), 'S1 (Herstellernummer)');
+// Der Etiketten-Code ist eine Scan-Kennung, keine Identitaet — dritte Wahl.
+assert.equal(unitLabel({ ...unit, houseRef: undefined, serial: undefined, code: 'QR-9' }), 'QR-9');
+// Und ohne jede Nummer steht ein benanntes Ergebnis da, keine id-Haelfte.
+const nackt = { ...unit, id: 'f47ac10b-58cc', houseRef: undefined, serial: undefined, code: undefined };
+assert.equal(unitLabel(nackt), 'ohne Nummer');
+
+// Die Hausreferenz ist die wahrscheinlichste Eingabe von allen: sie klebt auf
+// dem Case und wird abgetippt, wenn der Aufkleber unlesbar ist.
+const mitBeiden = { ...unit, houseRef: 'AV-0421', serial: 'S0134-77' };
+const scanQuelle = { items: [item], nodes: [], units: [mitBeiden] };
+assert.deepEqual(resolveInventoryCode('av-0421', scanQuelle), { kind: 'unit', unit: mitBeiden });
+assert.deepEqual(resolveInventoryCode('S0134-77', scanQuelle), { kind: 'unit', unit: mitBeiden });
+
+// Und die Nummer ueberlebt den Weg durch dieses Format.
+const zurueck = parseInventory(
+  serializeInventory({ items: [item], nodes: [], sets: [], units: [mitBeiden] }),
+);
+assert.equal(zurueck?.units[0].houseRef, 'AV-0421');
+assert.equal(zurueck?.units[0].serial, 'S0134-77');
+console.log('✓ Zwei Identitaeten je Einheit (Bedarf 107)');
 
 console.log('\nAlle avplan-inventory Wire-Contract-Checks bestanden.');
