@@ -66,6 +66,16 @@ jobs:
       - name: Arbeits-Notizen bleiben im eigenen Projekt
         run: npm run notes:check
 
+      # Bedarf 137 — der Rueckweg vom Pult. Nach dem Aufbau liegt der einzige
+      # richtige Stand in der Show-Datei des Pults; der Plan zeigt die Absicht
+      # von vor drei Wochen. Der Lauf haelt vor allem zwei Dinge fest, die man
+      # nicht sieht: dass ein mehrfach belegter Kanal KEINEN Feldvergleich
+      # ergibt (mehrere Leuchten auf einem Kanal sind im Licht normal), und
+      # dass der Vergleich nichts in den Plan schreibt -- am Ergebnis
+      # geprueft, nicht an der Absicht.
+      - name: Rueckweg vom Pult schreibt nichts zurueck
+        run: npm run patch:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { PlacedFixture, Truss, Wall, Ceiling, WorkNote, WorkNoteTarget } from '../types';
 import { computePower, fixtureCounts, footprint, trussLoads, circuitBreakdown, colorCounts, nearestTrussId } from '../core/patch';
 import { documentFingerprint, stampForStand, type DocumentStamp } from '../core/documentStamp';
 import { colorTable, gelCodes, inventoryTable, scheduleOrder, scheduleTable, tableToCsv, type DocumentTable } from '../core/documentTables';
+import {
+  RETURN_KIND_LABEL, parseConsolePatch, patchReturn, returnFindings, returnTable,
+  type PatchReturn,
+} from '../core/consolePatch';
 import { versionsFor } from '../utils/versionStore';
 import { rigCheck, issueCounts } from '../core/rigCheck';
 import { photometricReport, type EvalArea } from '../core/photometrics';
@@ -37,13 +41,14 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = 'list' | 'magic' | 'focus' | 'notes' | 'check' | 'photo' | 'load' | 'export';
+type Tab = 'list' | 'magic' | 'focus' | 'notes' | 'check' | 'return' | 'photo' | 'load' | 'export';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'list', label: 'Geräteliste & Patch', icon: 'schedule' },
   { id: 'magic', label: 'Magic Sheet', icon: 'grid' },
   { id: 'focus', label: 'Fokus', icon: 'autolight' },
   { id: 'notes', label: 'Notizen', icon: 'tag' },
   { id: 'check', label: 'Prüfung', icon: 'check' },
+  { id: 'return', label: 'Rückweg vom Pult', icon: 'import' },
   { id: 'photo', label: 'Photometrie', icon: 'heatmap' },
   { id: 'load', label: 'Last & Strom', icon: 'truss' },
   { id: 'export', label: 'Export', icon: 'export' },
@@ -59,6 +64,7 @@ const tabLabel = (t: (k: string, de: string) => string, id: Tab): string => {
     case 'magic': return t('sch.tab.magic', 'Magic Sheet');
     case 'focus': return t('sch.tab.focus', 'Fokus');
     case 'check': return t('sch.tab.check', 'Prüfung');
+    case 'return': return t('sch.tab.return', 'Rückweg vom Pult');
     case 'photo': return t('sch.tab.photo', 'Photometrie');
     case 'notes': return t('sch.tab.notes', 'Notizen');
     case 'load': return t('sch.tab.load', 'Last & Strom');
@@ -95,6 +101,13 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     return 'list';
   });
   const setTab = (t: Tab) => { setTabState(t); try { localStorage.setItem('lp-tool-tab', t); } catch { /* ignore */ } };
+
+  // Bedarf 137: der eingelesene Patch lebt NUR hier. Er geht weder in den
+  // Projekt-Zustand noch in eine Datei — sonst waere aus dem Nebeneinander
+  // schon wieder ein Uebernehmen geworden.
+  const patchFileRef = useRef<HTMLInputElement>(null);
+  const [parseInfo, setParseInfo] = useState<ReturnType<typeof parseConsolePatch> | null>(null);
+  const [rueckweg, setRueckweg] = useState<PatchReturn | null>(null);
 
   // BEDARF 71 — der Entwurf liegt lokal: waehrend der Probe wird getippt, und
   // jeder Tastendruck durch den Wirt zu schicken machte die Eingabe zaeh.
@@ -434,6 +447,114 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     </div>
   );
 
+  // ── BEDARF 137 — der Rueckweg vom Pult ──────────────────────────────────
+  //
+  // Nach dem Aufbau liegt der einzige richtige Stand in der Show-Datei des
+  // Pults; der Plan auf dem Laptop zeigt die Absicht von vor drei Wochen. Hier
+  // kommt der Patch-Export des Pults herein und wird DANEBEN gelegt — gelesen,
+  // nicht uebernommen. Was der Plan traegt (wo eine Leuchte haengt, wofuer sie
+  // da ist), weiss das Pult nicht; wer das eine ueber das andere schreibt,
+  // verliert eines von beiden.
+  const returnPanel = (() => {
+    const eintraege = rueckweg ? returnFindings(rueckweg) : [];
+    return (
+      <>
+        <div className="schedule-actions">
+          <button className="btn-secondary" onClick={() => patchFileRef.current?.click()}>
+            {t('sch.return.load', 'Patch-Export des Pults laden (CSV)')}
+          </button>
+          {rueckweg && (
+            <button className="btn-secondary" onClick={() => {
+              const tb = returnTable(rueckweg);
+              downloadCsv('rueckweg-pult.csv', [tb.header, ...tb.rows]
+                .map((r) => r.map((v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))).join(';'))
+                .join('\r\n'));
+            }}>{t('sch.return.export', 'Liste als CSV')}</button>
+          )}
+        </div>
+        <input
+          ref={patchFileRef}
+          type="file"
+          accept=".csv,.txt,.tsv,text/csv,text/plain"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const datei = e.target.files?.[0];
+            e.target.value = '';
+            if (!datei) return;
+            const leser = new FileReader();
+            leser.onload = () => {
+              const parse = parseConsolePatch(String(leser.result ?? ''));
+              setParseInfo(parse);
+              setRueckweg(patchReturn(fixtures, parse));
+            };
+            leser.readAsText(datei);
+          }}
+        />
+        {!rueckweg ? (
+          <div className="prop-derived">
+            {t('sch.return.hint',
+              'Der Patch-Export des Pults (Kanal, Adresse, Typ, Beschriftung) wird gegen den Plan gehalten. Es wird nichts übernommen — die Liste ist zum Durchgehen.')}
+          </div>
+        ) : (
+          <>
+            <div className="rig-pills">
+              <span className="rig-pill info">{rueckweg.compared} {t('sch.return.compared', 'Kanäle verglichen')}</span>
+              <span className={`rig-pill ${rueckweg.counts.changed ? 'warn' : 'off'}`}>{rueckweg.counts.changed} {t('sch.return.changed', 'geändert')}</span>
+              <span className={`rig-pill ${rueckweg.counts['only-in-console'] ? 'warn' : 'off'}`}>{rueckweg.counts['only-in-console']} {t('sch.return.onlyConsole', 'nur am Pult')}</span>
+              <span className={`rig-pill ${rueckweg.counts['only-in-plan'] ? 'warn' : 'off'}`}>{rueckweg.counts['only-in-plan']} {t('sch.return.onlyPlan', 'nur im Plan')}</span>
+              <span className={`rig-pill ${rueckweg.counts['ambiguous-channel'] ? 'warn' : 'off'}`}>{rueckweg.counts['ambiguous-channel']} {t('sch.return.ambiguous', 'Kanal mehrfach belegt')}</span>
+              <span className={`rig-pill ${rueckweg.counts['no-channel'] ? 'warn' : 'off'}`}>{rueckweg.counts['no-channel']} {t('sch.return.noChannel', 'ohne Kanalnummer')}</span>
+            </div>
+            {parseInfo && (
+              <div className="prop-derived">
+                {t('sch.return.columns', 'Gelesene Spalten')}: {parseInfo.mapping.map((m) => `${m.header} → ${m.column}`).join(', ') || t('sch.return.none', 'keine')}
+                {parseInfo.ignored.length > 0 && ` · ${t('sch.return.ignored', 'nicht gedeutet')}: ${parseInfo.ignored.join(', ')}`}
+              </div>
+            )}
+            {parseInfo && parseInfo.warnings.length > 0 && (
+              <ul className="rig-issues">
+                {parseInfo.warnings.map((w, k) => (
+                  <li key={k} className="rig-issue sev-warning"><span className="rig-dot" />{t('sch.return.line', 'Zeile')} {w.line}: {w.message}</li>
+                ))}
+              </ul>
+            )}
+            {eintraege.length === 0 ? (
+              <div className="rig-clean">✓ {t('sch.return.clean', 'Der Plan deckt sich mit dem Pult.')}</div>
+            ) : (
+              <table className="schedule-table">
+                <thead>
+                  <tr>
+                    <th>{t('sch.return.channel', 'Kanal')}</th>
+                    <th>{t('sch.return.what', 'Was')}</th>
+                    <th>{t('sch.return.label', 'Bezeichnung')}</th>
+                    <th>{t('sch.return.field', 'Feld')}</th>
+                    <th>{t('sch.return.inPlan', 'Im Plan')}</th>
+                    <th>{t('sch.return.atConsole', 'Am Pult')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eintraege.flatMap((e, k) => (e.differences.length ? e.differences : [null]).map((d, j) => (
+                    <tr key={`${k}-${j}`}>
+                      <td>{e.channel ?? ''}</td>
+                      <td>{RETURN_KIND_LABEL[e.kind]}</td>
+                      <td>{e.label}</td>
+                      <td>{d?.field ?? ''}</td>
+                      <td>{d?.from ?? ''}</td>
+                      <td>{d?.to ?? ''}</td>
+                    </tr>
+                  )))}
+                </tbody>
+              </table>
+            )}
+            <div className="prop-derived">
+              {t('sch.return.oneWay', 'Einbahnstraße: nichts davon wird in den Plan geschrieben. Der Plan trägt die Absicht, das Pult den Zustand nach dem Aufbau.')}
+            </div>
+          </>
+        )}
+      </>
+    );
+  })();
+
   const checkPanel = (
     <>
       <div className="rig-pills">
@@ -564,7 +685,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     </div>
   );
 
-  const panels: Record<Tab, React.ReactNode> = { list: listPanel, magic: magicPanel, focus: focusPanel, notes: notesPanel, check: checkPanel, photo: photoPanel, load: loadPanel, export: exportPanel };
+  const panels: Record<Tab, React.ReactNode> = { list: listPanel, magic: magicPanel, focus: focusPanel, notes: notesPanel, check: checkPanel, return: returnPanel, photo: photoPanel, load: loadPanel, export: exportPanel };
 
   return (
     <div className="modal-overlay" onMouseDown={onClose}>
