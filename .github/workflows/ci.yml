@@ -45,6 +45,12 @@ jobs:
       - name: i18n — erreichbare Oberflaeche uebersetzt
         run: npm run i18n:check
 
+      # Nutzer-Rueckmeldung 2026-09-07: "die ui ist nicht konsistent. lege
+      # globale ui regeln fest die fuer alle repos gelten." Die Regeln stehen
+      # in ADR-007 der av-planner-suite; dieser Check haelt sie hier.
+      - name: Oberflaechen-Regeln (ADR-007)
+        run: npm run brand:check
+
       # Nutzer-Rueckmeldung 2026-09-07 am Kabel-Planer: die Anwendung schrieb
       # ihr Deutsch als „Geraet"/„Domaene". Dieselbe Drift stand hier in elf
       # Meldungen. Der Check kennt nicht die falschen Woerter, sondern die,
