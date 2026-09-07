@@ -887,6 +887,15 @@ const en: Record<string, string> = {
   'sch.focusNote': 'Live during the focus call: tick off, capture a focus note per fixture, find it in the plan. Stored in the project and exported in the schedule CSV.',
   'sch.truss': 'Truss',
   'sch.floorStands': 'Floor / stands',
+  // Bedarf 142 — der Vorflug-Bericht, mit „nicht beurteilbar" darin.
+  'sch.check.csv': 'Report (CSV)',
+  'sch.check.blocked': 'Not like this \u2014 at least one error',
+  'sch.check.unknown': 'Cannot be judged \u2014 figures are missing',
+  'sch.check.check': 'Look through',
+  'sch.check.ready': 'Ready',
+  'sch.check.assumed': 'assumed',
+  'sch.check.assumedNote':
+    'Careful: {n} finding(s) rest on assumed values (missing weight, missing wattage, estimated truss capacity). Figures derived from them are smaller than reality \u2014 and for a truss load that is the dangerous direction.',
   'sch.checkClean': 'No problems found.',
   'sch.checkScope': 'Checked: DMX overlap, duplicate channels, unpatched movers, truss load, power headroom.',
   'sch.avg': 'Average (Eavg)',

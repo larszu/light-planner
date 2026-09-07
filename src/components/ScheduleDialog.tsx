@@ -9,6 +9,9 @@ import {
 } from '../core/consolePatch';
 import { versionsFor } from '../utils/versionStore';
 import { rigCheck, issueCounts } from '../core/rigCheck';
+import {
+  preflight, preflightTable, type PreflightVerdict,
+} from '../core/preflight';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
 import {
@@ -66,6 +69,16 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 // literale Schluessel, damit `i18n:check` sie sieht. Ein
 // `t(\`sch.exp.omit.${kind}\`)` waere fuer den Guard unsichtbar, und die
 // englische Fassung fehlte, ohne dass es jemand meldet.
+// Bedarf 142 — literale Schluessel, damit `i18n:check` das Urteil sieht.
+const verdictText = (t: (k: string, de: string) => string, v: PreflightVerdict): string => {
+  switch (v) {
+    case 'blocked': return t('sch.check.blocked', 'So nicht — mindestens ein Fehler');
+    case 'unknown': return t('sch.check.unknown', 'Nicht beurteilbar — es fehlen Angaben');
+    case 'check': return t('sch.check.check', 'Durchsehen');
+    case 'ready': return t('sch.check.ready', 'Bereit');
+  }
+};
+
 const omissionNoun = (t: (k: string, de: string) => string, kind: OmissionKind): string => {
   switch (kind) {
     case 'trusses': return t('sch.exp.omit.trusses', 'Traverse(n)');
@@ -142,8 +155,12 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const counts = fixtureCounts(fixtures);
   const power = computePower(fixtures);
   const totalWeight = fixtures.reduce((s, f) => s + (f.fixture.weight || 0), 0);
-  const issues = rigCheck(fixtures, trusses);
-  const ic = issueCounts(issues);
+  // BEDARF 142 — der Vorflug-Bericht statt der blossen Rig-Pruefung. Er
+  // enthaelt dieselben Befunde (`rigCheck` bleibt die Quelle) plus die
+  // semantischen, und er faellt ein Urteil, das „nicht beurteilbar" kennt.
+  const bericht = preflight(fixtures, trusses);
+  const issues = bericht.issues;
+  const ic = { errors: bericht.counts.error, warnings: bericht.counts.warning, infos: bericht.counts.info };
   const photo = photometricReport(fixtures, walls, ceilings, area);
   const loads = trussLoads(fixtures, trusses);
   const circuits = circuitBreakdown(fixtures);
@@ -675,7 +692,25 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         <span className={`rig-pill ${ic.errors ? 'err' : 'off'}`}>{ic.errors} Fehler</span>
         <span className={`rig-pill ${ic.warnings ? 'warn' : 'off'}`}>{ic.warnings} Warnungen</span>
         <span className="rig-pill info">{ic.infos} Hinweise</span>
+        {/* BEDARF 142 — das Urteil, und zwar mit „nicht beurteilbar" darin.
+            Ein Plan, dessen Last-Zahlen auf fehlenden Angaben beruhen, ist
+            nicht bereit: er ist unbeantwortet. */}
+        <span className={`rig-pill ${bericht.verdict === 'ready' ? 'off' : bericht.verdict === 'blocked' ? 'err' : 'warn'}`}>
+          {verdictText(t, bericht.verdict)}
+        </span>
+        <button className="btn-secondary" onClick={() => {
+          const tb = preflightTable(bericht);
+          downloadCsv('vorflug.csv', [tb.header, ...tb.rows]
+            .map((r) => r.map((v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))).join(';'))
+            .join('\r\n'));
+        }}>⬇ {t('sch.check.csv', 'Bericht (CSV)')}</button>
       </div>
+      {bericht.assumed > 0 && (
+        <div className="prop-derived">
+          {t('sch.check.assumedNote', 'Achtung: {n} Befund(e) beruhen auf angenommenen Werten (fehlendes Gewicht, fehlende Leistung, geschätzte Traglast). Zahlen daraus sind kleiner als die Wirklichkeit — und bei der Traglast ist das die gefährliche Richtung.')
+            .replace('{n}', String(bericht.assumed))}
+        </div>
+      )}
       {issues.length === 0 ? (
         <div className="rig-clean">✓ {t('sch.checkClean', 'Keine Probleme gefunden.')}</div>
       ) : (
@@ -687,6 +722,11 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
                 onClick={locatable ? () => onLocate(i.ids!) : undefined}
                 title={locatable ? t('sch.locateAffected', 'Betroffene Leuchten im Plan zeigen') : undefined}>
                 <span className="rig-dot" />{i.message}
+                {i.basis === 'assumed' && (
+                  <span className="rig-pill warn" style={{ marginLeft: 6 }}>
+                    {t('sch.check.assumed', 'angenommen')}
+                  </span>
+                )}
                 {locatable && <Icon name="chevronRight" size={14} className="rig-go" />}
               </li>
             );

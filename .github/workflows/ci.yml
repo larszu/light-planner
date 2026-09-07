@@ -102,6 +102,14 @@ jobs:
       - name: Zusammenfuehren ist ein Vorschlag, keine Uebernahme
         run: npm run merge:check
 
+      # Bedarf 142 — die Vorflug-Pruefung. Der Lauf haelt vor allem eines
+      # fest: dass ein Plan, dessen Last-Zahlen auf fehlenden Angaben beruhen,
+      # NICHT als „bereit" durchgeht. Das ist der Fall, den die Quelle als
+      # „confident, wrong numbers" beschreibt -- und er sieht von aussen aus
+      # wie ein sauberer Plan.
+      - name: Vorflug-Pruefung faellt kein Urteil ohne Grundlage
+        run: npm run preflight:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.
