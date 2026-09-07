@@ -38,6 +38,10 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { FixtureGroup, PlacedFixture, Truss } from '../types';
+import {
+  DEFAULT_TEMPLATE, type PhaseTemplate, circuitLabel, distributionFor,
+} from './powerDistribution';
+import { cableRuns } from './rigCables';
 
 /** Was auf dem Blatt steht, wo eine Gruppe keinen Namen bekommen hat. */
 export const UNNAMED_GROUP = 'ohne Namen';
@@ -144,7 +148,8 @@ export function groupTable(
 
 // ─── Was der MVR-Export NICHT mitnimmt ─────────────────────────────────────
 
-export type OmissionKind = 'trusses' | 'groups' | 'gels' | 'purposes' | 'notes';
+export type OmissionKind =
+  | 'trusses' | 'groups' | 'gels' | 'purposes' | 'notes' | 'circuits' | 'cables';
 
 export interface MvrOmission {
   kind: OmissionKind;
@@ -172,6 +177,7 @@ export function mvrOmissions(
   trusses: readonly Truss[],
   groups: readonly FixtureGroup[],
   noteCount = 0,
+  template: PhaseTemplate = DEFAULT_TEMPLATE,
 ): MvrOmission[] {
   const out: MvrOmission[] = [];
 
@@ -208,6 +214,36 @@ export function mvrOmissions(
       kind: 'purposes',
       count: mitZweck,
       message: 'Der Zweck („Frontlicht Bühne") hat in MVR kein Feld und bleibt in diesem Projekt.',
+    });
+  }
+
+  // BEDARF 140/141 — die beiden Datenklassen, die das Austauschformat NICHT
+  // hat und dieser Plan schon rechnet. Sie standen bis hierher nicht in dieser
+  // Liste, und das war genau der Fehler, gegen den die Liste geschrieben ist:
+  // die Kreise sind seit Bedarf 141 ausgerechnet und gingen trotzdem
+  // wortlos verloren. Was eine Ehrlichkeits-Liste nicht nennt, ist fuer den
+  // Leser dasselbe wie etwas, das es nicht gibt.
+  const kreise = new Set(
+    distributionFor(fixtures, template).assignments.map((a) => circuitLabel(a)),
+  ).size;
+  if (kreise > 0) {
+    out.push({
+      kind: 'circuits',
+      count: kreise,
+      // `mvrdevelopment/spec#158` hat den Kreis gegen die Spezifikation
+      // vorgebracht; der Text kennt bis heute keine Entsprechung.
+      message: 'MVR hat kein Feld für Kreise, Phasen und Last — nimm die Kreisliste (CSV) mit.',
+    });
+  }
+
+  const wege = cableRuns(fixtures, trusses, template).length;
+  if (wege > 0) {
+    out.push({
+      kind: 'cables',
+      count: wege,
+      // `mvrdevelopment/spec#296` und `#288`, beide offen: das Format hat
+      // keine Kabel-Entitaet und kein Pin-Patch.
+      message: 'MVR hat keine Kabel — nimm die Kabelliste (CSV) mit; die Wege stehen dort mit Länge und Stecker.',
     });
   }
 

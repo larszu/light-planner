@@ -876,6 +876,22 @@ const en: Record<string, string> = {
   'sch.exp.omit.gels': 'fixture(s) with gel',
   'sch.exp.omit.purposes': 'fixture(s) with a purpose',
   'sch.exp.omit.notes': 'note(s)',
+  'sch.exp.omit.circuits': 'circuit(s)',
+  'sch.exp.omit.cables': 'cable run(s)',
+  // Bedarf 140 — die Kabelliste.
+  'sch.cbl.head': 'Cable runs',
+  'sch.cbl.plusUnknown': '(+ {n} without length)',
+  'sch.cbl.basis':
+    'Lengths are the straight lines between hanging points — a lower bound. '
+    + 'Sag, the way around the truss and the loop at the hook come on top. Runs '
+    + 'from the source to the first fixture are left blank: the plan places '
+    + 'neither distros nor nodes, and a number here would be invented.',
+  'sch.cbl.col.kind': 'Kind',
+  'sch.cbl.col.from': 'From',
+  'sch.cbl.col.to': 'To',
+  'sch.cbl.col.connector': 'Connector',
+  'sch.exp.cables': 'Cable list (CSV)',
+  'sch.exp.cablesNote': 'Power and DMX runs with length and connector — what MVR does not carry.',
   // Bedarf 144 — Austauschdateien, die an einer Umbenennung nicht zerbrechen.
   'sch.exp.specClash': 'Same GDTF file name',
   'sch.exp.specClashNote':
