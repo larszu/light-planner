@@ -20,6 +20,10 @@ import {
   CIRCUIT_HEADERS, PHASE_HEADERS, PHASE_LABEL, TEMPLATE_LABEL, circuitLabel, circuitTable,
   distributionFor, phaseTable, type PhaseTemplate,
 } from '../core/powerDistribution';
+import { fieldContext } from '../core/reportFields';
+import {
+  REPORTS, renderReport, reportGaps, reportTable, findReport,
+} from '../core/reportEngine';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
 import {
@@ -76,12 +80,13 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = 'list' | 'magic' | 'focus' | 'notes' | 'check' | 'return' | 'photo' | 'load' | 'export';
+type Tab = 'list' | 'magic' | 'focus' | 'notes' | 'papers' | 'check' | 'return' | 'photo' | 'load' | 'export';
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'list', label: 'Geräteliste & Patch', icon: 'schedule' },
   { id: 'magic', label: 'Magic Sheet', icon: 'grid' },
   { id: 'focus', label: 'Fokus', icon: 'autolight' },
   { id: 'notes', label: 'Notizen', icon: 'tag' },
+  { id: 'papers', label: 'Papiere', icon: 'schedule' },
   { id: 'check', label: 'Prüfung', icon: 'check' },
   { id: 'return', label: 'Rückweg vom Pult', icon: 'import' },
   { id: 'photo', label: 'Photometrie', icon: 'heatmap' },
@@ -126,6 +131,7 @@ const tabLabel = (t: (k: string, de: string) => string, id: Tab): string => {
     case 'return': return t('sch.tab.return', 'Rückweg vom Pult');
     case 'photo': return t('sch.tab.photo', 'Photometrie');
     case 'notes': return t('sch.tab.notes', 'Notizen');
+    case 'papers': return t('sch.tab.papers', 'Papiere');
     case 'load': return t('sch.tab.load', 'Last & Strom');
     case 'export': return t('sch.tab.export', 'Export');
   }
@@ -176,6 +182,12 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   // Zuordnung, die niemand getroffen hat.
   const [noteTarget, setNoteTarget] = useState<WorkNoteTarget>({ kind: 'plan' });
 
+  // BEDARF 143 — welches der Blaetter gerade offen ist. Lokal: die Wahl ist
+  // eine Ansicht und keine Projekt-Angabe; sie in die Datei zu schreiben
+  // hiesse, dass zwei Leute mit derselben Datei streiten, welches Blatt „das"
+  // Blatt ist.
+  const [reportId, setReportId] = useState<string>(REPORTS[0].id);
+
   const counts = fixtureCounts(fixtures);
   const power = computePower(fixtures);
   const totalWeight = fixtures.reduce((s, f) => s + (f.fixture.weight || 0), 0);
@@ -203,6 +215,13 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   // Universe, sortiert nach der Zahl und nicht nach der Reihenfolge der
   // Leuchten: sonst saehe dasselbe Blatt zweimal anders aus.
   const lesarten = universeReadings(fixtures.map((f) => f.universe), dmxProtocol);
+
+  // BEDARF 143 — der Zusammenhang fuer die Felder, EINMAL gebaut und nicht je
+  // Zeile: `distributionFor` teilt den ganzen Bestand in Kreise auf, und wer
+  // das je Zeile taete, bekaeme bei n Leuchten n Verteilungen.
+  const feldKontext = fieldContext(fixtures, trusses, dmxProtocol, phaseTemplate);
+  const bericht143 = renderReport(findReport(reportId) ?? REPORTS[0], fixtures, feldKontext);
+  const luecken = reportGaps();
 
   const ordered = scheduleOrder(fixtures);
   const safe = (projectName || 'lichtplan').replace(/[^\w.-]+/g, '_');
@@ -247,6 +266,16 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     'kreisliste.csv',
     (fs: PlacedFixture[]) => circuitTable(distributionFor(fs, phaseTemplate)),
   );
+
+  // Bedarf 143 — jedes Blatt geht denselben Weg und traegt denselben Stempel.
+  // Der Dateiname folgt der Blatt-Kennung, damit zwei Blaetter nicht dieselbe
+  // Datei ueberschreiben.
+  const exportReport = () => {
+    const def = findReport(reportId) ?? REPORTS[0];
+    exportTable(`${def.id}.csv`, (fs: PlacedFixture[]) => reportTable(
+      renderReport(def, fs, fieldContext(fs, trusses, dmxProtocol, phaseTemplate)),
+    ));
+  };
 
   const exportUniverses = () => exportTable(
     'universes.csv',
@@ -814,6 +843,78 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     );
   })();
 
+  // ── BEDARF 143 — zwoelf Blaetter, ein Modell ─────────────────────────────
+  //
+  // „all sorts and groupings of the same fields" (jkarp7/showstack#48). Die
+  // Blaetter sind BESCHREIBUNGEN in `core/reportEngine.ts`; hier wird nur
+  // gezeigt, was `renderReport` liefert. Wer hier Zeilen selbst zusammenbaut,
+  // hat das dreizehnte handgepflegte Dokument angelegt — und genau das ist
+  // der Zustand, den dieser Bedarf abschafft.
+  const papersPanel = (
+    <>
+      <div className="schedule-actions">
+        <label>
+          {t('sch.rep.pick', 'Blatt')}{' '}
+          <select value={reportId} onChange={(e) => setReportId(e.target.value)}>
+            {REPORTS.map((r) => (
+              <option key={r.id} value={r.id}>{r.label}</option>
+            ))}
+          </select>
+        </label>
+        <button className="btn-secondary" onClick={exportReport}>
+          &#8595; {t('sch.rep.csv', 'Dieses Blatt (CSV)')}
+        </button>
+      </div>
+      <div className="prop-derived">{bericht143.def.purpose}</div>
+      <table className="schedule-table">
+        <thead>
+          <tr>{bericht143.header.map((h, i) => <th key={i}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {bericht143.groups.map((g) => (
+            <React.Fragment key={g.key}>
+              {/* Die Gruppen-Ueberschrift steht als eigene Zeile — und zwar
+                  auch in der CSV. Ein Ausdruck, der anders gruppiert als der
+                  Bildschirm, ist genau das Auseinanderlaufen, um das es geht. */}
+              {bericht143.def.groupBy && (
+                <tr className="row-muted">
+                  <td colSpan={bericht143.header.length}>
+                    <strong>{g.key}</strong> · {g.rows.length}
+                  </td>
+                </tr>
+              )}
+              {g.rows.map((row, i) => (
+                <tr key={`${g.key}-${i}`}>
+                  {row.map((c, j) => <td key={j}>{c}</td>)}
+                </tr>
+              ))}
+            </React.Fragment>
+          ))}
+          {bericht143.rows.length === 0 && (
+            <tr><td colSpan={bericht143.header.length} className="row-muted">
+              {t('sch.rep.empty', 'Keine Zeilen.')}
+            </td></tr>
+          )}
+        </tbody>
+      </table>
+      {/* Was dieses Modell NICHT schreiben kann — berechnet aus dem
+          Feld-Katalog, nicht aufgezaehlt. Eine Aufzaehlung waere der
+          Kenntnisstand ihres Autors, und das naechste fehlende Feld fiele
+          niemandem auf. */}
+      {luecken.length > 0 && (
+        <div className="prop-derived">
+          {t('sch.rep.gaps', 'Aus diesem Modell nicht schreibbar:')}
+          <ul>
+            {luecken.map((g) => <li key={g.label}>{g.message}</li>)}
+          </ul>
+        </div>
+      )}
+      <div className="prop-derived">
+        {t('sch.rep.hint', 'Alle Blätter lesen dieselben Felder. Wer eine Spalte ändert, ändert sie einmal — nicht zwölfmal.')}
+      </div>
+    </>
+  );
+
   const checkPanel = (
     <>
       <div className="rig-pills">
@@ -1099,7 +1200,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     </div>
   );
 
-  const panels: Record<Tab, React.ReactNode> = { list: listPanel, magic: magicPanel, focus: focusPanel, notes: notesPanel, check: checkPanel, return: returnPanel, photo: photoPanel, load: loadPanel, export: exportPanel };
+  const panels: Record<Tab, React.ReactNode> = { list: listPanel, magic: magicPanel, focus: focusPanel, notes: notesPanel, papers: papersPanel, check: checkPanel, return: returnPanel, photo: photoPanel, load: loadPanel, export: exportPanel };
 
   return (
     <div className="modal-overlay" onMouseDown={onClose}>

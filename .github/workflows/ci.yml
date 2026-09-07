@@ -131,6 +131,17 @@ jobs:
       - name: Last steht auf Phasen, nicht auf einem Durchschnitt
         run: npm run power:check
 
+      # Bedarf 143 -- zwoelf Blaetter, ein Modell. Der Beleg beschreibt sie als
+      # „all sorts and groupings of the same fields": zwoelf Sichten, keine
+      # zwoelf Dokumente. Der Waechter haelt vor allem drei Dinge fest: dass
+      # jede Spalte aus dem einen Feld-Katalog kommt (ein Blatt bringt keinen
+      # eigenen Zugriff mit), dass dieselben Leuchten in JEDER
+      # Einfuegereihenfolge dasselbe Blatt ergeben -- sonst meldete der
+      # Stand-Stempel Abweichungen, die niemand gemacht hat --, und dass die
+      # drei alten CSVs zeichengleich bleiben.
+      - name: Blaetter sind Sichten auf ein Modell
+        run: npm run reports:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

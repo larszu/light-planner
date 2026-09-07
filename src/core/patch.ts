@@ -230,6 +230,16 @@ export interface Circuit {
   watts: number;
   fixtureCount: number;
   utilization: number; // watts / CIRCUIT_WATTS
+  /**
+   * BEDARF 143 — WELCHE Leuchten in diesem Kreis liegen.
+   *
+   * Bis 2026-09-07 stand hier nur die Anzahl. Damit liess sich die Kreis-Zahl
+   * aufs Blatt schreiben, aber nicht die Frage beantworten, die jeder auf der
+   * Buehne stellt: „an welchem Kreis haengt DIESE Leuchte?" Wer sie ohne
+   * diese Liste beantworten wollte, musste die Fuellregel unten ein zweites
+   * Mal nachbauen — und ein Nachbau driftet von seinem Vorbild weg, still.
+   */
+  fixtureIds: string[];
 }
 
 // Greedy first-fit in reading/patch order: keep filling a circuit until the
@@ -241,10 +251,10 @@ export function circuitBreakdown(fixtures: PlacedFixture[], budget = CIRCUIT_WAT
   for (const f of ordered) {
     const w = f.fixture.wattage || 0;
     if (!cur || cur.watts + w > budget) {
-      cur = { index: circuits.length + 1, watts: 0, fixtureCount: 0, utilization: 0 };
+      cur = { index: circuits.length + 1, watts: 0, fixtureCount: 0, utilization: 0, fixtureIds: [] };
       circuits.push(cur);
     }
-    cur.watts += w; cur.fixtureCount += 1;
+    cur.watts += w; cur.fixtureCount += 1; cur.fixtureIds.push(f.id);
   }
   circuits.forEach((c) => { c.utilization = budget > 0 ? c.watts / budget : 0; });
   return circuits;

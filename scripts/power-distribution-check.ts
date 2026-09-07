@@ -44,8 +44,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   CIRCUIT_AMPS, CIRCUIT_HEADERS, DEFAULT_TEMPLATE, MAINS_VOLTAGE, OUTLETS_PER_DISTRO,
-  PHASE_HEADERS, PHASE_LABEL, TEMPLATE_LABEL, TEMPLATE_PHASES, circuitLabel, circuitTable,
-  distributionFor, distributionPlan, parseCircuitLabel, phaseTable, plugOrder,
+  PHASE_HEADERS, PHASE_LABEL, TEMPLATE_LABEL, TEMPLATE_PHASES, circuitByFixture, circuitLabel,
+  circuitTable, distributionFor, distributionPlan, parseCircuitLabel, phaseTable, plugOrder,
   type PhaseTemplate,
 } from '../src/core/powerDistribution.ts';
 import { CIRCUIT_WATTS, circuitBreakdown, computePower } from '../src/core/patch.ts';
@@ -82,6 +82,7 @@ const lampe = (id: string, watt: number, category: FixtureCategory = 'profile'):
 const kreise = (n: number, watt = 1000) =>
   Array.from({ length: n }, (_, i) => ({
     index: i + 1, watts: watt, fixtureCount: 1, utilization: watt / CIRCUIT_WATTS,
+    fixtureIds: [`k${i + 1}`],
   }));
 
 // ─── 1. Die Phase haengt am Steckplatz ─────────────────────────────────────
@@ -235,6 +236,32 @@ const kreise = (n: number, watt = 1000) =>
   assert.equal(pt.rows.length, 3);
 }
 
+// ─── 5b. Von der Leuchte zu ihrem Kreis ────────────────────────────────────
+{
+  // Die Frage, die auf der Buehne wirklich gestellt wird: „an welchem Kreis
+  // haengt DIESE Leuchte?" Sie wird AUS der Zuteilung beantwortet und nicht
+  // neben ihr gerechnet — es gibt genau eine Fuellregel.
+  const lampen = Array.from({ length: 5 }, (_, i) => lampe(`f${i}`, 1000));
+  const plan = distributionFor(lampen, 'ABC');
+  const zu = circuitByFixture(plan);
+  assert.equal(zu.size, 5, 'nicht jede Leuchte findet ihren Kreis');
+  // Drei Geraete zu 1000 W passen in einen 3000-W-Kreis, das vierte nicht.
+  assert.equal(circuitLabel(zu.get('f0')!), circuitLabel(zu.get('f2')!));
+  assert.notEqual(circuitLabel(zu.get('f0')!), circuitLabel(zu.get('f3')!));
+  // Und die Zuordnung stimmt mit der Zaehlung ueberein: keine Leuchte zweimal,
+  // keine erfunden.
+  for (const a of plan.assignments) {
+    assert.equal(a.fixtureIds.length, a.fixtureCount, `Kreis ${circuitLabel(a)}`);
+  }
+  assert.equal(plan.assignments.reduce((n, a) => n + a.fixtureIds.length, 0), 5);
+
+  // Eine Leuchte OHNE Leistungsangabe kommt in keinem Kreis vor — sie fehlt
+  // hier, statt einem erfundenen zugeschlagen zu werden.
+  const ohne = circuitByFixture(distributionFor([lampe('a', 1000), lampe('leer', 0)], 'ABC'));
+  assert.ok(ohne.has('a'));
+  assert.equal(ohne.has('leer'), false, 'eine Leuchte ohne Leistung bekam einen erfundenen Kreis');
+}
+
 // ─── 6. Ein Geraet, das in keinen Kreis passt, faellt auf ──────────────────
 {
   // 5 kW an 230 V sind 21,7 A. `circuitBreakdown` legt das Geraet allein in
@@ -317,10 +344,15 @@ const kreise = (n: number, watt = 1000) =>
   // Die schwerste Phase steht auf einer Karte -- und die Annahme DANEBEN,
   // nicht an ihrer Stelle.
   assert.match(dialog, /verteilung\.peak\?\.amps/, 'die schwerste Phase steht nirgends');
-  assert.match(dialog, /'sch\.pwr\.assumed'/, 'die Annahme ist verschwunden statt benannt');
+  // Der Schluessel-Namensraum unterscheidet sich zwischen dem eigenstaendigen
+  // Planer (`sch.*`) und der Suite-Fassung (`dlg.sch.*`). Der Waechter prueft
+  // die FORM, nicht den Namensraum -- sonst braeuchte die vendorte Kopie eine
+  // eigene Fassung dieser Datei, und die beiden driften ab dem Tag
+  // auseinander, an dem jemand nur eine von beiden anfasst.
+  assert.match(dialog, /'(dlg\.)?sch\.pwr\.assumed'/, 'die Annahme ist verschwunden statt benannt');
   assert.match(dialog, /power\.ampsPerPhase/, 'die alte Zahl fehlt zum Danebenhalten');
   // Die alte Beschriftung ist WEG: „pro Phase" als Tatsache war der Fehler.
-  assert.doesNotMatch(dialog, /'sch\.perPhase'/, 'die alte Beschriftung behauptet weiter eine Tatsache');
+  assert.doesNotMatch(dialog, /'(dlg\.)?sch\.perPhase'/, 'die alte Beschriftung behauptet weiter eine Tatsache');
   assert.match(dialog, /circuitLabel\(a\)/, 'die Kreisliste fuehrt die laufende Nummer statt „3-2"');
   assert.match(dialog, /onSetPhaseTemplate\(e\.target\.value as PhaseTemplate\)/, 'kein Umschalter');
   // Literale i18n-Schluessel -- ein Template waere fuer `i18n:check` unsichtbar.
