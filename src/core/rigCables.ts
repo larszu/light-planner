@@ -42,7 +42,7 @@
 // REIN: keine Datei, kein Netz, keine Uhr, kein Zufall.
 // ───────────────────────────────────────────────────────────────────────────
 import type { PlacedFixture, Truss } from '../types';
-import { nearestTrussId } from './patch';
+import { nearestTrussId, footprint } from './patch';
 import {
   DEFAULT_TEMPLATE, type PhaseTemplate, circuitByFixture, circuitLabel, distributionFor,
 } from './powerDistribution';
@@ -206,7 +206,7 @@ export function cableRuns(
           to: fixtureEnd(f),
           trussLabel: truss?.label ?? null,
           lengthM: weiter ? rund(abstand(letzteDaten!.f, f)) : null,
-          connector: (f.fixture.dmxChannels ?? 0) > 0 ? 'DMX' : NOT_SET,
+          connector: footprint(f) > 0 ? 'DMX' : NOT_SET,
         });
         letzteDaten = { f, key: datenKey };
       }

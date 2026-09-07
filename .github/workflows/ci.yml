@@ -209,6 +209,14 @@ jobs:
       - name: Kabelwege folgen dem Kreis, nicht einer zweiten Regel
         run: npm run cables:check
 
+      # Defektformen-Sweep, Form `zwei-rechnungen`: `integration/equipment.ts`
+      # rechnete den DMX-Fussabdruck ein zweites Mal und gab im Nein-Fall eine
+      # ANDERE Antwort (1 statt 0). Die 0 ist im Planer aber die Kodierung fuer
+      # „konventionelle Leuchte am Dimmer"; der Export behauptete fuer sie
+      # einen Kanal und haengte ihr eine DMX-Buchse an.
+      - name: Der DMX-Fussabdruck wird auch beim Export nur einmal gerechnet
+        run: npm run equipment:check
+
       # Bedarf 132: die Szenen waren eine flache Liste. Wer den dritten Song
       # nach vorn zieht, musste seine Teil-Stimmungen einzeln hinterherziehen
       # -- und vergisst eine; dann steht im Ablauf ein Chorus vor seinem Intro,

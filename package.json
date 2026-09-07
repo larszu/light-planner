@@ -35,6 +35,7 @@
     "shop:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/shop-order-check.ts",
     "labels:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/label-sheet-check.ts",
     "cables:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/rig-cables-check.ts",
+    "equipment:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/equipment-export-check.ts",
     "order:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/running-order-check.ts",
     "stamp:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/stamp-check.ts",
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
