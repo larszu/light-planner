@@ -138,8 +138,8 @@ export function rigCheck(
   if (spitze && spitze.amps > CIRCUIT_AMPS) {
     issues.push({
       severity: 'warning',
-      message: `${PHASE_LABEL[spitze.phase]} traegt ${spitze.amps.toFixed(1)} A `
-        + `(${spitze.circuits} Kreis(e)) – ueber ${CIRCUIT_AMPS} A je Phase`,
+      message: `${PHASE_LABEL[spitze.phase]} trägt ${spitze.amps.toFixed(1)} A `
+        + `(${spitze.circuits} Kreis(e)) – über ${CIRCUIT_AMPS} A je Phase`,
       basis: stromBasis,
     });
   }
@@ -159,7 +159,7 @@ export function rigCheck(
   if (verteilung.understatedAmps >= CIRCUIT_AMPS) {
     issues.push({
       severity: 'info',
-      message: `Ungleich verteilt: die schwerste Phase traegt ${verteilung.understatedAmps.toFixed(1)} A `
+      message: `Ungleich verteilt: die schwerste Phase trägt ${verteilung.understatedAmps.toFixed(1)} A `
         + `mehr als die ausgeglichene Annahme (${verteilung.assumedAmpsPerPhase.toFixed(1)} A) – `
         + `Unterschied zwischen schwerster und leichtester Phase ${verteilung.imbalanceAmps.toFixed(1)} A`,
       basis: stromBasis,
@@ -173,9 +173,9 @@ export function rigCheck(
   if (zuGross.length > 0) {
     issues.push({
       severity: 'error',
-      message: `${zuGross.length} Kreis(e) ueber ${CIRCUIT_AMPS} A `
+      message: `${zuGross.length} Kreis(e) über ${CIRCUIT_AMPS} A `
         + `(${zuGross.map((a) => `${a.distro}-${a.outlet}: ${a.amps.toFixed(1)} A`).join(', ')}) – `
-        + 'ein Geraet passt in keinen 16-A-Kreis',
+        + 'ein Gerät passt in keinen 16-A-Kreis',
       basis: stromBasis,
     });
   }

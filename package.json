@@ -19,6 +19,7 @@
     "inventory:check": "node --experimental-strip-types scripts/inventory-contract-check.ts",
     "mvr:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/mvr-check.ts",
     "spec:check": "node --experimental-strip-types scripts/spec-source-check.ts",
+    "ascii:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/ascii-drift-check.ts",
     "notes:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/work-notes-check.ts",
     "patch:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/console-patch-check.ts",
     "groups:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/fixture-groups-check.ts",

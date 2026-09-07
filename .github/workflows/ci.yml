@@ -45,6 +45,14 @@ jobs:
       - name: i18n — erreichbare Oberflaeche uebersetzt
         run: npm run i18n:check
 
+      # Nutzer-Rueckmeldung 2026-09-07 am Kabel-Planer: die Anwendung schrieb
+      # ihr Deutsch als „Geraet"/„Domaene". Dieselbe Drift stand hier in elf
+      # Meldungen. Der Check kennt nicht die falschen Woerter, sondern die,
+      # in denen „ae/oe/ue" kein Umlaut-Ersatz ist — sonst liesse er das
+      # naechste neue Wort still durch.
+      - name: Meldungstexte in richtigem Deutsch
+        run: npm run ascii:check
+
       - name: MVR-Export — Fixture-Typ-Identitaet
         run: npm run mvr:check
 
