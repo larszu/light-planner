@@ -175,6 +175,16 @@ jobs:
       - name: Etiketten lesen dieselben Felder wie die Blaetter
         run: npm run labels:check
 
+      # Bedarf 140: das Austauschformat MVR hat keine Kabel-Entitaet
+      # (`mvrdevelopment/spec#296`, `#288`, beide offen) -- die Wege folgen aber
+      # aus dem, was der Plan schon weiss. Der Waechter haelt die zwei Stellen
+      # fest, an denen so eine Liste luegt: die Kette muss der Traverse folgen
+      # und am Kreis brechen (nicht nach einer zweiten, eigenen Regel), und die
+      # Zuleitung vom Verteiler bekommt KEINE erfundene Laenge -- ausgerechnet
+      # dort, wo das Kabel am laengsten ist.
+      - name: Kabelwege folgen dem Kreis, nicht einer zweiten Regel
+        run: npm run cables:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.
