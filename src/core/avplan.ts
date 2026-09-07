@@ -93,10 +93,10 @@ export function makeAvPlan(args: {
 export function parseAvPlan(text: string): AvPlan {
   const data = JSON.parse(text) as Partial<AvPlan>;
   if (!data || data.kind !== AVPLAN_KIND) {
-    throw new Error('Keine gueltige .avplan-Datei (kind != avplan).');
+    throw new Error('Keine gültige .avplan-Datei (kind != avplan).');
   }
   if (data.formatVersion !== AVPLAN_VERSION) {
-    throw new Error(`Nicht unterstuetzte .avplan-Version: ${data.formatVersion}`);
+    throw new Error(`Nicht unterstützte .avplan-Version: ${data.formatVersion}`);
   }
   if (!data.venue || !data.domains) throw new Error('.avplan ohne venue/domains.');
   return data as AvPlan;
@@ -186,6 +186,6 @@ export function avPlanImportWarning(
   if (avPlanContentCount(current) === 0) return null;
   const bestand = `${current.fixtures} Lampen, ${current.trusses} Trussen, ${current.scenes} Szenen`;
   return hasLightingDomain
-    ? `Diese .avplan ersetzt das offene Projekt (${bestand}). Nicht gespeicherte Aenderungen gehen verloren. Fortfahren?`
-    : `Diese .avplan enthaelt KEINE Licht-Domaene. Der offene Lichtplan (${bestand}) wird durch einen leeren ersetzt. Fortfahren?`;
+    ? `Diese .avplan ersetzt das offene Projekt (${bestand}). Nicht gespeicherte Änderungen gehen verloren. Fortfahren?`
+    : `Diese .avplan enthält KEINE Licht-Domäne. Der offene Lichtplan (${bestand}) wird durch einen leeren ersetzt. Fortfahren?`;
 }

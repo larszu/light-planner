@@ -292,7 +292,7 @@ const kreise = (n: number, watt = 1000) =>
   const viel = Array.from({ length: 16 }, (_, i) => lampe(`f${i}`, 750));
   const aufDrei = rigCheck(viel, [], 'ABC');
   const aufEiner = rigCheck(viel, [], 'A');
-  const phasenZeile = (is: ReturnType<typeof rigCheck>) => is.find((i) => /traegt .* A/.test(i.message));
+  const phasenZeile = (is: ReturnType<typeof rigCheck>) => is.find((i) => /trägt .* A/.test(i.message));
   assert.ok(phasenZeile(aufEiner), 'einphasig faellt die Ueberlast nicht auf');
   assert.match(phasenZeile(aufEiner)!.message, /L1/);
   // Und die Zahl haengt wirklich an der Vorlage.

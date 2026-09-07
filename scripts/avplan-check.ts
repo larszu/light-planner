@@ -112,7 +112,7 @@ assert.equal(avPlanImportWarning(false, leer), null);
 
 // Datei OHNE Licht-Domaene: der Fall, den niemand erwartet, wird benannt.
 const ohne = avPlanImportWarning(false, rig);
-assert.ok(ohne && ohne.includes('KEINE Licht-Domaene'), 'fehlende Domaene muss benannt werden');
+assert.ok(ohne && ohne.includes('KEINE Licht-Domäne'), 'fehlende Domaene muss benannt werden');
 assert.ok(ohne.includes('12 Lampen'), 'der Bestand muss beziffert sein');
 assert.ok(ohne.includes('leeren'), 'das Ergebnis muss benannt sein');
 
