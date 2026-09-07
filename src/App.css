@@ -2631,3 +2631,57 @@ kbd {
 }
 .spec-src-est { color: #d9a441; }
 .spec-src-stale { color: #d96a4a; font-weight: 700; }
+
+/* ─── BEDARF 148 — Etiketten aus denselben Daten wie die Papiere ───────────
+   Ein Etikettenbogen ist ein physischer Gegenstand: die Masse stehen deshalb
+   in Millimetern und werden aus dem Modell (`core/labelSheet.ts`) als
+   Inline-Style gesetzt. Hier steht nur, was sich nicht rechnen laesst — der
+   Rahmen, die Schnittmarke und die Druckregeln.
+
+   `@page { margin: 0 }` ist noetig, weil der Bogen seine eigenen Raender
+   mitbringt: der Druckertreiber duerfte sonst zusaetzlich einruecken, und
+   der ganze Satz saesse versetzt. */
+.label-sheet {
+  background: #fff;
+  color: #000;
+  margin: 0 auto 12px;
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.label-cell {
+  position: absolute;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* Der gestrichelte Rahmen ist eine SCHNITTMARKE fuer die Bildschirm-
+     Vorschau, keine Zeichnung auf dem Etikett — im Druck ist er weg. */
+  border: 1px dashed rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.15;
+}
+.label-cell.is-empty { border-style: dotted; opacity: 0.35; }
+/* Eine Zeile, die (geschaetzt) nicht passt, wird MARKIERT und nicht gekuerzt:
+   ein abgeschnittener Kreis ist ein falsches Etikett. */
+.label-line.overflows { outline: 1px solid #c0392b; outline-offset: 1px; }
+.label-head { font-weight: 700; }
+
+@media print {
+  /* Im Druck ist NUR der Bogen auf dem Papier. Alles andere auszublenden ist
+     nicht Kosmetik: ein Dialograhmen ueber dem ersten Etikett verschiebt den
+     ganzen Satz. */
+  body * { visibility: hidden !important; }
+  .label-print-area, .label-print-area * { visibility: visible !important; }
+  .label-print-area {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .label-sheet { box-shadow: none !important; page-break-after: always; margin: 0 !important; }
+  .label-sheet:last-child { page-break-after: auto; }
+  .label-cell { border: none !important; }
+  .label-line.overflows { outline: none !important; }
+  @page { size: A4; margin: 0; }
+}

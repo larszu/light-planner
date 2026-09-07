@@ -29,6 +29,9 @@ import {
   type ConsoleTarget,
 } from '../core/consoleExport';
 import { shopOrder, shopOrderGaps, shopOrderTable } from '../core/shopOrder';
+import {
+  FIT_BASIS_NOTE, LABEL_DEFS, PADDING_MM, STOCKS, findLabelDef, findStock, labelSheet,
+} from '../core/labelSheet';
 import { useInventoryStore } from '../inventory/store';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
@@ -199,6 +202,13 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   // etwas anderes.
   const [consoleTarget, setConsoleTarget] = useState<ConsoleTarget>('eos-lightwright');
 
+  // BEDARF 148 — Bogen, Etikettenart und das erste freie Etikett. Alles drei
+  // sind Ansichten und keine Projekt-Angaben: welcher Bogen im Drucker liegt,
+  // ist eine Eigenschaft des Nachmittags und nicht der Show.
+  const [stockId, setStockId] = useState<string>(STOCKS[0].id);
+  const [labelDefId, setLabelDefId] = useState<string>(LABEL_DEFS[0].id);
+  const [labelStart, setLabelStart] = useState<number>(1);
+
   const counts = fixtureCounts(fixtures);
   const power = computePower(fixtures);
   const totalWeight = fixtures.reduce((s, f) => s + (f.fixture.weight || 0), 0);
@@ -245,6 +255,13 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const lagerBestand = useInventoryStore((st) => st.items);
   const bestellung = shopOrder(fixtures, lagerBestand);
   const bestellLuecken = shopOrderGaps(fixtures);
+
+  // BEDARF 148 — der Etikettensatz. Die Felder kommen aus DEMSELBEN Katalog
+  // wie die Blaetter (Bedarf 143): am Verteiler klebt dann dieselbe
+  // Kreisnummer, die auf der Kreisliste steht.
+  const bogen = findStock(stockId) ?? STOCKS[0];
+  const etikettenArt = findLabelDef(labelDefId) ?? LABEL_DEFS[0];
+  const etiketten = labelSheet(etikettenArt, fixtures, feldKontext, bogen, labelStart);
 
   const ordered = scheduleOrder(fixtures);
   const safe = (projectName || 'lichtplan').replace(/[^\w.-]+/g, '_');
@@ -953,6 +970,98 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
       )}
       <div className="prop-derived">
         {t('sch.rep.hint', 'Alle Blätter lesen dieselben Felder. Wer eine Spalte ändert, ändert sie einmal — nicht zwölfmal.')}
+      </div>
+
+      {/* ── BEDARF 148 — Etiketten aus denselben Daten ────────────────────
+          „Label output is a print view over the existing circuit/dimmer/
+          channel model" — deshalb steht es HIER, auf demselben Blatt-Tab, und
+          liest denselben Feld-Katalog. Am Verteiler klebt dann dieselbe
+          Kreisnummer, die auf der Kreisliste steht. */}
+      <h4 className="schedule-subhead">{t('sch.lbl.head', 'Etiketten')}</h4>
+      <div className="schedule-actions">
+        <label>
+          {t('sch.lbl.kind', 'Etikett')}{' '}
+          <select value={labelDefId} onChange={(e) => setLabelDefId(e.target.value)}>
+            {LABEL_DEFS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+          </select>
+        </label>
+        <label style={{ marginLeft: 12 }}>
+          {t('sch.lbl.stock', 'Bogen')}{' '}
+          <select value={stockId} onChange={(e) => setStockId(e.target.value)}>
+            {STOCKS.map((st) => <option key={st.id} value={st.id}>{st.label}</option>)}
+          </select>
+        </label>
+        {/* Etikettenbogen werden selten ganz aufgebraucht. Wer beim naechsten
+            Satz wieder bei 1 anfaengt, druckt auf abgezogene Stellen. */}
+        <label style={{ marginLeft: 12 }}>
+          {t('sch.lbl.startAt', 'Erstes freies Etikett')}{' '}
+          <input
+            type="number"
+            min={1}
+            max={bogen.columns * bogen.rows}
+            value={labelStart}
+            onChange={(e) => setLabelStart(Number(e.target.value) || 1)}
+            style={{ width: 64 }}
+          />
+        </label>
+        <button className="btn-secondary" style={{ marginLeft: 12 }} onClick={() => window.print()} disabled={etiketten.count === 0}>
+          {t('sch.lbl.print', 'Drucken')}
+        </button>
+      </div>
+      <div className="prop-derived">
+        {etikettenArt.purpose} · {bogen.note}
+      </div>
+      <div className="prop-derived">
+        {t('sch.lbl.counts', '{n} Etikett(en) auf {p} Bogen. Auf dem letzten bleiben {r} frei — beim nächsten Mal hier als „erstes freies Etikett" eintragen.')
+          .replace('{n}', String(etiketten.count))
+          .replace('{p}', String(etiketten.pages.length))
+          .replace('{r}', String(etiketten.leftover))}
+      </div>
+      {/* Was (geschaetzt) nicht passt, wird MARKIERT und nicht gekuerzt: ein
+          abgeschnittener Kreis ist ein falsches Etikett, und ein falsches
+          Etikett am Verteiler ist schlimmer als ein leeres. */}
+      {etiketten.overflowing > 0 && (
+        <div className="rig-pill warn">
+          {t('sch.lbl.overflow', '{n} Etikett(en) werden vermutlich zu breit — nichts wird gekürzt. Schmaleres Etikett wählen oder größeren Bogen.')
+            .replace('{n}', String(etiketten.overflowing))}
+        </div>
+      )}
+      <div className="prop-derived">{FIT_BASIS_NOTE}</div>
+      <div className="label-print-area">
+        {etiketten.pages.map((page, pi) => (
+          <div
+            key={pi}
+            className="label-sheet"
+            style={{ width: '210mm', height: '297mm' }}
+          >
+            {page.cells.map((lab, ci) => {
+              const spalte = ci % bogen.columns;
+              const zeile = Math.floor(ci / bogen.columns);
+              const stil: React.CSSProperties = {
+                left: `${bogen.marginLeftMm + spalte * bogen.widthMm}mm`,
+                top: `${bogen.marginTopMm + zeile * bogen.heightMm}mm`,
+                width: `${bogen.widthMm}mm`,
+                height: `${bogen.heightMm}mm`,
+                padding: `${PADDING_MM}mm`,
+              };
+              if (!lab) return <div key={ci} className="label-cell is-empty" style={stil} />;
+              return (
+                <div key={ci} className="label-cell" style={stil}>
+                  {lab.lines.map((ln, li) => (
+                    <div
+                      key={li}
+                      className={`label-line ${li === 0 ? 'label-head' : ''} ${ln.fits ? '' : 'overflows'}`}
+                      style={{ fontSize: `${ln.fontMm}mm` }}
+                      title={ln.fieldLabel}
+                    >
+                      {ln.text}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </>
   );

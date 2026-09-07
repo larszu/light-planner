@@ -30,6 +30,7 @@
     "reports:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/report-engine-check.ts",
     "console:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/console-export-check.ts",
     "shop:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/shop-order-check.ts",
+    "labels:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/label-sheet-check.ts",
     "stamp:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/stamp-check.ts",
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
     "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",
