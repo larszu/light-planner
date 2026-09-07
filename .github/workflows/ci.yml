@@ -142,6 +142,17 @@ jobs:
       - name: Blaetter sind Sichten auf ein Modell
         run: npm run reports:check
 
+      # Bedarf 146 -- den Patch ans Pult schicken statt abtippen. Der Beleg
+      # nennt zwei Fallen ausdruecklich: Eos will Tabulatoren und
+      # Windows-Zeilenenden, und es verwirft Zeilen ohne bekannten Geraetetyp
+      # -- beides ohne ein Wort. Die Empfehlung der Quelle ist deshalb keine
+      # Funktion, sondern eine Warnung VOR dem Speichern. Der Waechter haelt
+      # vor allem fest, dass gewarnt und geschrieben DIESELBE Entscheidung
+      # ist: zwei Regeln koennten auseinanderlaufen, und dann warnte die eine,
+      # waehrend die andere etwas anderes tut.
+      - name: Die Pult-Datei sagt vorher, was sie nicht enthaelt
+        run: npm run console:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

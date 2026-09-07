@@ -24,6 +24,10 @@ import { fieldContext } from '../core/reportFields';
 import {
   REPORTS, renderReport, reportGaps, reportTable, findReport,
 } from '../core/reportEngine';
+import {
+  DROP_LABEL, FORMATS, TARGETS, buildConsoleFile, consoleFileName, exportPreflight,
+  type ConsoleTarget,
+} from '../core/consoleExport';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
 import {
@@ -188,6 +192,11 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   // Blatt ist.
   const [reportId, setReportId] = useState<string>(REPORTS[0].id);
 
+  // BEDARF 146 — an welches Pult die Datei geht. Auch das ist eine Ansicht
+  // und keine Projekt-Angabe: dieselbe Show geht mal an ein Eos und mal an
+  // etwas anderes.
+  const [consoleTarget, setConsoleTarget] = useState<ConsoleTarget>('eos-lightwright');
+
   const counts = fixtureCounts(fixtures);
   const power = computePower(fixtures);
   const totalWeight = fixtures.reduce((s, f) => s + (f.fixture.weight || 0), 0);
@@ -222,6 +231,11 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const feldKontext = fieldContext(fixtures, trusses, dmxProtocol, phaseTemplate);
   const bericht143 = renderReport(findReport(reportId) ?? REPORTS[0], fixtures, feldKontext);
   const luecken = reportGaps();
+
+  // BEDARF 146 — was die Pult-Datei enthalten WIRD, und was nicht. Vor dem
+  // Speichern, nicht danach: „rather than letting the user discover it at
+  // load-in".
+  const pultVorschau = exportPreflight(fixtures, consoleTarget);
 
   const ordered = scheduleOrder(fixtures);
   const safe = (projectName || 'lichtplan').replace(/[^\w.-]+/g, '_');
@@ -275,6 +289,17 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
     exportTable(`${def.id}.csv`, (fs: PlacedFixture[]) => reportTable(
       renderReport(def, fs, fieldContext(fs, trusses, dmxProtocol, phaseTemplate)),
     ));
+  };
+
+  // Bedarf 146 — die Datei fuers Pult. KEIN `downloadCsv`: dort haengt eine
+  // Byte-Order-Mark vorn, und die stuende in einer Datei, die ein Pult
+  // feldweise liest, im ersten Spaltennamen.
+  const exportConsole = () => {
+    const text = buildConsoleFile(fixtures, consoleTarget, feldKontext);
+    triggerDownload(
+      new Blob([text], { type: 'text/plain;charset=utf-8;' }),
+      consoleFileName(projectName, consoleTarget),
+    );
   };
 
   const exportUniverses = () => exportTable(
@@ -1159,6 +1184,53 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           <span>{t('sch.exp.groupsNote', 'Gruppe je Zeile mit Kanal, Unit, Typ und Position – das, was am Pult, im Visualisierer und im Medienserver sonst von Hand nachgebaut wird.')}</span>
         </div>
         <button className="btn-secondary" onClick={exportGroups} disabled={gruppen.length === 0}>⬇ CSV</button>
+      </div>
+      {/* ── BEDARF 146 — den Patch ans Pult schicken statt abtippen ──────
+          Der Beleg nennt zwei Fallen ausdruecklich: Eos will Tabulatoren und
+          Windows-Zeilenenden, und es verwirft Zeilen ohne bekannten
+          Geraetetyp — beides ohne ein Wort. Die Empfehlung der Quelle ist
+          deshalb keine Funktion, sondern eine Warnung: „rather than letting
+          the user discover it at load-in". */}
+      <div className="export-row">
+        <Icon name="export" size={22} className="er-icon" />
+        <div className="er-text">
+          <b>{t('sch.exp.console', 'Patch fürs Pult')}</b>
+          <span>
+            <select
+              value={consoleTarget}
+              onChange={(e) => setConsoleTarget(e.target.value as ConsoleTarget)}
+              style={{ marginRight: 8 }}
+            >
+              {TARGETS.map((id) => (
+                <option key={id} value={id}>{FORMATS[id].label}</option>
+              ))}
+            </select>
+            {pultVorschau.note}
+          </span>
+          {/* Was NICHT mitgeht, mit Grund — vor dem Speichern. Eine Datei,
+              die stillschweigend die Haelfte verliert, ist schlimmer als
+              keine: am Pult sieht man ihr nicht an, dass sie unvollstaendig
+              ist, und gesucht wird dann beim Geraet. */}
+          {pultVorschau.dropped.length > 0 && (
+            <span className="rig-pill warn">
+              {t('sch.exp.consoleDropped', '{n} von {m} Zeilen gehen NICHT mit:')
+                .replace('{n}', String(pultVorschau.dropped.length))
+                .replace('{m}', String(fixtures.length))}
+              {' '}
+              {[...new Set(pultVorschau.dropped.map((d) => d.reason))]
+                .map((r) => DROP_LABEL[r]).join(' · ')}
+            </span>
+          )}
+          {pultVorschau.unverifiable > 0 && (
+            <span className="prop-derived">
+              {t('sch.exp.consoleUnverifiable', 'Ob die übrigen {n} Zeilen ankommen, hängt an der Geräte-Bibliothek des Pults. Das kann dieser Rechner nicht wissen — geprüft wird es beim Import.')
+                .replace('{n}', String(pultVorschau.unverifiable))}
+            </span>
+          )}
+        </div>
+        <button className="btn-secondary" onClick={exportConsole} disabled={pultVorschau.written === 0}>
+          &#8595; {FORMATS[consoleTarget].extension.toUpperCase()}
+        </button>
       </div>
       <div className="export-row">
         <Icon name="cube3d" size={22} className="er-icon" />

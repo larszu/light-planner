@@ -28,6 +28,7 @@
     "universe:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/universe-identity-check.ts",
     "power:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/power-distribution-check.ts",
     "reports:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/report-engine-check.ts",
+    "console:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/console-export-check.ts",
     "stamp:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/stamp-check.ts",
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
     "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",
