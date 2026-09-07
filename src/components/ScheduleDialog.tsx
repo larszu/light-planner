@@ -12,6 +12,10 @@ import { rigCheck, issueCounts } from '../core/rigCheck';
 import {
   preflight, preflightTable, type PreflightVerdict,
 } from '../core/preflight';
+import {
+  PROTOCOL_LABEL, UNIVERSE_HEADERS, artnetReading, readingsDiverge, sacnReading,
+  universeReading, universeReadings, universeTable, type DmxProtocol,
+} from '../core/universeIdentity';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
 import {
@@ -34,6 +38,15 @@ interface Props {
   projectName: string;
   /** Fuer den Stempel: unter dieser Kennung liegen die festgeschriebenen Staende. */
   projectId: string;
+  // ── Bedarf 147 — wie die Universe-Zahlen zu lesen sind ──
+  /**
+   * Das Protokoll, in dem die `universe`-Zahlen dieses Plans gemeint sind.
+   * Es haengt am PROJEKT: die Zahl an der Leuchte war nie falsch, sie war
+   * unbestimmt.
+   */
+  dmxProtocol: DmxProtocol;
+  /** Umstellen. Der Wert lebt im Wirt und geht mit in die Datei. */
+  onSetProtocol: (p: DmxProtocol) => void;
   conflicts: Set<string>;
   onAutoNumber: () => void;
   onAutoPatch: () => void;
@@ -129,7 +142,7 @@ const utilClass = (u: number) => (u >= 1 ? 'util-over' : u >= 0.8 ? 'util-warn' 
 
 // A focused multi-tool hub for paperwork, validation, analysis and interchange.
 // Each tab is one job, so no single view is overloaded.
-const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, projectId, conflicts, onAutoNumber, onAutoPatch, onLocate, onUpdateFixture, fixtureGroups, onRenameGroup, workNotes, onAddNote, onToggleNote, onRemoveNote, onClose }) => {
+const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, projectId, dmxProtocol, onSetProtocol, conflicts, onAutoNumber, onAutoPatch, onLocate, onUpdateFixture, fixtureGroups, onRenameGroup, workNotes, onAddNote, onToggleNote, onRemoveNote, onClose }) => {
   const { t } = useTranslation();
   const [tab, setTabState] = useState<Tab>(() => {
     try { const saved = localStorage.getItem('lp-tool-tab'); if (saved && TABS.some((x) => x.id === saved)) return saved as Tab; } catch { /* ignore */ }
@@ -158,7 +171,10 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   // BEDARF 142 — der Vorflug-Bericht statt der blossen Rig-Pruefung. Er
   // enthaelt dieselben Befunde (`rigCheck` bleibt die Quelle) plus die
   // semantischen, und er faellt ein Urteil, das „nicht beurteilbar" kennt.
-  const bericht = preflight(fixtures, trusses);
+  // BEDARF 147 — das Protokoll geht MIT in die Pruefung. Ohne es liesse sich
+  // nicht sagen, ob „Universe 40000" eine gueltige sACN-Zahl oder eine
+  // unmoegliche Art-Net-Port-Address ist, und der Bericht schwiege zu beidem.
+  const bericht = preflight(fixtures, trusses, dmxProtocol);
   const issues = bericht.issues;
   const ic = { errors: bericht.counts.error, warnings: bericht.counts.warning, infos: bericht.counts.info };
   const photo = photometricReport(fixtures, walls, ceilings, area);
@@ -166,6 +182,11 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const circuits = circuitBreakdown(fixtures);
   const colors = colorCounts(fixtures);
   const checkBadge = ic.errors + ic.warnings;
+
+  // BEDARF 147 — die Universes des Plans mit BEIDEN Lesarten. Eine Zeile je
+  // Universe, sortiert nach der Zahl und nicht nach der Reihenfolge der
+  // Leuchten: sonst saehe dasselbe Blatt zweimal anders aus.
+  const lesarten = universeReadings(fixtures.map((f) => f.universe), dmxProtocol);
 
   const ordered = scheduleOrder(fixtures);
   const safe = (projectName || 'lichtplan').replace(/[^\w.-]+/g, '_');
@@ -201,6 +222,13 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const exportSchedule = () => exportTable('instrument-schedule.csv', scheduleTable);
   const exportInventory = () => exportTable('geraeteliste.csv', inventoryTable);
   const exportColors = () => exportTable('farbliste.csv', colorTable);
+  // Bedarf 147 — das Universe-Blatt geht denselben Weg wie die anderen
+  // Listen und traegt damit denselben Stempel (ADR-004): wer es ausdruckt und
+  // ans Gateway mitnimmt, sieht, aus welchem Stand es stammt.
+  const exportUniverses = () => exportTable(
+    'universes.csv',
+    (fs: PlacedFixture[]) => universeTable(universeReadings(fs.map((f) => f.universe), dmxProtocol)),
+  );
 
   const exportMvr = () => {
     // Bedarf 144: die Projekt-Kennung geht mit — sie ist der Namensraum der
@@ -355,14 +383,22 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
       </table>
       <h4 className="schedule-subhead">{t('sch.instrumentSchedule', 'Instrument Schedule')}</h4>
       <table className="schedule-table">
-        <thead><tr><th>Unit</th><th>Ch</th><th>DMX</th><th>{t('sch.type', 'Typ')}</th><th>{t('sch.pos', 'Pos (x,y,h)')}</th><th>Gel</th><th>{t('sch.purpose', 'Zweck')}</th></tr></thead>
+        {/* BEDARF 147 — der Kopf nennt das Protokoll. „DMX 2.15" allein ist
+            unbestimmt: in sACN ist das Universe 2, in Art-Net die
+            Port-Address 0:0:2, und ab 16 laufen die beiden auseinander. */}
+        <thead><tr><th>Unit</th><th>Ch</th><th>DMX ({PROTOCOL_LABEL[dmxProtocol]})</th><th>{t('sch.type', 'Typ')}</th><th>{t('sch.pos', 'Pos (x,y,h)')}</th><th>Gel</th><th>{t('sch.purpose', 'Zweck')}</th></tr></thead>
         <tbody>
           {ordered.map((f) => (
             <tr key={f.id} className={conflicts.has(f.id) ? 'row-conflict' : ''}
               onClick={() => onLocate([f.id])} title={t('sch.locate', 'Im Plan zeigen')}>
               <td>{f.unitNumber ?? '–'}</td>
               <td>{f.channel ?? '–'}</td>
-              <td>{f.universe != null && f.dmxAddress != null ? `${f.universe}.${f.dmxAddress}` : (footprint(f) === 0 ? 'Dimmer' : '–')}</td>
+              {/* Die Zelle zeigt die Zahl SO, wie sie im gewaehlten Protokoll
+                  am Geraet steht — in Art-Net also „0:0:2.15" statt „2.15".
+                  Wer sie abtippt, tippt damit das, was am Node steht. */}
+              <td>{f.universe != null && f.dmxAddress != null
+                ? `${universeReading(f.universe, dmxProtocol).primary}.${f.dmxAddress}`
+                : (footprint(f) === 0 ? 'Dimmer' : '–')}</td>
               <td>{f.fixture.name}</td>
               <td>{f.x},{f.y} · {f.mountingHeight}m</td>
               <td>{gelCodes(f.gelFilterIds) || '–'}</td>
@@ -371,6 +407,75 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           ))}
         </tbody>
       </table>
+      {/* ── BEDARF 147 — ein Universe ist keine blosse Zahl ──────────────
+          Der Beleg (`mvrdevelopment/spec#94`) nennt die Verwechslung von
+          Art-Net-Port-Address und sACN-Universe „the classic patch error".
+          Beide Lesarten stehen hier NEBENEINANDER, auch die des nicht
+          gewaehlten Protokolls: wer das Gateway einstellt, hat oft das andere
+          vor sich, und der Sinn dieses Blattes ist, dass ihm der Unterschied
+          auffaellt, bevor er ihn tippt. */}
+      <h4 className="schedule-subhead">
+        {t('sch.uni.head', 'Universes')} ({lesarten.length})
+        {lesarten.length > 0 && (
+          <button className="btn-secondary" style={{ marginLeft: 8 }} onClick={exportUniverses}>
+            &#8595; {t('sch.uni.csv', 'Universe-Blatt (CSV)')}
+          </button>
+        )}
+      </h4>
+      <div className="schedule-actions">
+        <label>
+          {t('sch.uni.protocol', 'Die Universe-Zahlen dieses Plans sind')}{' '}
+          <select
+            value={dmxProtocol}
+            onChange={(e) => onSetProtocol(e.target.value as DmxProtocol)}
+          >
+            {/* Literale Optionen, keine Schleife ueber die Sprach-Schluessel:
+                die Protokollnamen sind Eigennamen und werden nicht uebersetzt. */}
+            <option value="sacn">{PROTOCOL_LABEL.sacn}</option>
+            <option value="artnet">{PROTOCOL_LABEL.artnet}</option>
+          </select>
+        </label>
+      </div>
+      {lesarten.length === 0 ? (
+        <div className="prop-derived">
+          {t('sch.uni.none', 'Noch nichts gepatcht — sobald Universes vergeben sind, stehen hier beide Lesarten nebeneinander.')}
+        </div>
+      ) : (
+        <table className="schedule-table">
+          <thead>
+            <tr>
+              <th>{UNIVERSE_HEADERS[0]}</th>
+              <th>{UNIVERSE_HEADERS[1]}</th>
+              <th>{UNIVERSE_HEADERS[2]}</th>
+              <th>{t('sch.uni.note', 'Hinweis')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lesarten.map((r) => (
+              <tr key={r.value}>
+                <td><strong>{r.value}</strong></td>
+                {/* Die Spalte des gewaehlten Protokolls ist hervorgehoben —
+                    aber die andere bleibt sichtbar. Sie wegzulassen hiesse,
+                    genau die Gegenprobe zu streichen, um die es hier geht. */}
+                <td className={dmxProtocol === 'artnet' ? 'row-conflict' : undefined}>
+                  {artnetReading(r.value)}
+                </td>
+                <td className={dmxProtocol === 'sacn' ? 'row-conflict' : undefined}>
+                  {sacnReading(r.value)}
+                </td>
+                <td>
+                  {r.problem ?? (readingsDiverge(r.value)
+                    ? t('sch.uni.diverge', 'Ab hier lesen Art-Net und sACN verschieden — am Node stimmen Net und Sub-Net nicht mehr mit 0.')
+                    : '\u2014')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="prop-derived">
+        {t('sch.uni.hint', 'Die Angabe hängt am Projekt und geht mit in die Datei: die Zahl an der Leuchte war nie falsch, sie war unbestimmt.')}
+      </div>
       {colors.length > 0 && (
         <>
           <h4 className="schedule-subhead">Farben &amp; Verbrauch ({colors.reduce((s, c) => s + c.count, 0)} Schnitte)</h4>

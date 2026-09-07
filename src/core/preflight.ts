@@ -32,6 +32,9 @@
 import type { PlacedFixture, Truss, FixtureCategory } from '../types';
 import { footprint } from './patch';
 import { rigCheck, type IssueBasis, type IssueSeverity, type RigIssue } from './rigCheck';
+import {
+  DEFAULT_PROTOCOL, PROTOCOL_LABEL, readingsDiverge, universeReading, type DmxProtocol,
+} from './universeIdentity';
 
 /**
  * Gerätearten, die NIE an einem Dimmer hängen dürfen.
@@ -94,7 +97,15 @@ export interface PreflightReport {
  * Ergebnis. Zwei Listen, die derselbe Mensch nebeneinander lesen muss, sind
  * eine zu viel.
  */
-export function semanticIssues(fixtures: readonly PlacedFixture[]): RigIssue[] {
+export function semanticIssues(
+  fixtures: readonly PlacedFixture[],
+  /**
+   * BEDARF 147 — wie die Universe-Zahlen zu lesen sind. Ohne diese Angabe
+   * laesst sich nicht sagen, ob „Universe 40000" eine gueltige sACN-Zahl oder
+   * eine unmoegliche Art-Net-Port-Address ist.
+   */
+  protocol: DmxProtocol = DEFAULT_PROTOCOL,
+): RigIssue[] {
   const out: RigIssue[] = [];
   if (fixtures.length === 0) return out;
 
@@ -135,6 +146,47 @@ export function semanticIssues(fixtures: readonly PlacedFixture[]): RigIssue[] {
     });
   }
 
+  // 3) BEDARF 147 — Universe-Zahlen, die es im gewaehlten Protokoll nicht
+  //    gibt. Eine Adresse, die kein Gateway einstellen kann, faellt sonst
+  //    erst am Aufbau auf — und dann sucht jemand den Fehler bei der Leuchte.
+  const unmoeglich = new Map<number, string[]>();
+  for (const f of fixtures) {
+    if (f.universe === undefined) continue;
+    const r = universeReading(f.universe, protocol);
+    if (!r.problem) continue;
+    const liste = unmoeglich.get(f.universe) ?? [];
+    liste.push(f.id);
+    unmoeglich.set(f.universe, liste);
+  }
+  for (const [wert, ids] of [...unmoeglich].sort((a, b) => a[0] - b[0])) {
+    out.push({
+      severity: 'error',
+      message: `Universe ${wert} gibt es in ${PROTOCOL_LABEL[protocol]} nicht: `
+        + `${universeReading(wert, protocol).problem}`,
+      ids,
+    });
+  }
+
+  // 4) BEDARF 147 — der Punkt, an dem die beiden Lesarten auseinanderlaufen.
+  //    Bis 15 heisst „Universe 3" hier wie dort dasselbe Feld am Geraet; ab 16
+  //    ist Art-Net 16 die Sub-Net 1 / Universe 0, und wer am Node „Universe
+  //    16" sucht, findet das Feld nicht (es hat vier Bit). Nur DORT ist der
+  //    Hinweis etwas wert — ein Blatt, das bei jeder Zahl warnt, wird nicht
+  //    gelesen.
+  const auseinander = [...new Set(
+    fixtures.map((f) => f.universe).filter((u): u is number => u !== undefined && readingsDiverge(u)),
+  )].sort((a, b) => a - b);
+  if (auseinander.length > 0) {
+    out.push({
+      severity: 'info',
+      message: `Universe ${auseinander.join(', ')}: ab 16 lesen Art-Net und sACN verschieden `
+        + '— am Art-Net-Node stimmen Net und Sub-Net dort nicht mehr mit 0.',
+      ids: fixtures
+        .filter((f) => f.universe !== undefined && auseinander.includes(f.universe))
+        .map((f) => f.id),
+    });
+  }
+
   return out;
 }
 
@@ -150,10 +202,11 @@ export function semanticIssues(fixtures: readonly PlacedFixture[]): RigIssue[] {
 export function preflight(
   fixtures: readonly PlacedFixture[],
   trusses: readonly Truss[] = [],
+  protocol: DmxProtocol = DEFAULT_PROTOCOL,
 ): PreflightReport {
   const issues = [
     ...rigCheck([...fixtures], [...trusses]),
-    ...semanticIssues(fixtures),
+    ...semanticIssues(fixtures, protocol),
   ];
   const rank: Record<IssueSeverity, number> = { error: 0, warning: 1, info: 2 };
   issues.sort((a, b) => rank[a.severity] - rank[b.severity]);

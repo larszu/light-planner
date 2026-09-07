@@ -110,6 +110,16 @@ jobs:
       - name: Vorflug-Pruefung faellt kein Urteil ohne Grundlage
         run: npm run preflight:check
 
+      # Bedarf 147 -- „Universe 2" heisst in sACN etwas anderes als in Art-Net,
+      # wo dieselbe Zahl die Port-Address 0:0:2 ist; ab 16 laufen die beiden
+      # Lesarten auseinander (Art-Net 16 ist Sub-Net 1 / Universe 0, und das
+      # Feld am Node hat nur vier Bit). Der Beleg nennt die Verwechslung „the
+      # classic patch error". Der Waechter haelt drei Dinge fest: die Zerlegung
+      # stimmt, es wird nichts geklemmt, und die Angabe ueberlebt alle vier
+      # ProjectData-Bauplaetze in App.tsx.
+      - name: Universe-Identitaet nennt beide Lesarten
+        run: npm run universe:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

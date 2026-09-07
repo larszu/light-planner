@@ -230,7 +230,12 @@ const hat = (issues: ReturnType<typeof semanticIssues>, teil: string): boolean =
 // ─── 6. Der Weg ist verdrahtet ─────────────────────────────────────────────
 {
   const dialog = lies('../src/components/ScheduleDialog.tsx');
-  assert.match(dialog, /preflight\(fixtures, trusses\)/, 'der Dialog nimmt den Bericht nicht');
+  // Die Argumente hinter `trusses` sind hier ABSICHTLICH offen: seit Bedarf
+  // 147 geht das DMX-Protokoll als drittes mit, und dass es das tut, haelt
+  // `universe-identity-check.ts` fest. Wer beide Waechter auf dieselbe
+  // Aufrufform festnagelt, muss bei jedem weiteren Argument zwei Dateien
+  // aendern -- und aendert dann irgendwann nur eine.
+  assert.match(dialog, /preflight\(fixtures, trusses[,)]/, 'der Dialog nimmt den Bericht nicht');
   assert.match(dialog, /verdictText\(t, bericht\.verdict\)/, 'das Urteil steht nirgends');
   assert.match(dialog, /bericht\.assumed > 0/, 'die Annahmen bleiben unerwaehnt');
   assert.match(dialog, /i\.basis === 'assumed'/, 'die einzelne Zeile sagt ihre Grundlage nicht');
