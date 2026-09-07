@@ -37,6 +37,10 @@ const en: Record<string, string> = {
   'menu.snap': 'Snap to grid',
   'menu.about': 'About Light Planner…',
   'menu.language': 'Language: English',
+  // Kommandopalette (ADR-007 Abschnitt 6, Strg/Cmd+K)
+  'cmdk.title': 'Commands',
+  'cmdk.placeholder': 'Type a command…',
+  'cmdk.empty': 'No matching command.',
   // About
   'about.version': 'Version',
   'about.close': 'Close',

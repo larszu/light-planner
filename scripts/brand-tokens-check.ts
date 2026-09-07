@@ -61,4 +61,42 @@ assert.ok(!/linear-gradient|radial-gradient/.test(css), 'Verlauf gefunden');
 // als Treffer lesen.
 assert.ok(!/box-shadow:(?!\s*none\s*;)[^;]+;/.test(css), 'Schatten gefunden');
 
+// ── 6. Der Rahmen: Kopfzeile 40 px, Statusleiste 24 px, Kopflinie ────────
+//
+// ADR-007 Abschnitt 6 nennt Zahlen, und Zahlen kann man messen. Vorher war
+// die Menueleiste 30 px hoch (eine Zahl aus keiner Regel) und die
+// Statusleiste hatte gar keine — sie ergab sich aus ihrem Inhalt. Ohne
+// diesen Check waeren beide beim naechsten Umbau wieder ein Zufall.
+const regel = (klasse: string): string => {
+  const m = css.match(new RegExp(`\\.${klasse}\\s*\\{([^}]*)\\}`));
+  assert.ok(m, `Regel .${klasse} fehlt in src/App.css`);
+  return m![1];
+};
+assert.match(regel('menubar'), /height:\s*40px/, 'Kopfzeile ist 40 px');
+assert.match(regel('menubar'), /flex:\s*none/, 'Kopfzeile schrumpft nicht mit');
+assert.match(regel('statusbar'), /height:\s*24px/, 'Statusleiste ist 24 px');
+assert.match(regel('statusbar'), /flex:\s*none/, 'Statusleiste schrumpft nicht mit');
+assert.match(
+  regel('panel-head'),
+  /border-bottom:\s*1px solid var\(--accent\)/,
+  'Kopflinie ist der Akzent',
+);
+// Die Rail steht im Raster der App und nicht in einer eigenen Regel.
+assert.match(css, /grid-template-columns:\s*56px/, 'Rail ist 56 px');
+
+// ── 7. Die Kommandopalette liegt auf Strg/Cmd + K ────────────────────────
+//
+// „Derselbe Griff ueberall" ist die halbe Zusage; die andere Haelfte ist,
+// dass die Palette dieselben Befehle anbietet wie das Menue. Deshalb prueft
+// der Waechter beides: die Tastenkombination UND dass die Liste aus
+// `menuModel.ts` kommt statt ein zweites Mal getippt zu sein.
+const lies = (rel: string): string => readFileSync(resolve(hier, '..', rel), 'utf8');
+const palette = lies('src/components/CommandPalette.tsx');
+assert.match(palette, /ctrlKey \|\| e\.metaKey/, 'Palette hoert nicht auf Strg/Cmd');
+assert.match(palette, /e\.key === 'k' \|\| e\.key === 'K'/, 'Palette hoert nicht auf K');
+assert.match(palette, /import type \{ MenuGroup \} from '\.\/menuModel'/, 'Palette liest nicht das Menue-Modell');
+const menubar = lies('src/components/MenuBar.tsx');
+assert.match(menubar, /buildMenus\(props, t, language, setLanguage\)/, 'Menueleiste baut nicht aus dem Modell');
+assert.ok(menubar.includes('<CommandPalette groups={menus} />'), 'Palette ist nicht gemountet');
+
 console.log('brand:check ok — Oberflaechen-Regeln (ADR-007) eingehalten');

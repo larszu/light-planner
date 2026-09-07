@@ -70,12 +70,18 @@ body {
 
 /* ── Menu Bar ──────────────────────────────────────────── */
 .menubar {
+  /* ADR-007 Abschnitt 6: „Kopfzeile 40 px." Vorher 30 px — eine Zahl, die
+     aus keiner Regel kam, und ein roher Hexwert (#1d1d2c) aus der alten
+     Blau-Grau-Welt, den die Token-Umstellung uebersehen hatte, weil er kein
+     Token WAR. `flex: none`, damit die Arbeitsflaeche der Leiste keine Pixel
+     abnimmt. */
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 30px;
-  padding: 0 8px;
-  background: #1d1d2c;
+  height: 40px;
+  flex: none;
+  padding: 0 12px;
+  background: var(--panel);
   border-bottom: 1px solid var(--border);
   position: relative;
   z-index: 60;
@@ -2606,7 +2612,7 @@ kbd {
 .toolrail-btn.on { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
 .toolrail-div { width: 24px; height: 1px; background: var(--border); margin: 4px 0; }
 .toolrail-tip { position: absolute; left: 48px; top: 50%; transform: translateY(-50%) translateX(-4px);
-  background: #0b0f14; color: var(--text); border: 1px solid var(--line-2); padding: 4px 9px; border-radius: 0;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line-2); padding: 4px 9px; border-radius: 0;
   font-size: 12px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s, transform .12s; z-index: 60; box-shadow: none; }
 .toolrail-btn:hover .toolrail-tip { opacity: 1; transform: translateY(-50%) translateX(0); }
 
@@ -2628,7 +2634,10 @@ kbd {
 .property-panel { width: 100%; min-width: 0; }
 
 /* ── Status bar ── */
-.statusbar { display: flex; align-items: center; gap: 16px; padding: 0 14px; background: var(--bg-2);
+/* ADR-007 Abschnitt 6: „Statusleiste unten, 24 px. Sie meldet; sie bedient
+   nicht." Die Hoehe stand vorher nirgends — sie ergab sich aus dem Inhalt. */
+.statusbar { display: flex; align-items: center; gap: 16px; height: 24px; flex: none;
+  padding: 0 12px; background: var(--bg-2);
   border-top: 1px solid var(--border); color: var(--text2); font-size: 11.5px; }
 .sb-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .sb-item b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -2732,3 +2741,72 @@ textarea:focus-visible,
   outline: 2px solid var(--signal);
   outline-offset: 3px;
 }
+
+
+/* ── ADR-007 Abschnitt 6: Kopflinie und Kommandopalette ────────────────────
+ *
+ * `.panel-head` ist die Kopflinie: eine LINIE in der Akzentfarbe, kein
+ * Balken — deshalb border-bottom und kein background.
+ *
+ * Die Palette liegt auf Strg/Cmd + K, „derselbe Griff ueberall". Sie ist
+ * eine Flaeche und keine Karte: kein Radius, kein Schatten. */
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--accent);
+}
+
+.cmdk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: rgba(19, 32, 64, 0.72);
+}
+.cmdk-panel {
+  width: 560px;
+  max-width: 92vw;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.cmdk-input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+}
+.cmdk-list { max-height: 50vh; overflow-y: auto; margin: 0; padding: 4px 0; list-style: none; }
+.cmdk-empty { padding: 8px 12px; color: var(--text2); font-size: 12px; }
+.cmdk-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.cmdk-item.on { background: var(--panel-alt); }
+.cmdk-group {
+  width: 84px;
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+.cmdk-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdk-shortcut { color: var(--text2); font-size: 11.5px; }
