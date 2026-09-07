@@ -1,4 +1,6 @@
 // ── Fixture categories following real event-tech conventions ──
+import type { DmxProtocol } from './core/universeIdentity';
+
 export type FixtureCategory =
   | 'profile'        // Profilscheinwerfer / Ellipsoidal (ETC Source Four, Selecon)
   | 'fresnel'        // Stufenlinsenscheinwerfer
@@ -435,6 +437,20 @@ export interface ProjectMeta {
 
 export interface ProjectData {
   meta: ProjectMeta;
+  /**
+   * BEDARF 147 — wie die Universe-Zahlen dieses Plans zu lesen sind.
+   *
+   * „Universe 2" heisst in sACN etwas anderes als in Art-Net, wo dieselbe
+   * Zahl die Port-Address 0:0:2 ist — und ab 16 laufen die beiden Lesarten
+   * auseinander. Der Beleg (`mvrdevelopment/spec#94`) nennt die Verwechslung
+   * „the classic patch error".
+   *
+   * Optional, damit alte Projekte unveraendert laden: fehlt die Angabe, gilt
+   * `DEFAULT_PROTOCOL` aus `core/universeIdentity.ts`. Die Leuchte behaelt
+   * ihre `universe`-ZAHL; was fehlte, war nie ein zweites Feld an ihr,
+   * sondern die Auskunft am Projekt.
+   */
+  dmxProtocol?: DmxProtocol;
   fixtures: PlacedFixture[];
   /**
    * Bedarf 71 — Arbeits-Notizen aus der Probe. Optional: alte Projekte laden

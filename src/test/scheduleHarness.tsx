@@ -8,6 +8,7 @@ import ScheduleDialog from '../components/ScheduleDialog';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import { autoPatch, findPatchConflicts } from '../core/patch';
 import type { FixtureGroup, PlacedFixture, Truss, Wall, WorkNote } from '../types';
+import { DEFAULT_PROTOCOL, type DmxProtocol } from '../core/universeIdentity';
 import '../App.css';
 
 const lib = (pred: (f: typeof fixtureLibrary[number]) => boolean) => fixtureLibrary.find(pred) ?? fixtureLibrary[0];
@@ -55,6 +56,10 @@ function Harness() {
     { id: 'g1', label: 'Front warm', fixtureIds: initial.slice(0, 2).map((f) => f.id) },
     { id: 'g2', label: '', fixtureIds: initial.slice(2, 4).map((f) => f.id) },
   ]);
+  // Bedarf 147 — die Lesart liegt im Harness echt, nicht als Stub: der
+  // Umschalter aendert die DMX-Spalte, und ein Stub zeigte im Bild immer
+  // dieselbe.
+  const [protocol, setProtocol] = React.useState<DmxProtocol>(DEFAULT_PROTOCOL);
   return (
     <ScheduleDialog
       fixtureGroups={groups}
@@ -66,6 +71,8 @@ function Harness() {
       area={{ minX: 2, minY: 4, maxX: 10, maxY: 8 }}
       projectName="Demo-Show"
       projectId="harness"
+      dmxProtocol={protocol}
+      onSetProtocol={setProtocol}
       conflicts={findPatchConflicts(fixtures)}
       onAutoNumber={() => {}}
       onAutoPatch={() => {}}

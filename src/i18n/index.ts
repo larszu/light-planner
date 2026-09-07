@@ -818,6 +818,17 @@ const en: Record<string, string> = {
   'sch.groups.locate': 'Show in plan',
   'sch.groups.hint':
     'The MVR format has no groups \u2014 this sheet is how they reach the console, the visualiser and the media server.',
+  // Bedarf 147 - ein Universe ist keine blosse Zahl.
+  'sch.uni.head': 'Universes',
+  'sch.uni.csv': 'Universe sheet (CSV)',
+  'sch.uni.protocol': 'The universe numbers in this plan are',
+  'sch.uni.none':
+    'Nothing patched yet \u2014 once universes are assigned, both readings appear here side by side.',
+  'sch.uni.note': 'Note',
+  'sch.uni.diverge':
+    'From here Art-Net and sACN read differently \u2014 at the node, Net and Sub-Net are no longer 0.',
+  'sch.uni.hint':
+    'The setting belongs to the project and travels with the file: the number on the fixture was never wrong, it was undetermined.',
   'sch.exp.groups': 'Group sheet (CSV)',
   'sch.exp.groupsNote':
     'One row per group member with channel, unit, type and position \u2014 what otherwise gets rebuilt by hand on the console, in the visualiser and in the media server.',
