@@ -44,6 +44,7 @@ import { useUiStore } from './store/uiStore';
 import { useProjectStore } from './store/projectStore';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
+import { canParent, moveItem } from './core/runningOrder';
 import { useTranslation } from './i18n';
 
 export type PlanMode = 'none' | 'calibrate' | 'move';
@@ -1445,6 +1446,22 @@ const App: React.FC = () => {
     setActiveSceneId((a) => (a === id ? null : a));
   }, []);
 
+  // BEDARF 132 — verschieben und ein-/ausruecken. Beides geht durch
+  // `core/runningOrder.ts`: `moveItem` nimmt die Teil-Stimmungen MIT, und
+  // `canParent` entscheidet, ob ein Umhaengen ueberhaupt geht. Hier wird
+  // nichts davon nachgebaut — eine zweite Fassung waere die, die den Kreis
+  // durchlaesst oder die Kinder stehen laesst.
+  const handleMoveScene = useCallback((id: string, direction: 'up' | 'down') => {
+    setScenes((prev) => moveItem(prev, id, direction));
+  }, []);
+
+  const handleReparentScene = useCallback((id: string, parentId: string | null) => {
+    setScenes((prev) => {
+      if (!canParent(prev, id, parentId).ok) return prev;
+      return prev.map((s) => (s.id === id ? { ...s, parentId: parentId ?? undefined } : s));
+    });
+  }, []);
+
   // ── Temporarily mute / un-mute lamps ──
   const handleShowAllFixtures = useCallback(() => {
     if (!fixtures.some((f) => f.hidden)) return;
@@ -1554,6 +1571,8 @@ const App: React.FC = () => {
           onRenameScene={handleRenameScene}
           onDeleteScene={handleDeleteScene}
           onShowAll={handleShowAllFixtures}
+          onMoveScene={handleMoveScene}
+          onReparentScene={handleReparentScene}
         />
         <div className="canvas-area">
           {viewMode === '2d' ? (

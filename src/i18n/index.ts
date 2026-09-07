@@ -285,6 +285,11 @@ const en: Record<string, string> = {
   'panel.scene.overwrite': 'Overwrite with the current look',
   'panel.scene.rename': 'Rename',
   'panel.scene.delete': 'Delete scene',
+  // Bedarf 132 — der Ablauf ist ein Baum.
+  'panel.scene.up': 'Move up — with everything below it',
+  'panel.scene.down': 'Move down — with everything below it',
+  'panel.scene.indent': 'Nest under the scene above',
+  'panel.scene.outdent': 'Move back to the top level',
   'panel.floor.title': 'Floor plan',
   'panel.floor.remove': 'Remove floor plan',
   'panel.floor.page': 'Page',

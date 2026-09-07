@@ -27,6 +27,9 @@ interface Props {
   onRenameScene: (id: string, name: string) => void;
   onDeleteScene: (id: string) => void;
   onShowAll: () => void;
+  // Bedarf 132 — verschieben und ein-/ausruecken. Das Dock reicht nur durch.
+  onMoveScene: (id: string, direction: 'up' | 'down') => void;
+  onReparentScene: (id: string, parentId: string | null) => void;
 }
 
 type TabId = 'library' | 'layers' | 'scenes';
@@ -82,6 +85,8 @@ const Dock: React.FC<Props> = (p) => {
             onRenameScene={p.onRenameScene}
             onDeleteScene={p.onDeleteScene}
             onShowAll={p.onShowAll}
+            onMoveScene={p.onMoveScene}
+            onReparentScene={p.onReparentScene}
           />
         )}
       </div>

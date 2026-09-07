@@ -1924,6 +1924,20 @@ kbd {
   padding: 2px 4px 2px 2px;
 }
 .sp-item.active { border-color: var(--accent); background: rgba(255, 204, 51, 0.12); }
+
+/* Bedarf 132 — der Ablauf ist ein Baum. Die Nummer steht vorn und ist
+   gerechnet; die Einrueckung kommt aus der Tiefe (inline, weil sie je Zeile
+   verschieden ist). Ein Eintrag ohne Stelle im Ablauf — Waise oder Kreis —
+   bleibt SICHTBAR und wird markiert: verschwinden zu lassen waere
+   Datenverlust ohne Meldung. */
+.sp-num {
+  flex: 0 0 auto;
+  min-width: 22px;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--text3);
+}
+.sp-item-problem { border-color: #b58900; background: rgba(181, 137, 0, 0.12); }
 .sp-name {
   flex: 1;
   display: flex;

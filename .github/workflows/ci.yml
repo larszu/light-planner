@@ -185,6 +185,17 @@ jobs:
       - name: Kabelwege folgen dem Kreis, nicht einer zweiten Regel
         run: npm run cables:check
 
+      # Bedarf 132: die Szenen waren eine flache Liste. Wer den dritten Song
+      # nach vorn zieht, musste seine Teil-Stimmungen einzeln hinterherziehen
+      # -- und vergisst eine; dann steht im Ablauf ein Chorus vor seinem Intro,
+      # und beim Durchgang merkt es niemand, weil beide plausibel heissen. Der
+      # Waechter haelt die drei Stellen fest, an denen so ein Baum kippt: das
+      # Verschieben muss die Kinder MITnehmen und darf die eigene Ebene NICHT
+      # verlassen, ein verwaistes Kind wird genannt statt entsorgt, und ein
+      # Kreis darf die Ableitung nicht aufhaengen.
+      - name: Der Ablauf ist ein Baum, keine Liste
+        run: npm run order:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.
