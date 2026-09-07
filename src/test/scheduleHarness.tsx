@@ -9,6 +9,7 @@ import { fixtureLibrary } from '../core/fixtureLibrary';
 import { autoPatch, findPatchConflicts } from '../core/patch';
 import type { FixtureGroup, PlacedFixture, Truss, Wall, WorkNote } from '../types';
 import { DEFAULT_PROTOCOL, type DmxProtocol } from '../core/universeIdentity';
+import { DEFAULT_TEMPLATE, type PhaseTemplate } from '../core/powerDistribution';
 import '../App.css';
 
 const lib = (pred: (f: typeof fixtureLibrary[number]) => boolean) => fixtureLibrary.find(pred) ?? fixtureLibrary[0];
@@ -60,6 +61,9 @@ function Harness() {
   // Umschalter aendert die DMX-Spalte, und ein Stub zeigte im Bild immer
   // dieselbe.
   const [protocol, setProtocol] = React.useState<DmxProtocol>(DEFAULT_PROTOCOL);
+  // Bedarf 141 — dito fuer die Phasen-Vorlage: der Umschalter aendert die
+  // Phasen-Tabelle und die Kreisliste.
+  const [template, setTemplate] = React.useState<PhaseTemplate>(DEFAULT_TEMPLATE);
   return (
     <ScheduleDialog
       fixtureGroups={groups}
@@ -73,6 +77,8 @@ function Harness() {
       projectId="harness"
       dmxProtocol={protocol}
       onSetProtocol={setProtocol}
+      phaseTemplate={template}
+      onSetPhaseTemplate={setTemplate}
       conflicts={findPatchConflicts(fixtures)}
       onAutoNumber={() => {}}
       onAutoPatch={() => {}}

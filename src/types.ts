@@ -1,5 +1,6 @@
 // ── Fixture categories following real event-tech conventions ──
 import type { DmxProtocol } from './core/universeIdentity';
+import type { PhaseTemplate } from './core/powerDistribution';
 
 export type FixtureCategory =
   | 'profile'        // Profilscheinwerfer / Ellipsoidal (ETC Source Four, Selecon)
@@ -451,6 +452,20 @@ export interface ProjectData {
    * sondern die Auskunft am Projekt.
    */
   dmxProtocol?: DmxProtocol;
+  /**
+   * BEDARF 141 — welche Phasen der Anschluss fuehrt, der dieses Rig speist.
+   *
+   * `computePower` teilte die Gesamtlast seit jeher durch drei — die Last
+   * einer AUSGEGLICHENEN Anlage, also des Zustands, den niemand hat. Kreise
+   * haengen an Steckplaetzen, Steckplaetze an Phasen, und den Automaten wirft
+   * die schwerste Phase. Der Beleg (`jkarp7/showstack#41`, `#39`) nennt
+   * AB/AC/ABC-Vorlagen ausdruecklich.
+   *
+   * Optional, damit alte Projekte unveraendert laden; fehlt die Angabe, gilt
+   * `DEFAULT_TEMPLATE` — und das ist ABC, damit die Vorgabe KEINE vorhandene
+   * Zahl aendert, sondern nur nachpruefbar macht, worauf sie beruhte.
+   */
+  phaseTemplate?: PhaseTemplate;
   fixtures: PlacedFixture[];
   /**
    * Bedarf 71 — Arbeits-Notizen aus der Probe. Optional: alte Projekte laden

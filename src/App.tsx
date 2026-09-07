@@ -3,6 +3,7 @@ import type { PlacedFixture, Shape, Tool, Fixture, FloorPlan, ViewMode, Person, 
 import { DEFAULT_FLOOR } from './core/surfaceTextures';
 import { addNote, normalizeWorkNotes, removeNote, toggleNote } from './core/workNotes';
 import { DEFAULT_PROTOCOL, type DmxProtocol } from './core/universeIdentity';
+import { DEFAULT_TEMPLATE, type PhaseTemplate } from './core/powerDistribution';
 import { convexHull } from './core/geometry';
 import { resolveSun, defaultSunSettings } from './core/sun';
 import TopBar from './components/TopBar';
@@ -167,6 +168,10 @@ const App: React.FC = () => {
   // zaehlt — Art-Net als Vorgabe behauptete eine Gateway-Einstellung, die
   // niemand gemacht hat.
   const [dmxProtocol, setDmxProtocol] = useState<DmxProtocol>(DEFAULT_PROTOCOL);
+  // BEDARF 141 — welche Phasen der Anschluss fuehrt. Auch das ist eine Aussage
+  // ueber die Anlage und nicht ueber die Leuchte: die Vorgabe ABC aendert
+  // keine vorhandene Zahl, sie macht nur nachpruefbar, worauf sie beruhte.
+  const [phaseTemplate, setPhaseTemplate] = useState<PhaseTemplate>(DEFAULT_TEMPLATE);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   // Look present just before a scene was switched on, so it can be switched off.
   const preSceneRef = useRef<Record<string, SceneFixtureState> | null>(null);
@@ -746,6 +751,7 @@ const App: React.FC = () => {
       // wieder offen; ausgeschrieben sagt die Datei selbst, wie sie zu lesen
       // ist — auch bei dem, der sie in vier Jahren oeffnet.
       dmxProtocol,
+      phaseTemplate,
       fixtures,
       shapes,
       persons,
@@ -786,7 +792,7 @@ const App: React.FC = () => {
     } catch (err) {
       window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
     }
-  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, dmxProtocol, cameras, layers, floor, sun, floorPlan, projectId]);
+  }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, dmxProtocol, phaseTemplate, cameras, layers, floor, sun, floorPlan, projectId]);
 
   const handleLoadProject = useCallback((data: ProjectData, keepId?: string) => {
     historyRef.current = [];
@@ -815,6 +821,7 @@ const App: React.FC = () => {
     // Eingestellte: sonst laege die Lesart am Rechner statt an der Datei, und
     // dieselbe Datei hiesse bei zwei Leuten zweierlei.
     setDmxProtocol(data.dmxProtocol ?? DEFAULT_PROTOCOL);
+    setPhaseTemplate(data.phaseTemplate ?? DEFAULT_TEMPLATE);
     setActiveSceneId(null);
     preSceneRef.current = null;
     setCameras(data.cameras ?? []);
@@ -909,6 +916,7 @@ const App: React.FC = () => {
           // verliert der Weg ueber die Suite genau die Angabe, die den
           // Patch-Fehler verhindert.
           dmxProtocol,
+          phaseTemplate,
           fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
           trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
           // BEDARF 71 — die .avplan ist die EIGENE Datei-Familie der Suite,
@@ -925,7 +933,7 @@ const App: React.FC = () => {
     });
     const safe = (projectMeta?.name || 'projekt').replace(/[^a-zA-Z0-9_-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(avplan, null, 2), `${safe}.avplan`);
-  }, [floorPlan, persons, walls, stageElements, projectMeta, host, fixtures, shapes, customFixtures, fixtureGroups, trusses, ceilings, scenes, workNotes, dmxProtocol, cameras, layers, floor, sun]);
+  }, [floorPlan, persons, walls, stageElements, projectMeta, host, fixtures, shapes, customFixtures, fixtureGroups, trusses, ceilings, scenes, workNotes, dmxProtocol, phaseTemplate, cameras, layers, floor, sun]);
 
   const handleImportAvplan = useCallback(async () => {
     const res = await host.openProjectFile();
@@ -1309,6 +1317,7 @@ const App: React.FC = () => {
       // sie laese ein zurueckgeholter Stand seine Universes anders als der,
       // aus dem er stammt.
       dmxProtocol,
+      phaseTemplate,
       meta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
       trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
       ...(workNotes.length > 0 ? { workNotes } : {}),
@@ -1328,7 +1337,7 @@ const App: React.FC = () => {
         ? { personForeign: preservedPersonsRef.current }
         : {}),
     };
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, dmxProtocol, cameras, layers, floor, sun, floorPlan]);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, dmxProtocol, phaseTemplate, cameras, layers, floor, sun, floorPlan]);
 
   // ── Project save/load to a real file (the host decides where) ──
   const handleSaveToFile = useCallback(async () => {
@@ -1338,6 +1347,7 @@ const App: React.FC = () => {
       meta: { ...meta, updatedAt: now },
       // BEDARF 147 — dito im Dateipfad.
       dmxProtocol,
+      phaseTemplate,
       fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups,
       trusses, walls, ceilings, scenes, cameras, layers, floor, sun,
       ...(workNotes.length > 0 ? { workNotes } : {}),
@@ -1355,7 +1365,7 @@ const App: React.FC = () => {
     };
     const safe = (meta.name || 'Lichtplan').replace(/[^\w.\-]+/g, '_');
     await host.saveProjectFile(JSON.stringify(data, null, 2), `${safe}.lightplan.json`);
-  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, dmxProtocol, cameras, layers, floor, sun, floorPlan, host]);
+  }, [projectMeta, fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, dmxProtocol, phaseTemplate, cameras, layers, floor, sun, floorPlan, host]);
 
   const handleLoadFromFile = useCallback(async () => {
     const res = await host.openProjectFile();
@@ -1806,6 +1816,8 @@ const App: React.FC = () => {
           projectId={projectId}
           dmxProtocol={dmxProtocol}
           onSetProtocol={setDmxProtocol}
+          phaseTemplate={phaseTemplate}
+          onSetPhaseTemplate={setPhaseTemplate}
           conflicts={patchConflicts}
           fixtureGroups={fixtureGroups}
           onRenameGroup={handleRenameGroup}

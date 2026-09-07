@@ -818,6 +818,16 @@ const en: Record<string, string> = {
   'sch.groups.locate': 'Show in plan',
   'sch.groups.hint':
     'The MVR format has no groups \u2014 this sheet is how they reach the console, the visualiser and the media server.',
+  // Bedarf 141 - Kreise, Phasen und Steckreihenfolge.
+  'sch.pwr.peak': 'heaviest phase',
+  'sch.pwr.assumed': 'assumed balanced',
+  'sch.pwr.phases': 'Phases & circuits',
+  'sch.pwr.csv': 'Circuit list (CSV)',
+  'sch.pwr.template': 'The service carries',
+  'sch.pwr.hCircuits': 'Circuits',
+  'sch.pwr.understated':
+    'Unbalanced: the heaviest phase carries {d} A more than the balanced assumption ({a} A). Difference between heaviest and lightest phase: {i} A.',
+  'sch.pwr.balanced': 'Evenly distributed \u2014 the balanced assumption holds here.',
   // Bedarf 147 - ein Universe ist keine blosse Zahl.
   'sch.uni.head': 'Universes',
   'sch.uni.csv': 'Universe sheet (CSV)',

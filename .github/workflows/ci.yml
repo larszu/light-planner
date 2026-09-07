@@ -120,6 +120,17 @@ jobs:
       - name: Universe-Identitaet nennt beide Lesarten
         run: npm run universe:check
 
+      # Bedarf 141 -- die Last je Phase. `computePower` teilte die Gesamtlast
+      # seit jeher durch drei: die Last einer AUSGEGLICHENEN Anlage, also des
+      # Zustands, den niemand hat. Den Automaten wirft die schwerste Phase.
+      # Der Waechter haelt vor allem drei Dinge fest: dass die Phase am
+      # STECKPLATZ haengt und nicht am Kreis (ein Distro verdrahtet reihum,
+      # und jedes faengt von vorn an), dass die alte Annahme benannt statt
+      # ersetzt wird -- sie kann nie groesser sein als die schwerste Phase --,
+      # und dass ein Geraet, das in keinen 16-A-Kreis passt, auffaellt.
+      - name: Last steht auf Phasen, nicht auf einem Durchschnitt
+        run: npm run power:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

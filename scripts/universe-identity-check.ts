@@ -254,7 +254,12 @@ const lampe = (id: string, universe?: number, category: FixtureCategory = 'profi
 // ─── 7. Der Weg ist verdrahtet ─────────────────────────────────────────────
 {
   const dialog = ohneKommentare('../src/components/ScheduleDialog.tsx');
-  assert.match(dialog, /preflight\(fixtures, trusses, dmxProtocol\)/,
+  // Was hinter `dmxProtocol` folgt, ist hier ABSICHTLICH offen: seit Bedarf
+  // 141 geht die Phasen-Vorlage als viertes mit, und dass sie das tut, haelt
+  // `power-distribution-check.ts` fest. Wer beide Waechter auf dieselbe
+  // Aufrufform festnagelt, muss bei jedem weiteren Argument zwei Dateien
+  // aendern — und aendert dann irgendwann nur eine.
+  assert.match(dialog, /preflight\(fixtures, trusses, dmxProtocol[,)]/,
     'die Pruefung bekommt das Protokoll nicht');
   assert.match(dialog, /universeReadings\(fixtures\.map\(\(f\) => f\.universe\), dmxProtocol\)/,
     'das Blatt rechnet die Lesarten nicht aus');
