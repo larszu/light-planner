@@ -9,6 +9,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { PlacedFixture } from '../core';
+import { footprint } from '../core/patch';
 
 // Subset of Cable-Planner's ConnectorType that lighting fixtures use. The host
 // union is a superset, so these string literals are assignable to it.
@@ -65,21 +66,36 @@ export function powerConnectorToCp(connector?: string): CpConnectorType {
  */
 export function fixtureToEquipment(pf: PlacedFixture): CpEquipmentItem {
   const f = pf.fixture;
-  const channels = f.dmxChannels && f.dmxChannels > 0 ? f.dmxChannels : 1;
+  // BEFUND (Defektformen-Sweep, Form `zwei-rechnungen`, 2026-09-07): hier
+  // stand `f.dmxChannels && f.dmxChannels > 0 ? f.dmxChannels : 1` — dieselbe
+  // Frage wie `footprint()` in `core/patch.ts`, aber mit der ANDEREN Antwort
+  // im Nein-Fall: 1 statt 0. Und die 0 ist im Planer keine Rundungsfrage,
+  // sondern die Kodierung fuer „konventionelle Leuchte am Dimmer, bekommt
+  // eine Kanalnummer, aber keine DMX-Adresse" — `autoPatch` ueberspringt
+  // solche Einheiten, `rigCheck` verlangt fuer sie keine Adresse,
+  // `preflight` meldet sie, wenn die Kategorie elektronisch ist.
+  //
+  // Der Export uebergab dem Kabel-Planer damit einen DMX-Fussabdruck von 1
+  // fuer Einheiten, die gar keinen haben — plus eine DMX-Eingangs- und eine
+  // Thru-Buchse, die es an einer Dimmerleuchte nicht gibt. Wer den Plan
+  // uebernahm, bekam eine DMX-Leitung zum 1-kW-Stufenlinsenscheinwerfer.
+  const channels = footprint(pf);
+  const hatDmx = channels > 0;
   const patch = pf.universe != null && pf.dmxAddress != null ? `U${pf.universe}.${pf.dmxAddress}` : undefined;
-  const inputs: CpPort[] = [
-    {
+  const inputs: CpPort[] = [];
+  if (hatDmx) {
+    inputs.push({
       id: `${pf.id}:dmx-in`, name: patch ? `DMX In (${patch})` : 'DMX In', type: 'DMX',
       connectorType: 'DMX 5-pol (XLR)', side: 'left', contentLabel: patch,
-    },
-    {
-      id: `${pf.id}:power`, name: 'Power', type: 'Power',
-      connectorType: powerConnectorToCp(f.powerConnector), side: 'left',
-    },
-  ];
-  const outputs: CpPort[] = [
-    { id: `${pf.id}:dmx-thru`, name: 'DMX Thru', type: 'DMX', connectorType: 'DMX 5-pol (XLR)', side: 'right' },
-  ];
+    });
+  }
+  inputs.push({
+    id: `${pf.id}:power`, name: 'Power', type: 'Power',
+    connectorType: powerConnectorToCp(f.powerConnector), side: 'left',
+  });
+  const outputs: CpPort[] = hatDmx
+    ? [{ id: `${pf.id}:dmx-thru`, name: 'DMX Thru', type: 'DMX', connectorType: 'DMX 5-pol (XLR)', side: 'right' }]
+    : [];
   const categoryProps: Record<string, string | number | boolean> = {
     'Lichtstrom (lm)': f.lumens,
     'Beam (°)': f.beamAngle,

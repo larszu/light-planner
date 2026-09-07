@@ -4,7 +4,7 @@ import { wallMidHandle, curveControlForMid, wallLength } from '../core/geometry'
 import { luxFromFixture, effectiveFieldAngleDeg, explainLux } from '../core/lightCalc';
 import type { FixtureCategory, BeamShape, LensType, MountType, WallPresetId } from '../types';
 import { WALL_PRESETS, DEFAULT_WALL_MATERIAL, wallPreset } from '../core/surfaceTextures';
-import { DEFAULT_TRUSS_CAPACITY } from '../core/patch';
+import { DEFAULT_TRUSS_CAPACITY, footprint } from '../core/patch';
 import { gelLibrary } from '../core/gelLibrary';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
@@ -458,7 +458,7 @@ const PropertyPanel: React.FC<Props> = ({
               onChange={(e) => onUpdateFixture(f.id, { dmxAddress: e.target.value === '' ? undefined : Number(e.target.value) })} />
           </label>
           <div className="prop-derived">
-            {t('prop.footprint', 'Footprint')}: {f.fixture.dmxChannels && f.fixture.dmxChannels > 0 ? `${f.fixture.dmxChannels} DMX-Ch` : t('prop.dimmer1ch', 'Dimmer (1 Ch)')}
+            {t('prop.footprint', 'Footprint')}: {footprint(f) > 0 ? `${footprint(f)} DMX-Ch` : t('prop.dimmer1ch', 'Dimmer (1 Ch)')}
           </div>
           <label className="prop-field">
             <span>{t('prop.purpose', 'Zweck')}</span>
