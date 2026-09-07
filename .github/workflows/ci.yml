@@ -93,6 +93,23 @@ jobs:
       - name: MVR-Identitaeten sind stabil und kollisionsfrei
         run: npm run identity:mvr
 
+      # Bedarf 138 — zwei auseinandergelaufene Kopien desselben Rigs. Der Lauf
+      # haelt vor allem drei Dinge fest: dass ohne gemeinsamen Stand gar nichts
+      # passiert (sonst liesse sich „neu angelegt" nicht von „geloescht"
+      # unterscheiden, und das IST der Datenverlust aus dem Beleg), dass
+      # geloescht-gegen-geaendert ein Konflikt ist, und dass ein Eintrag ohne
+      # Wahl nichts bewirkt.
+      - name: Zusammenfuehren ist ein Vorschlag, keine Uebernahme
+        run: npm run merge:check
+
+      # Bedarf 142 — die Vorflug-Pruefung. Der Lauf haelt vor allem eines
+      # fest: dass ein Plan, dessen Last-Zahlen auf fehlenden Angaben beruhen,
+      # NICHT als „bereit" durchgeht. Das ist der Fall, den die Quelle als
+      # „confident, wrong numbers" beschreibt -- und er sieht von aussen aus
+      # wie ein sauberer Plan.
+      - name: Vorflug-Pruefung faellt kein Urteil ohne Grundlage
+        run: npm run preflight:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.
