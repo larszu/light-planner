@@ -212,6 +212,21 @@ export interface Scene {
   id: string;
   name: string;
   states: Record<string, SceneFixtureState>; // by fixture id
+  /**
+   * BEDARF 132 — die Szene, unter der diese haengt.
+   *
+   *   > Each song or segment carries its own sub-cues (intro, verse, chorus).
+   *   > Changing the setlist means MANUALLY REORDERING EVERY COMPONENT.
+   *
+   * Beleg: `cpvalente/ontime#204` (2022-09-15), seit vier Jahren offen.
+   *
+   * Fehlt sie, steht die Szene oben. Der Ablauf ist damit ein Baum und keine
+   * Liste — wer den Song verschiebt, verschiebt ihn mit allem, was unter ihm
+   * haengt. Die Nummer („2.1") wird daraus GERECHNET und nicht gespeichert:
+   * eine gespeicherte Nummer ist ab der ersten Verschiebung falsch, und zwar
+   * still.
+   */
+  parentId?: string;
 }
 
 // ── Person on stage ──
