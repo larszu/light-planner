@@ -22,6 +22,27 @@ export interface ProjectDiff {
   stageElements: CategoryDiff;
   ceilings: CategoryDiff;
   total: number;
+  /**
+   * Kategorien, die sich UNTERSCHEIDEN, aber nicht aufgeschluesselt werden —
+   * beim Namen genannt (B-21).
+   *
+   * `diffProjects` vergleicht sechs von vierzehn inhaltlichen Kategorien
+   * Feld fuer Feld. Fuer die uebrigen acht fehlt, was ein solcher Vergleich
+   * braucht: eine Beschriftungsfunktion und eine Feldliste — welche Felder
+   * eine Aenderung AUSMACHEN und wie sie heissen, ist eine
+   * Produktentscheidung, und `layers`, `floor` und `sun` sind ueberdies keine
+   * Listen, auf die `diffList` passt.
+   *
+   * Was daraus NICHT folgt: dass die Oberflaeche „Keine Unterschiede zum
+   * aktuellen Stand" sagen darf, wenn sich eine dieser acht geaendert hat.
+   * Das ist keine Luecke in der Anzeige, sondern eine Falschaussage — der
+   * Nutzer verwirft daraufhin eine Version, die sich sehr wohl unterscheidet.
+   *
+   * Ob sich etwas geaendert hat, laesst sich ohne jede Produktentscheidung
+   * feststellen: ein Vergleich der Werte. Nur das WAS bleibt offen. Also
+   * sagen wir genau das — „Szenen unterscheiden sich" — statt zu schweigen.
+   */
+  unnamed: string[];
 }
 
 // A field to watch: how to read it (as a display string) and its German label.
@@ -109,8 +130,46 @@ const CEILING_FIELDS: FieldSpec<Ceiling>[] = [
 
 const count = (d: CategoryDiff) => d.added.length + d.removed.length + d.changed.length;
 
+/**
+ * Die acht Kategorien ohne Feld-Vergleich, mit ihrem Anzeigenamen.
+ *
+ * Gerechnet und nicht behauptet: `same` vergleicht die Werte. Ein reiner
+ * Referenzvergleich waere falsch (jedes Laden baut neue Objekte), ein
+ * JSON-Vergleich ueber Schluesselreihenfolge waere unzuverlaessig — deshalb
+ * ein stabiles Serialisieren mit sortierten Schluesseln.
+ */
+const UNNAMED_CATEGORIES: { label: string; get: (p: ProjectData) => unknown }[] = [
+  { label: 'Formen', get: (p) => p.shapes },
+  { label: 'Eigene Leuchten', get: (p) => p.customFixtures },
+  { label: 'Gruppen', get: (p) => p.fixtureGroups },
+  { label: 'Szenen', get: (p) => p.scenes },
+  { label: 'Kameras', get: (p) => p.cameras },
+  { label: 'Ebenen', get: (p) => p.layers },
+  { label: 'Boden', get: (p) => p.floor },
+  { label: 'Sonne', get: (p) => p.sun },
+];
+
+const stable = (v: unknown): string =>
+  JSON.stringify(v, (_k, val) => {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(val as Record<string, unknown>).sort()) {
+        out[k] = (val as Record<string, unknown>)[k];
+      }
+      return out;
+    }
+    return val;
+  }) ?? 'undefined';
+
+/** Welche der acht unterscheiden sich? Nur die Namen, kein Feld-Detail. */
+export function unnamedDifferences(before: ProjectData, after: ProjectData): string[] {
+  return UNNAMED_CATEGORIES
+    .filter((c) => stable(c.get(before)) !== stable(c.get(after)))
+    .map((c) => c.label);
+}
+
 export function diffProjects(before: ProjectData, after: ProjectData): ProjectDiff {
-  const d: Omit<ProjectDiff, 'total'> = {
+  const d: Omit<ProjectDiff, 'total' | 'unnamed'> = {
     fixtures: diffList(before.fixtures ?? [], after.fixtures ?? [], fixtureLabel, FIXTURE_FIELDS),
     persons: diffList(before.persons ?? [], after.persons ?? [], personLabel, PERSON_FIELDS),
     trusses: diffList(before.trusses ?? [], after.trusses ?? [], trussLabel, TRUSS_FIELDS),
@@ -119,7 +178,7 @@ export function diffProjects(before: ProjectData, after: ProjectData): ProjectDi
     ceilings: diffList(before.ceilings ?? [], after.ceilings ?? [], ceilingLabel, CEILING_FIELDS),
   };
   const total = count(d.fixtures) + count(d.persons) + count(d.trusses) + count(d.walls) + count(d.stageElements) + count(d.ceilings);
-  return { ...d, total };
+  return { ...d, total, unnamed: unnamedDifferences(before, after) };
 }
 
 export const categoryCount = count;

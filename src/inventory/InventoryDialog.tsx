@@ -73,7 +73,17 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
     }
     const replace = window.confirm(t('inventory.importConfirm', 'Bestehenden Bestand ERSETZEN? Abbrechen = zusammenführen.'));
     const n = importSnapshot(snap, replace ? 'replace' : 'merge');
-    setMsg(t('inventory.importDone', '{n} Objekte importiert.').replace('{n}', String(n)));
+    // „Importiert" ist erst wahr, wenn es auch geschrieben wurde. Vorher
+    // meldete der Dialog den Erfolg, während der volle localStorage den
+    // Bestand still verwarf — sichtbar wurde das beim nächsten Start.
+    setMsg(
+      useInventoryStore.getState().storageFull
+        ? t(
+            'inventory.importFull',
+            '{n} Objekte gelesen, aber NICHT gespeichert: der lokale Speicher ist voll. Erst Platz schaffen, dann erneut importieren.',
+          ).replace('{n}', String(n))
+        : t('inventory.importDone', '{n} Objekte importiert.').replace('{n}', String(n)),
+    );
   };
 
   const doScan = () => {

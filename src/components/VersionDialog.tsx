@@ -123,7 +123,12 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
           <div className="tool-content ver-diff">
             {!selected ? (
               <div className="tool-empty">{t('version.pick', 'Wähle links eine Version, um die Änderungen bis zum aktuellen Stand zu sehen.')}</div>
-            ) : diff && diff.total === 0 ? (
+            ) : diff && diff.total === 0 && diff.unnamed.length === 0 ? (
+              /* B-21: „Keine Unterschiede" nur, wenn AUCH die acht nicht
+                 aufgeschluesselten Kategorien gleich sind. Sonst ist der Satz
+                 keine Luecke in der Anzeige, sondern eine Falschaussage — und
+                 der Nutzer verwirft daraufhin eine Version, die sich sehr wohl
+                 unterscheidet. */
               <div className="rig-clean">✓ {t('version.noDiff', 'Keine Unterschiede zum aktuellen Stand.')}</div>
             ) : diff && (
               <>
@@ -242,6 +247,17 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                     : t('version.changes', 'Änderungen')}{' '}
                   {t('version.since', 'seit')} „{selected.label}" →{' '}
                   <b>{projectName || t('version.current', 'aktuell')}</b>
+                  {/* Die Zahl zaehlt nur, was aufgeschluesselt wurde. Was
+                      darueber hinaus anders ist, steht daneben — nicht
+                      stillschweigend in der Zahl versteckt und nicht
+                      verschwiegen. */}
+                  {diff.unnamed.length > 0 && (
+                    <>
+                      {' · '}
+                      {t('version.alsoChanged', '{cats} auch geändert (ohne Detail)')
+                        .replace('{cats}', diff.unnamed.join(', '))}
+                    </>
+                  )}
                 </div>
                 <DiffView diff={diff} />
               </>

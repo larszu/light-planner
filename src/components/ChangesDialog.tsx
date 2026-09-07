@@ -107,7 +107,12 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
         <b>{diff!.total}</b> {diff!.total === 1 ? t('dlg.chg.changeOne', 'Änderung') : t('dlg.chg.changeMany', 'Änderungen')} {t('dlg.chg.since', 'seit')} „{latest.label}" ({new Date(latest.savedAt).toLocaleString(locale(language), { dateStyle: 'short', timeStyle: 'short' })})
         <button className="btn-secondary diff-snap" onClick={() => { onSaveVersion(label || `${t('dlg.chg.stateAt', 'Stand')} ${new Date().toLocaleString(locale(language))}`); setLabel(''); }}><Icon name="save" size={13} /> {t('dlg.chg.saveNow', 'Jetzt sichern')}</button>
       </div>
-      {diff!.total === 0 ? <div className="rig-clean">✓ {t('dlg.chg.noChanges', 'Keine Änderungen seit der letzten Version.')}</div> : <DiffView diff={diff!} />}
+      {/* B-21: „Keine Änderungen" nur, wenn AUCH die acht nicht
+          aufgeschlüsselten Kategorien gleich sind. Sonst ist der Satz keine
+          Lücke in der Anzeige, sondern eine Falschaussage. */}
+      {diff!.total === 0 && diff!.unnamed.length === 0
+        ? <div className="rig-clean">✓ {t('dlg.chg.noChanges', 'Keine Änderungen seit der letzten Version.')}</div>
+        : <DiffView diff={diff!} />}
     </>
   );
 
@@ -125,7 +130,7 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
             {TABS.map((reiter) => (
               <button key={reiter.id} className={tab === reiter.id ? 'on' : ''} onClick={() => setTab(reiter.id)}>
                 <Icon name={reiter.icon} size={16} /><span>{t(reiter.key, reiter.label)}</span>
-                {reiter.id === 'diff' && diff && diff.total > 0 && <span className="nav-badge warn">{diff.total}</span>}
+                {reiter.id === 'diff' && diff && diff.total + diff.unnamed.length > 0 && <span className="nav-badge warn">{diff.total + diff.unnamed.length}</span>}
               </button>
             ))}
           </nav>

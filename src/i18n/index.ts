@@ -122,6 +122,7 @@ const en: Record<string, string> = {
   'inventory.importErr': 'Not a valid inventory file (avplan-inventory).',
   'inventory.importConfirm': 'REPLACE the existing inventory? Cancel = merge.',
   // Der Platzhalter {n} wird vom Aufrufer ersetzt und muss stehen bleiben.
+  'inventory.importFull': '{n} objects read but NOT saved: local storage is full. Free some space, then import again.',
   'inventory.importDone': '{n} items imported.',
   'inventory.export': 'Export',
   'inventory.exportHint': 'Export across apps',
@@ -446,6 +447,7 @@ const en: Record<string, string> = {
   'version.delete': 'Delete version',
   'version.restoreConfirm': 'Load version „{label}"? Unsaved changes will be lost.',
   'version.pick': 'Pick a version on the left to see what changed since then.',
+  'version.alsoChanged': '{cats} also changed (no detail)',
   'version.noDiff': 'No differences from the current state.',
   'version.change': 'change',
   'version.changes': 'changes',

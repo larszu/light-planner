@@ -42,6 +42,16 @@ jobs:
         run: npm run venue:check
       - name: Projekt-Identitaet (Versionen, Geraete-Liste)
         run: npm run identity:check
+      # B-21: „Keine Unterschiede zum aktuellen Stand" darf nicht mehr
+      # behaupten, als der Vergleich abdeckt — sonst verwirft der Nutzer eine
+      # Version, die sich sehr wohl unterscheidet.
+      - name: Versions-Vergleich behauptet nicht zu viel
+        run: npm run diff:check
+      # B-36: Ein Lager, das nicht geschrieben wurde, ist kein Lager. Der
+      # Store fing den Quota-Fehler mit einem leeren `catch` ab; der Import
+      # meldete Erfolg, und der Bestand war beim naechsten Start weg.
+      - name: Lager meldet einen gescheiterten Schreibvorgang
+        run: npm run storage:check
       - name: i18n — erreichbare Oberflaeche uebersetzt
         run: npm run i18n:check
 
