@@ -37,7 +37,8 @@
 //     aus, beides trägt das MVR-Format nicht — und eine Ehrlichkeits-Liste, die
 //     das verschweigt, ist der Kenntnisstand ihres Autors und keine Auskunft.
 //
-//  8. DER WEG IST VERDRAHTET.
+//  8. DER WEG IST VERDRAHTET. Dass dieser Waechter im CI laeuft, prueft
+//     `ci:complete` — an einer Stelle, fuer alle Laeufe.
 // ───────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -282,8 +283,12 @@ const lampe = (
   assert.match(dialog, /exportTable\(\s*'kabelliste\.csv'/,
     'die Kabelliste geht an der Stempel-Engstelle vorbei');
 
-  const workflow = lies('../.github/workflows/ci.yml');
-  assert.match(workflow, /cables:check/, 'der Waechter laeuft nicht im CI');
+  // Dass DIESER Waechter im CI laeuft, prueft `ci:complete` — an EINER
+  // Stelle, fuer alle Laeufe. Hier stand die Zusicherung ein zweites Mal,
+  // und zwei Orte fuer dieselbe Regel heisst: einer wird irgendwann
+  // vergessen. Nebenwirkung war, dass die Datei den Workflow-Pfad des
+  // eigenstaendigen Planers las und in der vendorierten Fassung deshalb
+  // gar nicht lief.
 }
 
 console.log('OK: Kabelwege — Kette an der Traverse, Bruch am Kreis, Zuleitung ohne erfundene Laenge (Bedarf 140).');
