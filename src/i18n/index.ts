@@ -818,6 +818,11 @@ const en: Record<string, string> = {
   'sch.groups.locate': 'Show in plan',
   'sch.groups.hint':
     'The MVR format has no groups \u2014 this sheet is how they reach the console, the visualiser and the media server.',
+  // Bedarf 146 - den Patch ans Pult schicken statt abtippen.
+  'sch.exp.console': 'Patch for the console',
+  'sch.exp.consoleDropped': '{n} of {m} rows will NOT be included:',
+  'sch.exp.consoleUnverifiable':
+    'Whether the remaining {n} rows arrive depends on the console\u2019s fixture library. This machine cannot know that \u2014 the import decides.',
   // Bedarf 143 - zwoelf Blaetter, ein Modell.
   'sch.tab.papers': 'Paperwork',
   'sch.rep.pick': 'Sheet',
