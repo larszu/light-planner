@@ -28,6 +28,8 @@ import {
   DROP_LABEL, FORMATS, TARGETS, buildConsoleFile, consoleFileName, exportPreflight,
   type ConsoleTarget,
 } from '../core/consoleExport';
+import { shopOrder, shopOrderGaps, shopOrderTable } from '../core/shopOrder';
+import { useInventoryStore } from '../inventory/store';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
 import {
@@ -237,6 +239,13 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   // load-in".
   const pultVorschau = exportPreflight(fixtures, consoleTarget);
 
+  // BEDARF 145 — die Bestellung faellt aus dem Plan. Der Bestand kommt aus
+  // dem projektuebergreifenden Lager, nicht aus dem Projekt: derselbe
+  // Scheinwerfer steht dort einmal, egal in wie vielen Plaenen er vorkommt.
+  const lagerBestand = useInventoryStore((st) => st.items);
+  const bestellung = shopOrder(fixtures, lagerBestand);
+  const bestellLuecken = shopOrderGaps(fixtures);
+
   const ordered = scheduleOrder(fixtures);
   const safe = (projectName || 'lichtplan').replace(/[^\w.-]+/g, '_');
 
@@ -301,6 +310,14 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
       consoleFileName(projectName, consoleTarget),
     );
   };
+
+  // Bedarf 145 — die Bestellliste geht denselben Weg wie die anderen Blaetter
+  // und traegt damit denselben Stempel (ADR-004): wer sie verschickt, sieht,
+  // aus welchem Stand sie stammt.
+  const exportShopOrder = () => exportTable(
+    'bestellung.csv',
+    (fs: PlacedFixture[]) => shopOrderTable(shopOrder(fs, lagerBestand)),
+  );
 
   const exportUniverses = () => exportTable(
     'universes.csv',
@@ -1184,6 +1201,42 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           <span>{t('sch.exp.groupsNote', 'Gruppe je Zeile mit Kanal, Unit, Typ und Position – das, was am Pult, im Visualisierer und im Medienserver sonst von Hand nachgebaut wird.')}</span>
         </div>
         <button className="btn-secondary" onClick={exportGroups} disabled={gruppen.length === 0}>⬇ CSV</button>
+      </div>
+      {/* ── BEDARF 145 — die Bestellung faellt aus dem Plan ──────────────
+          „Users must manually type equipment items" (jkarp7/showstack#29),
+          obwohl die Daten laengst da sind. Aufgeteilt wird nach eigenem und
+          fremdem Bestand — ENTSCHIEDEN wird nichts: was man nimmt, weiss der
+          Disponent. Und jede Zeile sagt, worauf ihre Deckung beruht: die
+          Zuordnung Plan-Geraet zu Lager-Artikel ist ein Vergleich von
+          Zeichenketten und keine Tatsache. */}
+      <div className="export-row">
+        <Icon name="library" size={22} className="er-icon" />
+        <div className="er-text">
+          <b>{t('sch.exp.shop', 'Bestellliste (CSV)')}</b>
+          <span>
+            {t('sch.exp.shopNote', 'Bedarf aus dem Plan, gedeckt aus dem Lager: eigen, fremd (kommt zurück) und was übrig bleibt.')}
+          </span>
+          {bestellung.unmatched > 0 && (
+            <span className="rig-pill warn">
+              {t('sch.exp.shopUnmatched', '{n} Zeile(n) ohne Lager-Artikel – dort hat niemand gutgesagt.')
+                .replace('{n}', String(bestellung.unmatched))}
+            </span>
+          )}
+          {/* Was die Quelle nennt und dieser Plan nicht hergibt — berechnet,
+              nicht aufgezaehlt. Eine leere Rubrik saehe aus, als waere
+              nichts noetig. */}
+          {bestellLuecken.length > 0 && (
+            <span className="prop-derived">
+              {t('sch.exp.shopGaps', 'Nicht aus diesem Plan:')}{' '}
+              {bestellLuecken.map((g) => g.label).join(' · ')}
+            </span>
+          )}
+        </div>
+        <button
+          className="btn-secondary"
+          onClick={exportShopOrder}
+          disabled={bestellung.lines.length === 0}
+        >&#8595; CSV</button>
       </div>
       {/* ── BEDARF 146 — den Patch ans Pult schicken statt abtippen ──────
           Der Beleg nennt zwei Fallen ausdruecklich: Eos will Tabulatoren und
