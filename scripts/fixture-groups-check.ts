@@ -53,6 +53,19 @@ import type { FixtureGroup, PlacedFixture, Truss } from '../src/types.ts';
 
 const lies = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
+/**
+ * Quelltext OHNE Kommentare.
+ *
+ * Wer eine abgeschaffte Bauform verbietet, muss sie in der Begruendung
+ * zitieren duerfen — sonst steht im Code kein Wort mehr darueber, warum sie
+ * weg ist. Eine Pruefung ueber den ganzen Text verbietet ausgerechnet die
+ * Erklaerung mit. Also erst die Kommentare weg, dann pruefen.
+ */
+const ohneKommentare = (rel: string): string =>
+  lies(rel)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '');
+
 const lampe = (
   id: string,
   name: string,
@@ -197,8 +210,14 @@ const traversen: Truss[] = [
 
   // Literale i18n-Schluessel: ein `t(`sch.exp.omit.${kind}`)` waere fuer
   // `i18n:check` unsichtbar, und die englische Fassung fehlte still.
-  assert.doesNotMatch(dialog, /t\(`sch\.exp\.omit\./, 'Template-Schluessel — der i18n-Guard sieht sie nicht');
-  assert.match(dialog, /'sch\.exp\.omit\.trusses'/);
+  // Der Schluessel-Namensraum unterscheidet sich zwischen dem eigenstaendigen
+  // Planer (`sch.*`) und der Suite-Fassung (`dlg.sch.*`). Der Waechter prueft
+  // die FORM, nicht den Namensraum -- sonst braeuchte die vendorte Kopie eine
+  // eigene Fassung dieser Datei, und die beiden driften ab dem Tag
+  // auseinander, an dem jemand nur eine von beiden anfasst.
+  const dialogCode = ohneKommentare('../src/components/ScheduleDialog.tsx');
+  assert.doesNotMatch(dialogCode, /t\(`(dlg\.)?sch\.exp\.omit\./, 'Template-Schluessel — der i18n-Guard sieht sie nicht');
+  assert.match(dialogCode, /'(dlg\.)?sch\.exp\.omit\.trusses'/);
 
   const app = lies('../src/App.tsx');
   assert.match(app, /fixtureGroups=\{fixtureGroups\}/, 'die Gruppen erreichen den Dialog nicht');
