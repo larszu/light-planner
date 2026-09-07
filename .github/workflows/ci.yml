@@ -164,6 +164,17 @@ jobs:
       - name: Die Bestellung teilt auf und nennt ihre Grundlage
         run: npm run shop:check
 
+      # Bedarf 148 -- Etiketten aus denselben Daten wie die Papiere. „Label
+      # output is a print view over the existing circuit/dimmer/channel
+      # model": die Zeilen nennen Feld-Kennungen aus dem Katalog von
+      # Bedarf 143, keine eigenen Zugriffe -- sonst klebte am Ladetag am
+      # Verteiler etwas anderes, als auf dem Blatt steht. Der Waechter haelt
+      # daneben zwei Dinge fest, die man erst am Drucker merkt: dass NICHTS
+      # gekuerzt wird (ein abgeschnittener Kreis ist ein falsches Etikett) und
+      # dass die Bogen-Masse wirklich auf A4 passen.
+      - name: Etiketten lesen dieselben Felder wie die Blaetter
+        run: npm run labels:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

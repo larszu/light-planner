@@ -824,6 +824,16 @@ const en: Record<string, string> = {
     'Demand from the plan, covered from stock: owned, foreign (goes back) and what is left over.',
   'sch.exp.shopUnmatched': '{n} line(s) with no stock item \u2014 nobody vouched for those.',
   'sch.exp.shopGaps': 'Not from this plan:',
+  // Bedarf 148 - Etiketten aus denselben Daten wie die Papiere.
+  'sch.lbl.head': 'Labels',
+  'sch.lbl.kind': 'Label',
+  'sch.lbl.stock': 'Sheet',
+  'sch.lbl.startAt': 'First free label',
+  'sch.lbl.print': 'Print',
+  'sch.lbl.counts':
+    '{n} label(s) on {p} sheet(s). {r} stay free on the last one \u2014 enter that as \u201cfirst free label\u201d next time.',
+  'sch.lbl.overflow':
+    '{n} label(s) will probably be too wide \u2014 nothing is truncated. Pick a narrower label or a bigger sheet.',
   // Bedarf 146 - den Patch ans Pult schicken statt abtippen.
   'sch.exp.console': 'Patch for the console',
   'sch.exp.consoleDropped': '{n} of {m} rows will NOT be included:',
