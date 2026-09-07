@@ -818,6 +818,14 @@ const en: Record<string, string> = {
   'sch.groups.locate': 'Show in plan',
   'sch.groups.hint':
     'The MVR format has no groups \u2014 this sheet is how they reach the console, the visualiser and the media server.',
+  // Bedarf 143 - zwoelf Blaetter, ein Modell.
+  'sch.tab.papers': 'Paperwork',
+  'sch.rep.pick': 'Sheet',
+  'sch.rep.csv': 'This sheet (CSV)',
+  'sch.rep.empty': 'No rows.',
+  'sch.rep.gaps': 'Not producible from this model:',
+  'sch.rep.hint':
+    'Every sheet reads the same fields. Change a column once \u2014 not twelve times.',
   // Bedarf 141 - Kreise, Phasen und Steckreihenfolge.
   'sch.pwr.peak': 'heaviest phase',
   'sch.pwr.assumed': 'assumed balanced',

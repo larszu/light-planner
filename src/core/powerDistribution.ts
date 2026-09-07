@@ -145,6 +145,12 @@ export interface CircuitAssignment extends PointCircuit {
   utilization: number;
   /** Ueber dem Nennstrom des Kreises. */
   overloaded: boolean;
+  /**
+   * BEDARF 143 — welche Leuchten an diesem Ausgang haengen. Ohne sie liesse
+   * sich „an welchem Kreis haengt diese Leuchte?" nur beantworten, indem
+   * jemand die Fuellregel aus `circuitBreakdown` nachbaut.
+   */
+  fixtureIds: string[];
 }
 
 /**
@@ -177,6 +183,7 @@ export function plugOrder(
       fixtureCount: c.fixtureCount,
       utilization: c.utilization,
       overloaded: amps > CIRCUIT_AMPS,
+      fixtureIds: [...c.fixtureIds],
     };
   });
 }
@@ -264,6 +271,20 @@ export const distributionFor = (
   budget: number = CIRCUIT_WATTS,
   outletsPerDistro: number = OUTLETS_PER_DISTRO,
 ): DistributionPlan => distributionPlan(circuitBreakdown([...fixtures], budget), template, outletsPerDistro);
+
+/**
+ * Von der Leuchte zu ihrem Kreis (Bedarf 143).
+ *
+ * Die Umkehrung der Zuteilung, und zwar AUS ihr gebildet statt neben ihr
+ * gerechnet: es gibt genau eine Fuellregel, und sie steht in
+ * `circuitBreakdown`. Eine Leuchte ohne Leistungsangabe kommt in keinem Kreis
+ * vor — sie fehlt hier, statt einem erfundenen zugeschlagen zu werden.
+ */
+export function circuitByFixture(plan: DistributionPlan): Map<string, CircuitAssignment> {
+  const m = new Map<string, CircuitAssignment>();
+  for (const a of plan.assignments) for (const id of a.fixtureIds) m.set(id, a);
+  return m;
+}
 
 export const CIRCUIT_HEADERS = ['Kreis', 'Phase', 'Leuchten', 'W', 'A', 'Auslastung'] as const;
 
