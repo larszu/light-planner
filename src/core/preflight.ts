@@ -32,6 +32,7 @@
 import type { PlacedFixture, Truss, FixtureCategory } from '../types';
 import { footprint } from './patch';
 import { rigCheck, type IssueBasis, type IssueSeverity, type RigIssue } from './rigCheck';
+import { DEFAULT_TEMPLATE, type PhaseTemplate } from './powerDistribution';
 import {
   DEFAULT_PROTOCOL, PROTOCOL_LABEL, readingsDiverge, universeReading, type DmxProtocol,
 } from './universeIdentity';
@@ -203,9 +204,15 @@ export function preflight(
   fixtures: readonly PlacedFixture[],
   trusses: readonly Truss[] = [],
   protocol: DmxProtocol = DEFAULT_PROTOCOL,
+  /**
+   * BEDARF 141 — welche Phasen der Anschluss fuehrt. Ohne die Angabe bliebe
+   * die Stromlast die ausgeglichene Annahme, und der Bericht meldete eine
+   * Phase als frei, die in Wahrheit die schwerste ist.
+   */
+  template: PhaseTemplate = DEFAULT_TEMPLATE,
 ): PreflightReport {
   const issues = [
-    ...rigCheck([...fixtures], [...trusses]),
+    ...rigCheck([...fixtures], [...trusses], template),
     ...semanticIssues(fixtures, protocol),
   ];
   const rank: Record<IssueSeverity, number> = { error: 0, warning: 1, info: 2 };

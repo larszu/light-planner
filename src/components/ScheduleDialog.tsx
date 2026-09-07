@@ -16,6 +16,10 @@ import {
   PROTOCOL_LABEL, UNIVERSE_HEADERS, artnetReading, readingsDiverge, sacnReading,
   universeReading, universeReadings, universeTable, type DmxProtocol,
 } from '../core/universeIdentity';
+import {
+  CIRCUIT_HEADERS, PHASE_HEADERS, PHASE_LABEL, TEMPLATE_LABEL, circuitLabel, circuitTable,
+  distributionFor, phaseTable, type PhaseTemplate,
+} from '../core/powerDistribution';
 import { photometricReport, type EvalArea } from '../core/photometrics';
 import { buildMvr } from '../core/mvrExport';
 import {
@@ -47,6 +51,13 @@ interface Props {
   dmxProtocol: DmxProtocol;
   /** Umstellen. Der Wert lebt im Wirt und geht mit in die Datei. */
   onSetProtocol: (p: DmxProtocol) => void;
+  // ── Bedarf 141 — Kreise, Phasen und Steckreihenfolge ──
+  /**
+   * Welche Phasen der Anschluss fuehrt, der dieses Rig speist. Ohne die
+   * Angabe bliebe die Last je Phase die ausgeglichene Annahme.
+   */
+  phaseTemplate: PhaseTemplate;
+  onSetPhaseTemplate: (p: PhaseTemplate) => void;
   conflicts: Set<string>;
   onAutoNumber: () => void;
   onAutoPatch: () => void;
@@ -142,7 +153,7 @@ const utilClass = (u: number) => (u >= 1 ? 'util-over' : u >= 0.8 ? 'util-warn' 
 
 // A focused multi-tool hub for paperwork, validation, analysis and interchange.
 // Each tab is one job, so no single view is overloaded.
-const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, projectId, dmxProtocol, onSetProtocol, conflicts, onAutoNumber, onAutoPatch, onLocate, onUpdateFixture, fixtureGroups, onRenameGroup, workNotes, onAddNote, onToggleNote, onRemoveNote, onClose }) => {
+const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, area, projectName, projectId, dmxProtocol, onSetProtocol, phaseTemplate, onSetPhaseTemplate, conflicts, onAutoNumber, onAutoPatch, onLocate, onUpdateFixture, fixtureGroups, onRenameGroup, workNotes, onAddNote, onToggleNote, onRemoveNote, onClose }) => {
   const { t } = useTranslation();
   const [tab, setTabState] = useState<Tab>(() => {
     try { const saved = localStorage.getItem('lp-tool-tab'); if (saved && TABS.some((x) => x.id === saved)) return saved as Tab; } catch { /* ignore */ }
@@ -174,12 +185,17 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   // BEDARF 147 — das Protokoll geht MIT in die Pruefung. Ohne es liesse sich
   // nicht sagen, ob „Universe 40000" eine gueltige sACN-Zahl oder eine
   // unmoegliche Art-Net-Port-Address ist, und der Bericht schwiege zu beidem.
-  const bericht = preflight(fixtures, trusses, dmxProtocol);
+  const bericht = preflight(fixtures, trusses, dmxProtocol, phaseTemplate);
   const issues = bericht.issues;
   const ic = { errors: bericht.counts.error, warnings: bericht.counts.warning, infos: bericht.counts.info };
   const photo = photometricReport(fixtures, walls, ceilings, area);
   const loads = trussLoads(fixtures, trusses);
   const circuits = circuitBreakdown(fixtures);
+  // BEDARF 141 — die Kreise auf Distros, Ausgaenge und Phasen, in
+  // Steckreihenfolge. Beide Zahlen — die gerechnete und die angenommene —
+  // kommen aus dieser einen Stelle, damit sie nicht zweimal verschieden
+  // entstehen koennen.
+  const verteilung = distributionFor(fixtures, phaseTemplate);
   const colors = colorCounts(fixtures);
   const checkBadge = ic.errors + ic.warnings;
 
@@ -225,6 +241,13 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   // Bedarf 147 — das Universe-Blatt geht denselben Weg wie die anderen
   // Listen und traegt damit denselben Stempel (ADR-004): wer es ausdruckt und
   // ans Gateway mitnimmt, sieht, aus welchem Stand es stammt.
+  // Bedarf 141 — die Kreis-Liste ist eines der zwoelf Blaetter aus Bedarf 143
+  // und das erste, das ohne die Phasen-Zuordnung gar nicht schreibbar war.
+  const exportCircuits = () => exportTable(
+    'kreisliste.csv',
+    (fs: PlacedFixture[]) => circuitTable(distributionFor(fs, phaseTemplate)),
+  );
+
   const exportUniverses = () => exportTable(
     'universes.csv',
     (fs: PlacedFixture[]) => universeTable(universeReadings(fs.map((f) => f.universe), dmxProtocol)),
@@ -866,7 +889,21 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
       <div className="schedule-cards">
         <div className="schedule-card"><span className="sc-val">{(power.totalWatts / 1000).toFixed(2)} kW</span><span className="sc-label">{t('sch.totalPower', 'Gesamtleistung')}</span></div>
         <div className="schedule-card"><span className="sc-val">{power.amps1ph.toFixed(1)} A</span><span className="sc-label">{t('sch.singlePhase', '@ 230 V (1-phasig)')}</span></div>
-        <div className="schedule-card"><span className="sc-val">{power.ampsPerPhase.toFixed(1)} A</span><span className="sc-label">{t('sch.perPhase', 'pro Phase (3×230 V)')}</span></div>
+        {/* BEDARF 141 — hier stand bis 2026-09-07 `power.ampsPerPhase`, also
+            `Gesamtlast / 3`: die Last einer AUSGEGLICHENEN Anlage, und damit
+            eines Zustands, den niemand hat. Den Automaten wirft die SCHWERSTE
+            Phase. Die Annahme steht jetzt daneben statt an ihrer Stelle. */}
+        <div className={`schedule-card ${verteilung.peak && verteilung.peak.amps > 16 ? 'photo-bad' : ''}`}>
+          <span className="sc-val">{(verteilung.peak?.amps ?? 0).toFixed(1)} A</span>
+          <span className="sc-label">
+            {t('sch.pwr.peak', 'schwerste Phase')}
+            {verteilung.peak ? ` · ${PHASE_LABEL[verteilung.peak.phase]}` : ''}
+          </span>
+        </div>
+        <div className="schedule-card">
+          <span className="sc-val">{power.ampsPerPhase.toFixed(1)} A</span>
+          <span className="sc-label">{t('sch.pwr.assumed', 'ausgeglichen angenommen')}</span>
+        </div>
         <div className="schedule-card"><span className="sc-val">{circuits.length}×</span><span className="sc-label">{t('sch.circuits', 'Stromkreise (16 A, 3 kW)')}</span></div>
       </div>
       {circuits.length > 0 && (
@@ -879,6 +916,99 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
             </div>
           ))}
         </div>
+      )}
+      {/* ── BEDARF 141 — Kreise, Phasen und Steckreihenfolge ─────────────
+          Der Beleg (`jkarp7/showstack#41`, `#39`) nennt drei Dinge, die dem
+          Plan fehlten: AB/AC/ABC-Vorlagen, die Last JE PHASE, und die
+          Punkt-Kreis-Schreibweise „3-2" (Distro 3, Ausgang 2). Die dritte ist
+          keine Verzierung: sie ist die einzige Bezeichnung, die jemand am
+          Steckfeld wiederfindet. */}
+      <h4 className="schedule-subhead">
+        {t('sch.pwr.phases', 'Phasen & Kreise')}
+        {verteilung.assignments.length > 0 && (
+          <button className="btn-secondary" style={{ marginLeft: 8 }} onClick={exportCircuits}>
+            &#8595; {t('sch.pwr.csv', 'Kreisliste (CSV)')}
+          </button>
+        )}
+      </h4>
+      <div className="schedule-actions">
+        <label>
+          {t('sch.pwr.template', 'Der Anschluss führt')}{' '}
+          <select
+            value={phaseTemplate}
+            onChange={(e) => onSetPhaseTemplate(e.target.value as PhaseTemplate)}
+          >
+            {/* Literale Optionen: die vier Vorlagen aus dem Beleg, nicht eine
+                frei zusammenstellbare Menge. „L2+L3 ohne L1" findet niemand
+                vor — „eine Phase ist belegt" schon. */}
+            <option value="ABC">{TEMPLATE_LABEL.ABC}</option>
+            <option value="AB">{TEMPLATE_LABEL.AB}</option>
+            <option value="AC">{TEMPLATE_LABEL.AC}</option>
+            <option value="A">{TEMPLATE_LABEL.A}</option>
+          </select>
+        </label>
+      </div>
+      <table className="schedule-table">
+        <thead>
+          <tr>
+            <th>{PHASE_HEADERS[0]}</th>
+            <th>{t('sch.pwr.hCircuits', 'Kreise')}</th>
+            <th>W</th>
+            <th>A</th>
+          </tr>
+        </thead>
+        <tbody>
+          {verteilung.phases.map((ph) => (
+            <tr key={ph.phase} className={ph.amps > 16 ? 'row-conflict' : ''}>
+              <td>{PHASE_LABEL[ph.phase]}</td>
+              <td>{ph.circuits}</td>
+              <td>{Math.round(ph.watts)}</td>
+              <td>{ph.amps.toFixed(1)} A</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* Der Betrag, um den der Plan zu gut aussah — als Satz und nicht als
+          Fussnote. Null heisst: die Anlage ist ausgeglichen, die alte Zahl
+          stimmte. Alles darueber ist der Unterschied zur Wirklichkeit. */}
+      <div className="prop-derived">
+        {verteilung.understatedAmps >= 1
+          ? t('sch.pwr.understated', 'Ungleich verteilt: die schwerste Phase trägt {d} A mehr als die ausgeglichene Annahme ({a} A). Unterschied zwischen schwerster und leichtester Phase: {i} A.')
+            .replace('{d}', verteilung.understatedAmps.toFixed(1))
+            .replace('{a}', verteilung.assumedAmpsPerPhase.toFixed(1))
+            .replace('{i}', verteilung.imbalanceAmps.toFixed(1))
+          : t('sch.pwr.balanced', 'Gleichmäßig verteilt — die ausgeglichene Annahme trifft hier zu.')}
+      </div>
+      {verteilung.assignments.length > 0 && (
+        <table className="schedule-table">
+          <thead>
+            <tr>
+              <th>{CIRCUIT_HEADERS[0]}</th>
+              <th>{PHASE_HEADERS[0]}</th>
+              <th>{t('sch.fixtures', 'Leuchten')}</th>
+              <th>W</th>
+              <th>A</th>
+              <th>{t('sch.utilisation', 'Auslastung')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {verteilung.assignments.map((a) => (
+              <tr key={a.index} className={a.overloaded ? 'row-conflict' : ''}>
+                {/* Die Punkt-Kreis-Schreibweise, nicht die laufende Nummer:
+                    „Kreis 14" sagt niemandem, wo er steht. */}
+                <td><strong>{circuitLabel(a)}</strong></td>
+                <td>{PHASE_LABEL[a.phase]}</td>
+                <td>{a.fixtureCount}</td>
+                <td>{Math.round(a.watts)}</td>
+                <td>{a.amps.toFixed(1)}{a.overloaded ? ' \u26a0' : ''}</td>
+                <td>
+                  <span className={`util-bar ${utilClass(a.utilization)}`}><i style={{ width: `${Math.min(100, a.utilization * 100)}%` }} /></span>
+                  <span className="util-pct">{Math.round(a.utilization * 100)} %</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
       <h4 className="schedule-subhead">{t('sch.loadPerTruss', 'Last pro Traverse')} · {totalWeight.toFixed(1)} kg {t('sch.total', 'gesamt')}</h4>
       <table className="schedule-table">

@@ -26,6 +26,7 @@
     "merge:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/rig-merge-check.ts",
     "preflight:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/preflight-check.ts",
     "universe:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/universe-identity-check.ts",
+    "power:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/power-distribution-check.ts",
     "stamp:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/stamp-check.ts",
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
     "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",

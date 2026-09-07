@@ -4,6 +4,9 @@
 // list of issues out (sorted worst-first) for a report panel.
 import type { PlacedFixture, Truss } from '../types';
 import { findPatchConflicts, footprint, computePower, trussLoads, DEFAULT_TRUSS_CAPACITY } from './patch';
+import {
+  CIRCUIT_AMPS, DEFAULT_TEMPLATE, PHASE_LABEL, distributionFor, type PhaseTemplate,
+} from './powerDistribution';
 
 export type IssueSeverity = 'error' | 'warning' | 'info';
 
@@ -34,7 +37,16 @@ export interface RigIssue {
 
 const RANK: Record<IssueSeverity, number> = { error: 0, warning: 1, info: 2 };
 
-export function rigCheck(fixtures: PlacedFixture[], trusses: Truss[] = []): RigIssue[] {
+export function rigCheck(
+  fixtures: PlacedFixture[],
+  trusses: Truss[] = [],
+  /**
+   * BEDARF 141 — welche Phasen der Anschluss fuehrt. Ohne diese Angabe laesst
+   * sich nicht sagen, wie sich die Kreise verteilen, und die Stromlast bliebe
+   * die ausgeglichene Annahme, die sie bisher war.
+   */
+  template: PhaseTemplate = DEFAULT_TEMPLATE,
+): RigIssue[] {
   const issues: RigIssue[] = [];
   if (fixtures.length === 0) return issues;
 
@@ -112,6 +124,60 @@ export function rigCheck(fixtures: PlacedFixture[], trusses: Truss[] = []): RigI
   const power = computePower(fixtures);
   if (power.amps1ph > 16) {
     issues.push({ severity: 'info', message: `Gesamtlast ${power.amps1ph.toFixed(1)} A – auf mind. ${power.circuits16A} Stromkreise (16 A) verteilen`, basis: stromBasis });
+  }
+
+  // 6) BEDARF 141 — die Last je Phase, gerechnet statt angenommen.
+  //
+  //    `power.ampsPerPhase` ist `totalWatts / (3 * 230)` — die Last einer
+  //    AUSGEGLICHENEN Anlage, also des Zustands, den niemand hat. Kreise
+  //    haengen an Steckplaetzen, Steckplaetze an Phasen, und den Automaten
+  //    wirft die schwerste Phase und nicht der Durchschnitt. Die angenommene
+  //    Zahl ist deshalb systematisch zu klein.
+  const verteilung = distributionFor(fixtures, template);
+  const spitze = verteilung.peak;
+  if (spitze && spitze.amps > CIRCUIT_AMPS) {
+    issues.push({
+      severity: 'warning',
+      message: `${PHASE_LABEL[spitze.phase]} traegt ${spitze.amps.toFixed(1)} A `
+        + `(${spitze.circuits} Kreis(e)) – ueber ${CIRCUIT_AMPS} A je Phase`,
+      basis: stromBasis,
+    });
+  }
+  // Und der Betrag, um den der Plan zu gut aussah — aber nur, wenn er eine
+  // Entscheidung aendern koennte.
+  //
+  // DIE SCHWELLE IST EIN GANZER KREIS, kein erfundener Prozentsatz. Ein
+  // Einzelgeraet auf einer von drei Phasen ist rechnerisch „zu 100 %
+  // unausgeglichen" und interessiert niemanden: beide Zahlen liegen unter
+  // jedem Automaten. Erst wenn die Annahme mehr als einen vollen 16-A-Kreis
+  // verschweigt, spezifiziert jemand daraufhin einen zu kleinen Anschluss.
+  //
+  // Auf dem Last-Blatt steht der Betrag TROTZDEM immer — dort sieht man
+  // absichtlich nach. Hier unterbricht er, und was unterbricht, muss es wert
+  // sein: eine Liste, die bei jedem Plan meckert, liest beim zweiten Mal
+  // niemand mehr.
+  if (verteilung.understatedAmps >= CIRCUIT_AMPS) {
+    issues.push({
+      severity: 'info',
+      message: `Ungleich verteilt: die schwerste Phase traegt ${verteilung.understatedAmps.toFixed(1)} A `
+        + `mehr als die ausgeglichene Annahme (${verteilung.assumedAmpsPerPhase.toFixed(1)} A) – `
+        + `Unterschied zwischen schwerster und leichtester Phase ${verteilung.imbalanceAmps.toFixed(1)} A`,
+      basis: stromBasis,
+    });
+  }
+  // Ein einzelnes Geraet, das groesser ist als das Kreis-Budget, bekommt von
+  // `circuitBreakdown` einen eigenen Kreis — und der liegt dann UEBER dem
+  // Budget, weil ein Geraet sich nicht teilen laesst. Das faellt sonst
+  // niemandem auf: die Kreis-Zahl stimmt ja.
+  const zuGross = verteilung.assignments.filter((a) => a.overloaded);
+  if (zuGross.length > 0) {
+    issues.push({
+      severity: 'error',
+      message: `${zuGross.length} Kreis(e) ueber ${CIRCUIT_AMPS} A `
+        + `(${zuGross.map((a) => `${a.distro}-${a.outlet}: ${a.amps.toFixed(1)} A`).join(', ')}) – `
+        + 'ein Geraet passt in keinen 16-A-Kreis',
+      basis: stromBasis,
+    });
   }
 
   return issues.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
