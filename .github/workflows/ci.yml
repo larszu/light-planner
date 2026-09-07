@@ -153,6 +153,17 @@ jobs:
       - name: Die Pult-Datei sagt vorher, was sie nicht enthaelt
         run: npm run console:check
 
+      # Bedarf 145 -- die Bestellung faellt aus dem Plan, statt getippt zu
+      # werden. Der Waechter haelt vor allem drei Dinge fest: dass die Mengen
+      # in JEDER Zeile aufgehen (Bedarf = eigen + fremd + bestellen), dass
+      # fremdes Material als fremdes erscheint -- es kommt zurueck und kostet
+      # je Tag, und wer es als „gedeckt" verbucht, hat den Fehler aus Bedarf 82
+      # wieder --, und dass jede Zeile sagt, worauf ihre Deckung beruht: die
+      # Zuordnung Plan-Geraet zu Lager-Artikel ist ein Vergleich von
+      # Zeichenketten und keine Tatsache.
+      - name: Die Bestellung teilt auf und nennt ihre Grundlage
+        run: npm run shop:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.

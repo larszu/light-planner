@@ -818,6 +818,12 @@ const en: Record<string, string> = {
   'sch.groups.locate': 'Show in plan',
   'sch.groups.hint':
     'The MVR format has no groups \u2014 this sheet is how they reach the console, the visualiser and the media server.',
+  // Bedarf 145 - die Bestellung faellt aus dem Plan.
+  'sch.exp.shop': 'Shop order (CSV)',
+  'sch.exp.shopNote':
+    'Demand from the plan, covered from stock: owned, foreign (goes back) and what is left over.',
+  'sch.exp.shopUnmatched': '{n} line(s) with no stock item \u2014 nobody vouched for those.',
+  'sch.exp.shopGaps': 'Not from this plan:',
   // Bedarf 146 - den Patch ans Pult schicken statt abtippen.
   'sch.exp.console': 'Patch for the console',
   'sch.exp.consoleDropped': '{n} of {m} rows will NOT be included:',
