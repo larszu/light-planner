@@ -31,17 +31,30 @@ const load = (): Persisted => {
   }
 };
 
-const persist = (s: Persisted) => {
+/**
+ * Schreibt und MELDET, ob es geklappt hat.
+ *
+ * BEFUND (Defektformen-Sweep, Backlog B-36 der av-planner-suite, Form
+ * `zustand-nach-fehler`): Hier stand ein leeres `catch { /* quota *\/ }`.
+ * Bei vollem localStorage meldete der Import „N Objekte importiert", der
+ * Bestand stand in der Oberflaeche — und war beim naechsten Start weg. Ein
+ * Undo fuer diesen Store gibt es nicht, und es sind projektuebergreifende
+ * Stammdaten: Geraete, Lagerorte, Einheiten, Codes.
+ */
+const persist = (s: Persisted): { storageFull: boolean } => {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
+    return { storageFull: false };
   } catch {
-    /* quota */
+    return { storageFull: true };
   }
 };
 
 export type InventoryItemInput = Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface InventoryState extends Persisted {
+  /** Der letzte Schreibvorgang ist an der Quota gescheitert — siehe `persist`. */
+  storageFull: boolean;
   addItem: (input: InventoryItemInput) => string;
   updateItem: (id: string, patch: Partial<InventoryItemInput>) => void;
   removeItem: (id: string) => void;
@@ -53,27 +66,25 @@ const initial = load();
 
 export const useInventoryStore = create<InventoryState>((set, get) => ({
   ...initial,
+  storageFull: false,
   addItem: (input) => {
     const now = new Date().toISOString();
     const item: InventoryItem = { ...input, id: uid(), createdAt: now, updatedAt: now };
     set((st) => {
       const items = [...st.items, item];
-      persist({ ...st, items });
-      return { items };
+      return { items, ...persist({ ...st, items }) };
     });
     return item.id;
   },
   updateItem: (id, patch) =>
     set((st) => {
       const items = st.items.map((it) => (it.id === id ? { ...it, ...patch, updatedAt: new Date().toISOString() } : it));
-      persist({ ...st, items });
-      return { items };
+      return { items, ...persist({ ...st, items }) };
     }),
   removeItem: (id) =>
     set((st) => {
       const items = st.items.filter((it) => it.id !== id);
-      persist({ ...st, items });
-      return { items };
+      return { items, ...persist({ ...st, items }) };
     }),
   exportSnapshot: () => {
     const s = get();
@@ -95,8 +106,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
         sets: mode === 'replace' ? inSets : mergeById(st.sets, inSets),
         units: mode === 'replace' ? inUnits : mergeById(st.units, inUnits),
       };
-      persist(next);
-      return next;
+      return { ...next, ...persist(next) };
     });
     return total;
   },
