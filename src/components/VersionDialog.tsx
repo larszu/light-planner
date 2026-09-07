@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { ProjectData } from '../types';
 import { versionsFor, saveVersion, deleteVersion, type ProjectVersion } from '../utils/versionStore';
 import { diffProjects } from '../core/diff';
+import { parseAvPlan } from '../core/avplan';
+import {
+  CATEGORY_LABEL, KIND_LABEL, MERGE_REFUSAL_LABEL, SIDE_LABEL, applyMerge, mergePlan, openCount,
+  type MergeEntry, type MergePlan, type MergeSide,
+} from '../core/rigMerge';
 import DiffView from './DiffView';
 import Icon from './Icon';
 import { useTranslation } from '../i18n';
@@ -45,6 +50,37 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
       'Stand „{label}" laden? Nicht gesicherte Änderungen gehen verloren.',
     ).replace('{label}', v.label);
     if (window.confirm(frage)) onRestore(v.doc);
+  };
+
+  // ── BEDARF 138 — zwei auseinandergelaufene Kopien zusammenfuehren ────────
+  //
+  // Der gewaehlte Stand ist der gemeinsame Ausgangspunkt. Ohne ihn liesse
+  // sich „die andere Seite hat es angelegt" nicht von „ich habe es geloescht"
+  // unterscheiden — und die falsche der beiden Antworten ist genau der
+  // Datenverlust aus `showstack#38`.
+  const otherFileRef = useRef<HTMLInputElement>(null);
+  const [plan, setPlan] = useState<MergePlan | null>(null);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [otherName, setOtherName] = useState('');
+  const [theirDoc, setTheirDoc] = useState<ProjectData | null>(null);
+
+  const waehle = (id: string, category: string, choice: MergeSide) =>
+    setPlan((p) => (p ? {
+      ...p,
+      entries: p.entries.map((e) =>
+        (e.id === id && e.category === category ? { ...e, choice } : e)),
+    } : p));
+
+  const uebernehmen = () => {
+    if (!plan || !theirDoc) return;
+    const entschieden = plan.entries.filter((e) => e.choice);
+    if (entschieden.length === 0) return;
+    const frage = t(
+      'merge.confirm',
+      '{n} von {total} Einträgen übernehmen? Alles ohne Wahl bleibt, wie es hier ist.',
+    ).replace('{n}', String(entschieden.length)).replace('{total}', String(plan.entries.length));
+    if (!window.confirm(frage)) return;
+    onRestore(applyMerge(currentDoc, theirDoc, plan.entries));
   };
 
   const selected = versions.find((v) => v.id === selectedId) ?? null;
@@ -91,6 +127,114 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
               <div className="rig-clean">✓ {t('version.noDiff', 'Keine Unterschiede zum aktuellen Stand.')}</div>
             ) : diff && (
               <>
+                {/* BEDARF 138 — der Weg zum Zusammenfuehren. Er haengt am
+                    gewaehlten Stand: der ist der gemeinsame Ausgangspunkt,
+                    ohne den ein Abgleich raten muesste. */}
+                <div className="diff-summary">
+                  <button className="btn-secondary" onClick={() => otherFileRef.current?.click()}>
+                    <Icon name="import" size={14} />{' '}
+                    {t('merge.load', 'Andere Fassung laden (.avplan) und zusammenführen…')}
+                  </button>
+                  <input
+                    ref={otherFileRef}
+                    type="file"
+                    accept=".avplan,.json,application/json"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const datei = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!datei) return;
+                      const leser = new FileReader();
+                      leser.onload = () => {
+                        setPlan(null); setTheirDoc(null); setOtherName(datei.name);
+                        try {
+                          const avplan = parseAvPlan(String(leser.result ?? ''));
+                          const licht = avplan.domains.lighting as ProjectData | undefined;
+                          if (!licht) {
+                            // Benannt, nicht stumm: eine .avplan ohne
+                            // Licht-Domaene ist kein kaputtes Zusammenfuehren,
+                            // sondern die falsche Datei.
+                            setMergeError(t('merge.noLighting', 'Diese Datei enthält keine Licht-Domäne — es gibt nichts zusammenzuführen.'));
+                            return;
+                          }
+                          const p = mergePlan(selected.doc, currentDoc, licht);
+                          if ('refusal' in p) { setMergeError(MERGE_REFUSAL_LABEL[p.refusal]); return; }
+                          setMergeError(null); setTheirDoc(licht); setPlan(p);
+                        } catch (err) {
+                          setMergeError(err instanceof Error ? err.message : String(err));
+                        }
+                      };
+                      leser.readAsText(datei);
+                    }}
+                  />
+                </div>
+                {mergeError && (
+                  <ul className="rig-issues">
+                    <li className="rig-issue sev-error"><span className="rig-dot" />{mergeError}</li>
+                  </ul>
+                )}
+                {plan && (
+                  <div className="merge-plan">
+                    <div className="diff-summary">
+                      <b>{plan.entries.length}</b>{' '}
+                      {t('merge.entries', 'Unterschiede gegenüber')} „{otherName}" ·{' '}
+                      <b>{plan.counts.conflict}</b> {t('merge.conflicts', 'Konflikte')} ·{' '}
+                      <b>{openCount(plan.entries)}</b> {t('merge.open', 'ohne Wahl')}
+                    </div>
+                    {plan.untouched.length > 0 && (
+                      <div className="prop-derived">
+                        {t('merge.untouched', 'Nicht angefasst')}: {plan.untouched.join(', ')} —{' '}
+                        {t('merge.untouchedNote', 'diese Bereiche bleiben, wie sie hier sind. Eine Zusammenführung, die darüber schweigt, wird für vollständig gehalten.')}
+                      </div>
+                    )}
+                    <table className="schedule-table">
+                      <thead>
+                        <tr>
+                          <th>{t('merge.what', 'Was')}</th>
+                          <th>{t('merge.object', 'Objekt')}</th>
+                          <th>{t('merge.diff', 'Unterschied')}</th>
+                          <th>{t('merge.take', 'Übernehmen')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {plan.entries.map((e: MergeEntry) => (
+                          <tr key={`${e.category}:${e.id}`} className={e.kind === 'conflict' ? 'sev-warning' : undefined}>
+                            <td>
+                              {KIND_LABEL[e.kind]}
+                              {e.side ? ` (${SIDE_LABEL[e.side]})` : ''}
+                            </td>
+                            <td>{CATEGORY_LABEL[e.category]}: {e.label}</td>
+                            <td>
+                              {e.fields.length === 0
+                                ? '—'
+                                : e.fields.map((f) => `${f.field}: ${f.from} → ${f.to}`).join(' · ')}
+                            </td>
+                            <td>
+                              <button
+                                className={e.choice === 'mine' ? 'btn-primary' : 'btn-secondary'}
+                                onClick={() => waehle(e.id, e.category, 'mine')}
+                              >{t('merge.mine', 'meine')}</button>{' '}
+                              <button
+                                className={e.choice === 'theirs' ? 'btn-primary' : 'btn-secondary'}
+                                onClick={() => waehle(e.id, e.category, 'theirs')}
+                              >{t('merge.theirs', 'ihre')}</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="diff-summary">
+                      <button
+                        className="btn-primary"
+                        disabled={plan.entries.every((e) => !e.choice)}
+                        onClick={uebernehmen}
+                      >{t('merge.apply', 'Gewählte übernehmen')}</button>{' '}
+                      <span className="prop-derived">
+                        {t('merge.applyNote', 'Nur Einträge mit Wahl. Alles andere bleibt, wie es hier ist — eine Vorbelegung wäre eine Entscheidung, die niemand getroffen hat.')}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="diff-summary">
                   <b>{diff.total}</b>{' '}
                   {diff.total === 1

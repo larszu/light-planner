@@ -409,6 +409,25 @@ const en: Record<string, string> = {
   'fixtureCategory.custom': 'Custom',
 
   // ── Versionen & Vergleich ────────────────────────────────────────────────
+  // Bedarf 138 — zwei auseinandergelaufene Kopien zusammenfuehren.
+  'merge.load': 'Load the other copy (.avplan) and merge\u2026',
+  'merge.noLighting': 'This file carries no lighting domain \u2014 there is nothing to merge.',
+  'merge.entries': 'differences against',
+  'merge.conflicts': 'conflicts',
+  'merge.open': 'without a choice',
+  'merge.untouched': 'Not touched',
+  'merge.untouchedNote':
+    'these areas stay as they are here. A merge that says nothing about them is taken for complete.',
+  'merge.what': 'What',
+  'merge.object': 'Object',
+  'merge.diff': 'Difference',
+  'merge.take': 'Take',
+  'merge.mine': 'mine',
+  'merge.theirs': 'theirs',
+  'merge.apply': 'Apply the chosen ones',
+  'merge.applyNote':
+    'Only entries with a choice. Everything else stays as it is here \u2014 a default would be a decision nobody made.',
+  'merge.confirm': 'Apply {n} of {total} entries? Anything without a choice stays as it is here.',
   'version.title': 'Versions & comparison',
   'version.namePlaceholder': 'Name this version (e.g. after rehearsal 1)…',
   'version.save': 'Save',
