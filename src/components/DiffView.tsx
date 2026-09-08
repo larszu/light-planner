@@ -1,14 +1,11 @@
 import React from 'react';
-import { categoryCount, type CategoryDiff, type ProjectDiff } from '../core/diff';
+import { categoryCount, ALLE_KATEGORIEN, KATEGORIE_NAMEN, type CategoryDiff, type ProjectDiff } from '../core/diff';
 
-const CATS: { key: keyof Omit<ProjectDiff, 'total' | 'unnamed'>; label: string }[] = [
-  { key: 'fixtures', label: 'Leuchten' },
-  { key: 'persons', label: 'Personen' },
-  { key: 'trusses', label: 'Traversen' },
-  { key: 'walls', label: 'Wände' },
-  { key: 'stageElements', label: 'Bühne' },
-  { key: 'ceilings', label: 'Decken' },
-];
+// B-21, zweite Haelfte: die Liste stand hier ein zweites Mal und war um acht
+// Eintraege kuerzer als der Vergleich. Sie kommt jetzt aus `core/diff` —
+// derselbe Grund wie ueberall: eine zweite Liste laeuft der ersten davon, und
+// zwar still.
+const CATS = ALLE_KATEGORIEN.map((key) => ({ key, label: KATEGORIE_NAMEN[key][1] }));
 
 const Section: React.FC<{ label: string; diff: CategoryDiff }> = ({ label, diff }) => {
   if (categoryCount(diff) === 0) return null;
@@ -51,7 +48,8 @@ const DiffView: React.FC<{ diff: ProjectDiff }> = ({ diff }) => (
           <div className="diff-chg-body">
             <b>{diff.unnamed.join(', ')}</b>
             <span className="diff-field">
-              unterscheiden sich — dieser Vergleich zeigt für sie noch keine einzelnen Felder.
+              unterscheiden sich — für sie kennt dieser Vergleich noch keine Felder.
+              Das ist ein Hinweis an die Entwicklung, kein Zustand des Plans.
             </span>
           </div>
         </div>
