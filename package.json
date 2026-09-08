@@ -1,6 +1,9 @@
 {
   "name": "light-planner",
   "private": true,
+  "avplan": {
+    "sourceLanguage": "de"
+  },
   "version": "1.0.0",
   "type": "module",
   "main": "electron/main.cjs",
@@ -41,6 +44,7 @@
     "stamp:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/stamp-check.ts",
     "identity:check": "node --experimental-strip-types scripts/project-identity-check.ts",
     "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",
+    "lang:check": "node --experimental-strip-types scripts/quellsprache-check.ts",
     "ci:complete": "node --experimental-strip-types scripts/ci-runs-every-check.ts",
     "docs:check": "node --experimental-strip-types scripts/docs-reachable-check.ts",
     "devport:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/dev-port-single-source.ts",
