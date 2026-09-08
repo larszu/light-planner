@@ -58,6 +58,25 @@ console.log('✓ Passthrough: Lampen mit allen Details ueberstehen die Reise dur
 // 3) Fremde / inkompatible Dateien werden abgelehnt.
 assert.throws(() => parseAvPlan('{"kind":"lightplan"}'));
 assert.throws(() => parseAvPlan(JSON.stringify({ ...ex, formatVersion: 99 })));
+
+// 3a) Und der geteilte Raum wird angesehen, nicht nur gezaehlt.
+//
+// BEFUND (Defektformen-Sweep, Form `vertrag-nur-feldnamen`, 2026-09-07).
+// `parseAvPlan` pruefte `kind`, `formatVersion` und dass `venue` und `domains`
+// „da" sind — und gab dann `data as AvPlan` zurueck. `venue: 42` kam durch,
+// denn `!42` ist falsch. Der Raum geht in ALLEN DREI Apps in die Geometrie
+// ein; in light in die Lichtrechnung, wo aus `undefined` stillschweigend NaN
+// wird. Geprueft wird er jetzt von derselben Stelle wie in `.venue`
+// (`pruefeVenue`), damit hier keine zweite Rechnung entsteht.
+assert.throws(() => parseAvPlan(JSON.stringify({ ...ex, venue: 42 })), /venue/);
+assert.throws(
+  () => parseAvPlan(JSON.stringify({ ...ex, venue: { ...venue, persons: [{ id: 'p1' }] } })),
+  /x/, 'eine Person ohne Koordinaten wird zu NaN in der Lichtrechnung');
+assert.throws(() => parseAvPlan(JSON.stringify({ ...ex, domains: [] })), /domains/);
+// Gegenprobe: die gueltige Datei von oben muss weiterhin durchgehen — sonst
+// waere „alles ablehnen" ebenfalls gruen.
+assert.doesNotThrow(() => parseAvPlan(JSON.stringify(ex)));
+console.log('✓ der geteilte Raum wird auf seine Bedeutung geprueft, nicht nur auf Anwesenheit');
 console.log('✓ Fremde / inkompatible Dateien werden abgelehnt');
 
 // 4) ADR-005 — die App-Ebene, die die Pruefungen 1-3 strukturell NICHT sehen.

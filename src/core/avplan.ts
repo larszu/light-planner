@@ -13,6 +13,7 @@
 //   cable-planner:    src/renderer/lib/avplan.ts  (Slot "cabling")
 // ───────────────────────────────────────────────────────────────────────────
 import type { VenueExchange } from './venueExchange';
+import { pruefeVenue } from './venueExchange';
 
 export const AVPLAN_KIND = 'avplan' as const;
 export const AVPLAN_VERSION = 1 as const;
@@ -99,6 +100,17 @@ export function parseAvPlan(text: string): AvPlan {
     throw new Error(`Nicht unterstützte .avplan-Version: ${data.formatVersion}`);
   }
   if (!data.venue || !data.domains) throw new Error('.avplan ohne venue/domains.');
+  // Defektformen-Sweep, Form `vertrag-nur-feldnamen`: bis hierher prüfte die
+  // Funktion drei Namen und gab dann `data as AvPlan` zurück. `venue: 42`
+  // kam durch — `!data.venue` ist für 42 falsch —, und eine Person ohne
+  // Koordinaten erst recht. Der geteilte Raum geht in JEDER der drei Apps in
+  // die Geometrie ein; in light in die Lichtrechnung, wo aus `undefined`
+  // stillschweigend NaN wird. Geprüft wird er von derselben Stelle wie in
+  // `.venue`, damit hier nicht die zweite Rechnung entsteht.
+  pruefeVenue(data.venue);
+  if (typeof data.domains !== 'object' || Array.isArray(data.domains)) {
+    throw new Error('.avplan: domains ist kein Objekt.');
+  }
   return data as AvPlan;
 }
 
