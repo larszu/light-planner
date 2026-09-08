@@ -3,7 +3,7 @@
 // overloaded trusses and an electrical-load sanity check. Pure data in, a flat
 // list of issues out (sorted worst-first) for a report panel.
 import type { PlacedFixture, Truss } from '../types';
-import { findPatchConflicts, footprint, computePower, trussLoads, DEFAULT_TRUSS_CAPACITY } from './patch';
+import { findPatchConflicts, footprint, computePower, trussLoads, DEFAULT_TRUSS_CAPACITY, UNIVERSE_SIZE } from './patch';
 import {
   CIRCUIT_AMPS, DEFAULT_TEMPLATE, PHASE_LABEL, distributionFor, type PhaseTemplate,
 } from './powerDistribution';
@@ -79,8 +79,25 @@ export function rigCheck(
     issues.push({ severity: 'warning', message: `${dupChannels.length} doppelte Kanalnummer(n) (${dupChannels.map(([c]) => c).join(', ')})`, ids });
   }
 
+  // 3a) Profile, die nicht in ein Universe passen. Vor der allgemeinen
+  //     „ohne Patch-Adresse"-Warnung, weil sie deren Grund NENNT: `autoPatch`
+  //     vergibt für sie mit Absicht nichts, und ohne diese Zeile stünde die
+  //     Leuchte nur unter „ungepatcht" und niemand wüsste, warum sie es
+  //     bleibt, egal wie oft man auf Auto-Patch drückt.
+  const ueberUniverse = fixtures.filter((f) => footprint(f) > UNIVERSE_SIZE);
+  if (ueberUniverse.length > 0) {
+    issues.push({
+      severity: 'error',
+      message: `${ueberUniverse.length} Leuchte(n) belegen mehr als ${UNIVERSE_SIZE} Kanäle und passen in kein Universe – sie müssen von Hand auf mehrere aufgeteilt werden`,
+      ids: ueberUniverse.map((f) => f.id),
+    });
+  }
+
   // 3) DMX fixtures (footprint > 0) without an assigned address.
-  const unpatched = fixtures.filter((f) => footprint(f) > 0 && (f.universe == null || f.dmxAddress == null));
+  const ueberUniverseIds = new Set(ueberUniverse.map((f) => f.id));
+  const unpatched = fixtures.filter(
+    (f) => footprint(f) > 0 && !ueberUniverseIds.has(f.id) && (f.universe == null || f.dmxAddress == null),
+  );
   if (unpatched.length > 0) {
     issues.push({ severity: 'warning', message: `${unpatched.length} DMX-Leuchte(n) ohne Patch-Adresse`, ids: unpatched.map((f) => f.id) });
   }

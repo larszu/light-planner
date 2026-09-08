@@ -217,6 +217,14 @@ jobs:
       - name: Der DMX-Fussabdruck wird auch beim Export nur einmal gerechnet
         run: npm run equipment:check
 
+      # Defektformen-Sweep, Form `fixture-erreicht-grenze-nicht`: der einzige
+      # interessante Zweig in `autoPatch` — der Uebergang ins naechste
+      # Universe bei 512 Kanaelen — ist nie gelaufen. Der einzige Lauf, der
+      # `autoPatch` ueberhaupt aufrief, war ein Entwicklerskript mit einer
+      # Handvoll Leuchten, das nicht einmal in package.json stand.
+      - name: Der Auto-Patch erreicht die Universe-Grenze
+        run: npm run autopatch:check
+
       # Bedarf 132: die Szenen waren eine flache Liste. Wer den dritten Song
       # nach vorn zieht, musste seine Teil-Stimmungen einzeln hinterherziehen
       # -- und vergisst eine; dann steht im Ablauf ein Chorus vor seinem Intro,
