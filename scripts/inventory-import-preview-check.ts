@@ -290,8 +290,12 @@ const satz = (id: string, model: string, rest: Partial<Satz> = {}): Satz => ({ i
 // Sie laeuft, waehrend der Nutzer noch entscheidet. Wuerde sie ihre Eingaben
 // anfassen, waere der Import beim Abbrechen halb passiert.
 {
-  const vorhanden = [satz('a', 'A', { manufacturer: 'ETC' })];
-  const eingehend = [satz('a', 'A neu')];
+  // Mehr als ein Element, und BEWUSST nicht nach Id sortiert: mit einer
+  // einelementigen Liste waere ein Umsortieren an Ort und Stelle nicht
+  // messbar, und genau das ist bei der Gegenprobe herausgekommen — die
+  // Zusicherung war gruen zu haben, ohne dass sie galt.
+  const vorhanden = [satz('c', 'C', { manufacturer: 'ETC' }), satz('a', 'A'), satz('b', 'B')];
+  const eingehend = [satz('b', 'B neu'), satz('a', 'A')];
   const vorherKopie = JSON.parse(JSON.stringify(vorhanden)) as Satz[];
   const eingehendKopie = JSON.parse(JSON.stringify(eingehend)) as Satz[];
 
@@ -323,9 +327,17 @@ const satz = (id: string, model: string, rest: Partial<Satz> = {}): Satz => ({ i
 
   // Drei Ausgaenge, und der dritte ist der, den es vorher nicht gab.
   assert.match(dialog, /setPending\(null\)/, 'es gibt keinen Weg, den Import abzubrechen');
-  assert.match(dialog, /inventory\.previewCancel/, 'der Abbruch hat keine Beschriftung');
-  assert.match(dialog, /inventory\.previewMerge/, 'die Antwort "zusammenfuehren" hat keine Beschriftung');
-  assert.match(dialog, /inventory\.previewReplace/, 'die Antwort "ersetzen" hat keine Beschriftung');
+  // Mit SCHLIESSENDEM Anfuehrungszeichen. Ohne es war diese Zeile von
+  // `inventory.previewMergeHint` zu haben — der Erklaertext neben dem
+  // Schalter haette den Schalter selbst ersetzt, und die Gegenprobe „der
+  // Modus-Schalter fehlt" kam gruen zurueck.
+  for (const [key, klage] of [
+    ['inventory.previewCancel', 'der Abbruch hat keine Beschriftung'],
+    ['inventory.previewMerge', 'die Antwort "zusammenfuehren" hat keine Beschriftung'],
+    ['inventory.previewReplace', 'die Antwort "ersetzen" hat keine Beschriftung'],
+  ] as [string, string][]) {
+    assert.ok(dialog.includes(`'${key}'`), klage);
+  }
 
   // Importiert wird der Modus, den die gezeigte Vorschau gerechnet hat.
   assert.match(
