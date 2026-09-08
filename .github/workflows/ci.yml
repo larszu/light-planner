@@ -262,6 +262,14 @@ jobs:
       - name: Actions laufen auf einer unterstuetzten Node-Version
         run: npm run actions:check
 
+      # B-22: der Lager-Import fragte per window.confirm „ERSETZEN? Abbrechen =
+      # zusammenfuehren" -- ohne eine einzige Zahl daneben und ohne dritten
+      # Ausgang. Dieser Lauf haelt die Vorschau gegen das tatsaechliche
+      # Import-Ergebnis: eine Vorschau, die anders rechnet als der Import,
+      # sieht nach Pruefung aus und ist eine zweite Meinung.
+      - name: Der Lager-Import zeigt vorher, was er tut
+        run: npm run preview:check
+
       - name: Jeder Pruef-Lauf steht auch im Workflow
         run: npm run ci:complete
       - name: Build (inkl. Type-Check)
