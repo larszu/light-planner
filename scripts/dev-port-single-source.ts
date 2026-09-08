@@ -3,11 +3,19 @@
 //
 // WARUM ES DAS GIBT (gemessen 2026-09-08). B-17 hat den Planer auf 4183
 // festgenagelt (`vite.config.ts`, `strictPort: true`); zehn Skripte unter
-// `scripts/` behielten ihr `http://localhost:5174` als eigenes Literal. Der
-// Fehler war stumm: `npm run shots` startete, holte sich einen
+// `scripts/` zielten weiter auf Port 5174, jedes mit einem eigenen Literal.
+// Der Fehler war stumm: `npm run shots` startete, holte sich einen
 // Verbindungsfehler und sah aus wie ein Puppeteer-Problem. Kein Lauf, keine
 // Pruefung und keine Doku hat die Abweichung gemeldet — die Zahl stand
 // zehnmal da, und keine der zehn Stellen wusste von den neun anderen.
+//
+// Und ja, diese Datei haelt sich selbst an ihre Regel: die alte Adresse steht
+// hier als ZAHL und nicht als waehlbares `localhost:`-Literal. Der erste
+// Versuch tat das nicht — der Wachter hat sich beim ersten CI-Lauf selbst
+// gemeldet (Lauf 34194046486). Das ist kein Schoenheitsfehler, sondern der
+// Beleg, dass er auch Dateien prueft, die niemand als „Doku" durchgehen
+// laesst. Lokal war er blind dafuer, weil er nur VERSIONIERTE Dateien liest
+// und er selbst da noch nicht versioniert war.
 //
 // WAS ER PRUEFT, und warum genau das. Nicht „importieren die Skripte
 // `basisUrl`" — das waere ein Wachter auf die Aufrufform, und der wird bei der
