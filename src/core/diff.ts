@@ -4,6 +4,8 @@
 // concrete field changes per item. Pure data in, a structured diff out.
 import type {
   ProjectData, PlacedFixture, Person, Truss, Wall, StageElement, Ceiling,
+  Shape, Fixture, FixtureGroup, Scene, CameraView, Layers, LayerKey,
+  FloorMaterial, SunSettings,
 } from '../types';
 import { gelLibrary } from './gelLibrary';
 
@@ -21,6 +23,16 @@ export interface ProjectDiff {
   walls: CategoryDiff;
   stageElements: CategoryDiff;
   ceilings: CategoryDiff;
+  // ── B-21, zweite Haelfte: die uebrigen acht Kategorien ──────────────────
+  shapes: CategoryDiff;
+  customFixtures: CategoryDiff;
+  fixtureGroups: CategoryDiff;
+  scenes: CategoryDiff;
+  cameras: CategoryDiff;
+  /** `layers`, `floor` und `sun` sind KEINE Listen — je ein Einzelstueck. */
+  layers: CategoryDiff;
+  floor: CategoryDiff;
+  sun: CategoryDiff;
   total: number;
   /**
    * Kategorien, die sich UNTERSCHEIDEN, aber nicht aufgeschluesselt werden —
@@ -128,27 +140,6 @@ const CEILING_FIELDS: FieldSpec<Ceiling>[] = [
   { label: 'Reflexion', get: (c) => num(c.reflectance) },
 ];
 
-const count = (d: CategoryDiff) => d.added.length + d.removed.length + d.changed.length;
-
-/**
- * Die acht Kategorien ohne Feld-Vergleich, mit ihrem Anzeigenamen.
- *
- * Gerechnet und nicht behauptet: `same` vergleicht die Werte. Ein reiner
- * Referenzvergleich waere falsch (jedes Laden baut neue Objekte), ein
- * JSON-Vergleich ueber Schluesselreihenfolge waere unzuverlaessig — deshalb
- * ein stabiles Serialisieren mit sortierten Schluesseln.
- */
-const UNNAMED_CATEGORIES: { label: string; get: (p: ProjectData) => unknown }[] = [
-  { label: 'Formen', get: (p) => p.shapes },
-  { label: 'Eigene Leuchten', get: (p) => p.customFixtures },
-  { label: 'Gruppen', get: (p) => p.fixtureGroups },
-  { label: 'Szenen', get: (p) => p.scenes },
-  { label: 'Kameras', get: (p) => p.cameras },
-  { label: 'Ebenen', get: (p) => p.layers },
-  { label: 'Boden', get: (p) => p.floor },
-  { label: 'Sonne', get: (p) => p.sun },
-];
-
 const stable = (v: unknown): string =>
   JSON.stringify(v, (_k, val) => {
     if (val && typeof val === 'object' && !Array.isArray(val)) {
@@ -161,11 +152,180 @@ const stable = (v: unknown): string =>
     return val;
   }) ?? 'undefined';
 
-/** Welche der acht unterscheiden sich? Nur die Namen, kein Feld-Detail. */
+// ───────────────────────────────────────────────────────────────────────────
+// B-21, zweite Haelfte: die uebrigen acht Kategorien, Feld fuer Feld.
+//
+// Der Eintrag nannte als Grund fuer das Warten zwei Dinge: eine
+// Beschriftungsfunktion und eine Feldliste je Kategorie („welche Felder eine
+// Aenderung AUSMACHEN und wie sie benannt werden"), und dass `layers`, `floor`
+// und `sun` keine Listen sind, auf die `diffList` passt.
+//
+// Beides ist hier beantwortet, und zwar nach EINER Regel, damit es keine
+// Geschmacksfrage bleibt: aufgezaehlt wird, was der Nutzer im Dialog SETZEN
+// kann, mit dem Namen, den die Oberflaeche dafuer benutzt. Kein Feld wird
+// weggelassen, weil es „unwichtig" waere — genau dieses Weglassen ist der
+// Defekt, gegen den B-21 angetreten ist.
+//
+// Fuer die drei Einzelstuecke gibt es `diffSingle`: dieselbe `CategoryDiff`-
+// Form, aber mit genau einer moeglichen Zeile. Ein Einzelstueck kann
+// hinzukommen (vorher nicht gesetzt), wegfallen (jetzt nicht mehr gesetzt)
+// oder sich aendern — dieselben drei Faelle wie bei einer Liste, nur ohne Id.
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Ein Einzelstueck (kein Listenelement) vergleichen.
+ *
+ * `id` ist der feste Schluessel des Stuecks — es gibt nur eines davon, und
+ * der Dialog braucht trotzdem etwas, woran er die Zeile haengt.
+ */
+function diffSingle<T>(
+  before: T | undefined, after: T | undefined,
+  id: string, label: string, specs: FieldSpec<T>[],
+): CategoryDiff {
+  if (before === undefined && after === undefined) return { added: [], removed: [], changed: [] };
+  if (before === undefined) return { added: [{ id, label }], removed: [], changed: [] };
+  if (after === undefined) return { added: [], removed: [{ id, label }], changed: [] };
+  const fields: FieldChange[] = [];
+  for (const s of specs) {
+    const from = s.get(before), to = s.get(after);
+    if (from !== to) fields.push({ field: s.label, from, to });
+  }
+  return { added: [], removed: [], changed: fields.length ? [{ id, label, fields }] : [] };
+}
+
+const punkte = (ps?: { x: number; y: number }[]) =>
+  (ps ?? []).map((p) => `${num(p.x)},${num(p.y)}`).join(' ') || '–';
+
+const shapeLabel = (s: Shape) => s.label || (s.type === 'measure' ? 'Maß' : s.type === 'line' ? 'Linie' : 'Rechteck');
+const SHAPE_FIELDS: FieldSpec<Shape>[] = [
+  { label: 'Art', get: (s) => s.type },
+  { label: 'Punkte', get: (s) => punkte(s.points) },
+  { label: 'Farbe', get: (s) => s.color },
+];
+
+const customFixtureLabel = (f: Fixture) => `${f.manufacturer} ${f.name}`.trim() || f.id;
+const CUSTOM_FIXTURE_FIELDS: FieldSpec<Fixture>[] = [
+  { label: 'Kategorie', get: (f) => f.category },
+  { label: 'Leistung', get: (f) => num(f.wattage, ' W') },
+  { label: 'Lichtstrom', get: (f) => num(f.lumens, ' lm') },
+  { label: 'Beam', get: (f) => num(f.beamAngle, '°') },
+  { label: 'Field', get: (f) => num(f.fieldAngle, '°') },
+  { label: 'Zoom', get: (f) => (f.zoomRange ? `${num(f.zoomRange[0], '°')}–${num(f.zoomRange[1], '°')}` : '–') },
+  { label: 'Farbtemp.', get: (f) => num(f.colorTemp, ' K') },
+  { label: 'Gewicht', get: (f) => num(f.weight, ' kg') },
+  { label: 'Montage', get: (f) => f.mountType },
+  { label: 'DMX-Kanäle', get: (f) => (f.dmxChannels == null ? '–' : String(f.dmxChannels)) },
+  { label: 'Stromanschluss', get: (f) => f.powerConnector || '–' },
+];
+
+const groupLabel = (g: FixtureGroup) => g.label || 'Gruppe';
+const GROUP_FIELDS: FieldSpec<FixtureGroup>[] = [
+  // Sortiert verglichen: die REIHENFOLGE in einer Gruppe bedeutet nichts, und
+  // eine Umsortierung als Aenderung zu melden waere ein falscher Alarm.
+  { label: 'Leuchten', get: (g) => [...(g.fixtureIds ?? [])].sort().join(', ') || '–' },
+  { label: 'Anzahl', get: (g) => String((g.fixtureIds ?? []).length) },
+];
+
+const sceneLabel = (s: Scene) => s.name || 'Szene';
+const SCENE_FIELDS: FieldSpec<Scene>[] = [
+  { label: 'Übergeordnet', get: (s) => s.parentId || '–' },
+  // Die Zustaende sind eine Abbildung Leuchte -> Werte. Verglichen wird ihr
+  // Inhalt, nicht ihre Schluesselreihenfolge (siehe `stable`), und gemeldet
+  // wird, WIE VIELE Leuchten die Szene stellt und welche sich geaendert haben.
+  { label: 'Gestellte Leuchten', get: (s) => String(Object.keys(s.states ?? {}).length) },
+  { label: 'Werte', get: (s) => stable(s.states) },
+];
+
+const cameraLabel = (c: CameraView) => c.label || 'Kamera';
+const CAMERA_FIELDS: FieldSpec<CameraView>[] = [
+  { label: 'Position', get: (c) => `${num(c.x)},${num(c.y)}` },
+  { label: 'Augenhöhe', get: (c) => num(c.height, ' m') },
+  { label: 'Ziel', get: (c) => `${num(c.aimX)},${num(c.aimY)}` },
+  { label: 'Bildwinkel', get: (c) => num(c.fov, '°') },
+];
+
+/** Die Ebenen-Schluessel in fester Reihenfolge — sonst wackelt die Meldung. */
+const LAYER_KEYS: LayerKey[] = [
+  'fixtures', 'persons', 'trusses', 'stage', 'shapes', 'ceilings', 'walls', 'floorPlan',
+];
+const LAYER_LABEL: Record<LayerKey, string> = {
+  fixtures: 'Leuchten', persons: 'Personen', trusses: 'Traversen', stage: 'Bühne',
+  shapes: 'Formen', ceilings: 'Decken', walls: 'Wände', floorPlan: 'Grundriss',
+};
+const LAYER_FIELDS: FieldSpec<Layers>[] = LAYER_KEYS.map((k) => ({
+  label: LAYER_LABEL[k],
+  get: (l: Layers) => {
+    const info = l?.[k];
+    if (!info) return '–';
+    return `${info.visible ? 'sichtbar' : 'verborgen'}, ${info.locked ? 'gesperrt' : 'frei'}`;
+  },
+}));
+
+const FLOOR_FIELDS: FieldSpec<FloorMaterial>[] = [
+  { label: 'Vorlage', get: (f) => f.preset },
+  { label: 'Farbe', get: (f) => f.color },
+];
+
+const SUN_FIELDS: FieldSpec<SunSettings>[] = [
+  { label: 'Aktiv', get: (s) => (s.enabled ? 'ja' : 'nein') },
+  { label: 'Ort', get: (s) => `${num(s.latitude, '°')} / ${num(s.longitude, '°')}` },
+  { label: 'Datum', get: (s) => s.date || '–' },
+  { label: 'Uhrzeit', get: (s) => s.time || '–' },
+  { label: 'Nordrichtung', get: (s) => num(s.northDeg, '°') },
+  { label: 'Stärke', get: (s) => num(s.intensity, ' lx') },
+];
+
+const count = (d: CategoryDiff) => d.added.length + d.removed.length + d.changed.length;
+
+/**
+ * Kategorien, die sich unterscheiden, aber nicht aufgeschluesselt sind.
+ *
+ * B-21, zweite Haelfte (2026-09-08): Es gibt keine mehr — alle vierzehn
+ * inhaltlichen Kategorien werden Feld fuer Feld verglichen. Die Funktion
+ * bleibt, weil `ProjectDiff.unnamed` das Versprechen der Oberflaeche traegt
+ * („Keine Unterschiede" nur, wenn WIRKLICH keine da sind), und weil eine
+ * fuenfzehnte Kategorie sonst wieder still durchfallen wuerde.
+ *
+ * Sie vergleicht deshalb den GANZEN Datensatz gegen die Summe dessen, was
+ * `diffProjects` abdeckt: was uebrigbleibt, wird beim Namen genannt. Neu
+ * hinzukommende Felder in `ProjectData` fallen damit von selbst auf, statt
+ * auf eine Liste zu warten, die jemand nachzieht.
+ */
+const VERGLICHENE_SCHLUESSEL: readonly (keyof ProjectData)[] = [
+  'fixtures', 'persons', 'trusses', 'walls', 'stageElements', 'ceilings',
+  'shapes', 'customFixtures', 'fixtureGroups', 'scenes', 'cameras',
+  'layers', 'floor', 'sun',
+];
+
+/**
+ * Schluessel, die KEINE inhaltliche Kategorie sind und deshalb nicht als
+ * Unterschied gelten. Jeder mit Begruendung — eine stille Ausnahme waere
+ * genau das Loch, das B-21 beschrieben hat.
+ */
+const KEINE_KATEGORIE: readonly (keyof ProjectData)[] = [
+  // Der Kopf des Projekts: Name, Autor, Zeitstempel. `updatedAt` aendert sich
+  // bei JEDEM Speichern — als Unterschied gemeldet waere jede Version
+  // "geaendert", und die Aussage waere wertlos.
+  'meta',
+  // Wie Universe-Zahlen zu lesen sind und welche Phasen der Anschluss fuehrt:
+  // Angaben ueber den Plan, keine Gegenstaende in ihm. Sie erscheinen in
+  // eigenen Dialogen mit eigener Anzeige.
+  'dmxProtocol', 'phaseTemplate',
+  // Der Grundriss ist ein Bild; ein Feld-Vergleich waere ein Byte-Vergleich.
+  'floorPlan',
+];
+
 export function unnamedDifferences(before: ProjectData, after: ProjectData): string[] {
-  return UNNAMED_CATEGORIES
-    .filter((c) => stable(c.get(before)) !== stable(c.get(after)))
-    .map((c) => c.label);
+  const alle = new Set<string>([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]);
+  const offen: string[] = [];
+  for (const key of alle) {
+    if ((VERGLICHENE_SCHLUESSEL as readonly string[]).includes(key)) continue;
+    if ((KEINE_KATEGORIE as readonly string[]).includes(key)) continue;
+    const a = (before as unknown as Record<string, unknown>)?.[key];
+    const b = (after as unknown as Record<string, unknown>)?.[key];
+    if (stable(a) !== stable(b)) offen.push(key);
+  }
+  return offen.sort();
 }
 
 export function diffProjects(before: ProjectData, after: ProjectData): ProjectDiff {
@@ -176,10 +336,51 @@ export function diffProjects(before: ProjectData, after: ProjectData): ProjectDi
     walls: diffList(before.walls ?? [], after.walls ?? [], wallLabel, WALL_FIELDS),
     stageElements: diffList(before.stageElements ?? [], after.stageElements ?? [], stageLabel, STAGE_FIELDS),
     ceilings: diffList(before.ceilings ?? [], after.ceilings ?? [], ceilingLabel, CEILING_FIELDS),
+    shapes: diffList(before.shapes ?? [], after.shapes ?? [], shapeLabel, SHAPE_FIELDS),
+    customFixtures: diffList(before.customFixtures ?? [], after.customFixtures ?? [], customFixtureLabel, CUSTOM_FIXTURE_FIELDS),
+    fixtureGroups: diffList(before.fixtureGroups ?? [], after.fixtureGroups ?? [], groupLabel, GROUP_FIELDS),
+    scenes: diffList(before.scenes ?? [], after.scenes ?? [], sceneLabel, SCENE_FIELDS),
+    cameras: diffList(before.cameras ?? [], after.cameras ?? [], cameraLabel, CAMERA_FIELDS),
+    layers: diffSingle(before.layers, after.layers, 'layers', 'Ebenen', LAYER_FIELDS),
+    floor: diffSingle(before.floor, after.floor, 'floor', 'Boden', FLOOR_FIELDS),
+    sun: diffSingle(before.sun, after.sun, 'sun', 'Sonne', SUN_FIELDS),
   };
-  const total = count(d.fixtures) + count(d.persons) + count(d.trusses) + count(d.walls) + count(d.stageElements) + count(d.ceilings);
+  const total = ALLE_KATEGORIEN.reduce((n, k) => n + count(d[k]), 0);
   return { ...d, total, unnamed: unnamedDifferences(before, after) };
 }
+
+/**
+ * Die Kategorien des Vergleichs, in Anzeigereihenfolge — als DATEN.
+ *
+ * B-21 (2026-09-08): `total` wurde vorher als Summe von sechs handgeschriebenen
+ * `count(...)`-Aufrufen gebildet. Eine siebte Kategorie haette man dort
+ * vergessen koennen, und dann waere `total` wieder kleiner als die Wahrheit —
+ * derselbe Defekt eine Ebene tiefer. Jetzt zaehlt die Liste, und der Test
+ * haelt fest, dass sie vollstaendig ist.
+ */
+export const ALLE_KATEGORIEN = [
+  'fixtures', 'persons', 'trusses', 'walls', 'stageElements', 'ceilings',
+  'shapes', 'customFixtures', 'fixtureGroups', 'scenes', 'cameras',
+  'layers', 'floor', 'sun',
+] as const satisfies readonly (keyof Omit<ProjectDiff, 'total' | 'unnamed'>)[];
+
+/** Anzeigename je Kategorie — Einzahl und Mehrzahl, fuer Dialog und Zeitachse. */
+export const KATEGORIE_NAMEN: Record<(typeof ALLE_KATEGORIEN)[number], [string, string]> = {
+  fixtures: ['Leuchte', 'Leuchten'],
+  persons: ['Person', 'Personen'],
+  trusses: ['Traverse', 'Traversen'],
+  walls: ['Wand', 'Wände'],
+  stageElements: ['Bühne', 'Bühnen'],
+  ceilings: ['Decke', 'Decken'],
+  shapes: ['Form', 'Formen'],
+  customFixtures: ['Eigene Leuchte', 'Eigene Leuchten'],
+  fixtureGroups: ['Gruppe', 'Gruppen'],
+  scenes: ['Szene', 'Szenen'],
+  cameras: ['Kamera', 'Kameras'],
+  layers: ['Ebenen', 'Ebenen'],
+  floor: ['Boden', 'Boden'],
+  sun: ['Sonne', 'Sonne'],
+};
 
 export const categoryCount = count;
 
@@ -193,18 +394,14 @@ export function summarizeChange(before: Partial<ProjectData>, after: Partial<Pro
     if (cd.removed.length) parts.push(`−${cd.removed.length} ${cd.removed.length === 1 ? sing : plur}`);
     if (cd.changed.length) parts.push(`${cd.changed.length} ${cd.changed.length === 1 ? sing : plur} geändert`);
   };
-  add(d.fixtures, 'Leuchte', 'Leuchten');
-  add(d.persons, 'Person', 'Personen');
-  add(d.trusses, 'Traverse', 'Traversen');
-  add(d.walls, 'Wand', 'Wände');
-  add(d.stageElements, 'Bühne', 'Bühnen');
-  add(d.ceilings, 'Decke', 'Decken');
-  if (parts.length === 0) {
-    // Shapes/annotations aren't in the structured diff — fall back to a coarse check.
-    const bs = before.shapes ?? [], as = after.shapes ?? [];
-    if (bs.length !== as.length) return as.length > bs.length ? 'Form hinzugefügt' : 'Form entfernt';
-    if (JSON.stringify(bs) !== JSON.stringify(as)) return 'Form bearbeitet';
-    return 'Geändert';
+  // Alle vierzehn, aus der Liste — kein handgeschriebener Satz mehr, der
+  // beim Hinzufuegen einer Kategorie stehenbleibt. Der Not-Zweig fuer
+  // `shapes` ist damit ebenfalls weg: Formen sind jetzt eine Kategorie wie
+  // jede andere, und die Zeitachse sagt "+1 Form" statt "Form bearbeitet".
+  for (const key of ALLE_KATEGORIEN) {
+    const [sing, plur] = KATEGORIE_NAMEN[key];
+    add(d[key], sing, plur);
   }
+  if (parts.length === 0) return d.unnamed.length ? `${d.unnamed.join(', ')} geändert` : 'Geändert';
   return parts.slice(0, 3).join(', ');
 }
