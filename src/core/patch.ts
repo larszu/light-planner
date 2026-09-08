@@ -7,7 +7,9 @@
 import type { PlacedFixture, Truss } from '../types';
 import { gelLibrary } from './gelLibrary';
 
-const UNIVERSE_SIZE = 512;
+/** Kanäle je DMX-Universe. Mehr passt nicht hinein — das ist keine Konvention,
+ *  sondern die Größe des Datenpakets. */
+export const UNIVERSE_SIZE = 512;
 
 // DMX footprint of a fixture; 0 / undefined means a conventional unit that
 // lives on a dimmer (gets a channel number but no DMX address).
@@ -47,7 +49,22 @@ export function autoPatch(fixtures: PlacedFixture[], opts: PatchOptions): Placed
     }
     if (opts.patch) {
       const fp = footprint(f);
-      if (fp > 0) {
+      if (fp > UNIVERSE_SIZE) {
+        // BEFUND (Defektformen-Sweep, Form `fixture-erreicht-grenze-nicht`,
+        // gemessen 2026-09-08): hier wurde eine Adresse vergeben, die es
+        // nicht geben kann. Ein Profil mit mehr als 512 Kanälen bekam
+        // `universe = n, address = 1` — und belegte damit rechnerisch 513…fp
+        // eines Universes, das an dieser Stelle aufhört. Kein Fehler, keine
+        // Warnung: der Patch-Zettel sah aus wie jeder andere.
+        //
+        // Solche Profile gibt es (große Pixel-Matrizen, LED-Wände als ein
+        // Gerät). Was der Planer NICHT kann, ist sie automatisch auf mehrere
+        // Universes aufteilen — das ist eine Entscheidung über die Verkabelung,
+        // keine Rechnung. Also wird nichts vergeben, und `rigCheck` meldet die
+        // Leuchte als ungepatcht mit eigener Begründung.
+        patch.universe = undefined;
+        patch.dmxAddress = undefined;
+      } else if (fp > 0) {
         if (address + fp - 1 > UNIVERSE_SIZE) { universe += 1; address = 1; }
         patch.universe = universe;
         patch.dmxAddress = address;
