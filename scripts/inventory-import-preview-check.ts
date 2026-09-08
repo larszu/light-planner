@@ -44,7 +44,7 @@
 //     niemand aufruft.
 // ───────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import {
   VORSCHAU_SORTEN,
   importVorschau,
@@ -56,6 +56,21 @@ import {
 } from '../src/inventory/importPreview.ts';
 
 const lies = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8');
+
+/** Alle `.ts`-Dateien unter einem i18n-Ordner, aneinandergehaengt. */
+const i18nQuellen = (rel: string): string => {
+  const wurzel = new URL(`${rel}/`, import.meta.url);
+  const sammle = (ordner: URL): string[] => {
+    const raus: string[] = [];
+    for (const eintrag of readdirSync(ordner, { withFileTypes: true })) {
+      const kind = new URL(`${eintrag.name}${eintrag.isDirectory() ? '/' : ''}`, ordner);
+      if (eintrag.isDirectory()) raus.push(...sammle(kind));
+      else if (eintrag.name.endsWith('.ts')) raus.push(readFileSync(kind, 'utf8'));
+    }
+    return raus;
+  };
+  return sammle(wurzel).join('\n');
+};
 
 /** Ein Lager-Artikel, so schlank wie moeglich — id + zwei Felder reichen. */
 interface Satz {
@@ -326,7 +341,29 @@ const satz = (id: string, model: string, rest: Partial<Satz> = {}): Satz => ({ i
   assert.match(dialog, /vorschauSumme\(/, 'die Vorschau nennt keine Zahlen');
 
   // Drei Ausgaenge, und der dritte ist der, den es vorher nicht gab.
-  assert.match(dialog, /setPending\(null\)/, 'es gibt keinen Weg, den Import abzubrechen');
+  //
+  // Als blosses `/setPending\(null\)/` war diese Zeile unverdient: dieselbe
+  // Anweisung steht in `doImportConfirm`, das `pending` nach dem Schreiben
+  // leert. Wer den Abbruch-Knopf entfernte, blieb gruen. Geprueft wird der
+  // KLICK-HANDLER — und zwar der, nicht seine Aufschrift: die vendorte
+  // Suite-Kopie beschriftet ihn ueber `t()`, und ein Waechter, der an einer
+  // richtigen Aenderung rot wird, wird geaendert statt gelesen.
+  assert.match(
+    dialog,
+    /onClick=\{\(\) => setPending\(null\)\}/,
+    'es gibt keinen Weg, den Import abzubrechen',
+  );
+  assert.match(
+    dialog,
+    /onClick=\{doImportConfirm\}/,
+    'der Importieren-Knopf loest den Import nicht aus',
+  );
+  // Beide Modi werden AUFGEZAEHLT. Faellt einer weg, ist die Wahl keine mehr.
+  assert.match(
+    dialog,
+    /\(\['merge', 'replace'\] as ImportMode\[\]\)\.map/,
+    'der Modus-Schalter bietet nicht beide Antworten',
+  );
   // Mit SCHLIESSENDEM Anfuehrungszeichen. Ohne es war diese Zeile von
   // `inventory.previewMergeHint` zu haben — der Erklaertext neben dem
   // Schalter haette den Schalter selbst ersetzt, und die Gegenprobe „der
@@ -348,7 +385,13 @@ const satz = (id: string, model: string, rest: Partial<Satz> = {}): Satz => ({ i
 
   // Die EN-Seite: eine Beschriftung, die nur auf Deutsch existiert, ist im
   // englischen Betrieb ein Schluessel-Name auf einem Knopf.
-  const en = lies('../src/i18n/index.ts');
+  //
+  // GELESEN WIRD DER GANZE ORDNER, nicht `index.ts`. Hier stand der einzelne
+  // Dateipfad, und upstream stimmt er — aber die vendorte Suite-Kopie teilt
+  // dasselbe Woerterbuch auf `src/i18n/en/*.ts` auf. Dieser Guard wird
+  // mitvendoriert; ein mitvendorierter Guard, der in der Kopie an einer
+  // richtigen Struktur scheitert, wird dort geloescht statt gelesen.
+  const en = i18nQuellen('../src/i18n');
   for (const key of [
     'inventory.previewTitle',
     'inventory.previewCancel',
