@@ -274,4 +274,77 @@ const placeholder = fromVenueExchange({ ...roomIn, venue: { ...roomIn.venue, nam
 assert.equal(placeholder.venueForeign.name, undefined, 'der Platzhalter wird nicht aufgehoben');
 console.log('✓ ADR-005: der Raum-Name ueberlebt den Light-Round-Trip');
 
+// ───────────────────────────────────────────────────────────────────────────
+// Der Vertrag kennt die BEDEUTUNG der Felder, nicht nur ihre Namen.
+//
+// BEFUND (Defektformen-Sweep, Form `vertrag-nur-feldnamen`, gemessen
+// 2026-09-07). Alles oberhalb prueft NAMEN und Round-Trips; die einzigen
+// Ablehnungsfaelle waren fremdes `kind` und fremde Version. `parseVenueExchange`
+// gab danach `data as VenueExchange` zurueck — der Cast war die ganze
+// Zusicherung.
+//
+// Dahinter steht `fromVenueExchange`, das bei den OPTIONALEN Feldern sorgfaeltig
+// ist (`?? 0.5`, `?? ''`, `?? 270`) und den PFLICHT-Feldern blind vertraut. Eine
+// Person ohne `x` wird damit zu `{ x: undefined }`, und die Lichtrechnung
+// rechnet ab da mit NaN — im Plan steht dann „—", ohne dass irgendwo stuende,
+// warum.
+//
+// Die Faelle hier sind keine Typ-Uebungen: jeder von ihnen ist eine Datei, die
+// es geben kann — von Hand editiert, aus einem aelteren Stand gerettet, von
+// einem fremden Werkzeug geschrieben.
+// ───────────────────────────────────────────────────────────────────────────
+const mitVenue = (venue: unknown) => JSON.stringify({ ...fromMulticam, venue });
+const gutesVenue = (fromMulticam as { venue: Record<string, unknown> }).venue;
+
+// Der Venue-Block selbst
+assert.throws(() => parseVenueExchange(mitVenue(42)), /venue/, 'venue: 42 ist kein Raum');
+assert.throws(() => parseVenueExchange(mitVenue([])), /venue/, 'venue: [] ist kein Raum');
+assert.throws(() => parseVenueExchange(mitVenue({ ...gutesVenue, name: '' })), /name/);
+assert.throws(() => parseVenueExchange(mitVenue({ ...gutesVenue, widthM: 'breit' })), /widthM/);
+
+// Personen — genau die Felder, die `fromVenueExchange` ungeprueft weitergibt
+for (const feld of ['x', 'y', 'height']) {
+  const kaputt = { ...gutesVenue, persons: [{ id: 'p1', label: 'A', x: 1, y: 1, height: 1.8, [feld]: 'egal' }] };
+  assert.throws(() => parseVenueExchange(mitVenue(kaputt)), new RegExp(feld),
+    `persons[0].${feld} muss eine Zahl sein`);
+}
+assert.throws(
+  () => parseVenueExchange(mitVenue({ ...gutesVenue, persons: [{ x: 1, y: 1, height: 1.8 }] })),
+  /id/, 'eine Person ohne Id kann spaeter niemand wiederfinden');
+assert.throws(() => parseVenueExchange(mitVenue({ ...gutesVenue, persons: [null] })), /persons\[0\]/);
+assert.throws(() => parseVenueExchange(mitVenue({ ...gutesVenue, persons: 'keine' })), /persons/);
+
+// Waende und Buehnen-Objekte
+assert.throws(
+  () => parseVenueExchange(mitVenue({ ...gutesVenue, walls: [{ id: 'w1', x1: 0, y1: 0, x2: 1, height: 3 }] })),
+  /y2/, 'eine Wand ohne Endpunkt zeichnet nirgends und wirft trotzdem Schatten');
+assert.throws(
+  () => parseVenueExchange(mitVenue({ ...gutesVenue, stageObjects: [{ id: 's1', x: 0, y: 0 }] })),
+  /width/);
+
+// GEGENPROBE: die Strenge darf nicht ins Gegenteil kippen. Optionale Felder
+// duerfen fehlen, 0 ist ein Wert, und eine leere Liste ist ein leerer Raum.
+const knapp = { name: 'Halle', persons: [], walls: [], stageObjects: [] };
+assert.doesNotThrow(() => parseVenueExchange(mitVenue(knapp)), 'ein leerer Raum ist gueltig');
+const nullen = {
+  name: 'Halle',
+  persons: [{ id: 'p1', label: '', x: 0, y: 0, height: 0 }],
+  walls: [], stageObjects: [],
+};
+assert.doesNotThrow(() => parseVenueExchange(mitVenue(nullen)), '0 ist eine Position, kein fehlender Wert');
+const ohneListen = { name: 'Halle' };
+assert.doesNotThrow(() => parseVenueExchange(mitVenue(ohneListen)), 'fehlende Listen sind leere Listen');
+
+// Und die Rundreise: was light selbst schreibt, nimmt light selbst an.
+const eigen = toVenueExchange({
+  venueName: 'Show A',
+  persons: [{ id: 'p1', x: 2, y: 3, height: 1.8, label: 'A', pose: 'standing', facing: 270 }],
+  walls: [{ id: 'w1', x1: 0, y1: 0, x2: 5, y2: 0, height: 3, label: '', reflectance: 0.5, color: '#ccc' }],
+  stageElements: [{ id: 's1', type: 'custom', x: 1, y: 1, width: 2, depth: 1, height: 0.2, rotation: 0, label: '' }],
+  floorPlan: null, appVersion: '1.0.0', exportedAt: 't',
+} as never);
+assert.doesNotThrow(() => parseVenueExchange(JSON.stringify(eigen)),
+  'der eigene Export muss den eigenen Import ueberstehen');
+console.log('✓ der Vertrag prueft die Bedeutung der Felder, nicht nur ihre Namen');
+
 console.log('\nAlle Venue-Austausch-Checks bestanden.');

@@ -16,7 +16,7 @@
     "lint": "eslint .",
     "venue:check": "node --experimental-strip-types scripts/venue-exchange-check.ts",
     "diff:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/version-diff-check.ts",
-    "avplan:check": "node --experimental-strip-types scripts/avplan-check.ts",
+    "avplan:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/avplan-check.ts",
     "inventory:check": "node --experimental-strip-types scripts/inventory-contract-check.ts",
     "storage:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/inventory-storage-check.ts",
     "mvr:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/mvr-check.ts",

@@ -213,9 +213,68 @@ function collectPersonForeign(
   return out;
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Der Venue-Block wird auf seine BEDEUTUNG geprüft, nicht auf Feldnamen.
+//
+// BEFUND (Defektformen-Sweep, Form `vertrag-nur-feldnamen`, gemessen
+// 2026-09-07). `parseVenueExchange` prüfte `kind`, `formatVersion` und dass
+// ein `venue` dasteht — und gab dann `data as VenueExchange` zurück. Der Cast
+// war die ganze Zusicherung. `venue: 42` kam durch (`!data.venue` ist für 42
+// falsch), und `persons: [{ id: 'p1' }]` erst recht.
+//
+// Der Guard dazu (`scripts/venue-exchange-check.ts`) fror die Feldnamen ein
+// und prüfte den Round-Trip. Über die Bedeutung eines Feldes stand nichts.
+//
+// Was dahinter liegt, verzeiht das nicht: `fromVenueExchange` ist sorgfältig
+// bei den OPTIONALEN Feldern (`?? 0.5`, `?? ''`, `?? 270`) und vertraut den
+// PFLICHT-Feldern blind — `p.x`, `p.y`, `p.height`, `w.x1`… gehen ungeprüft
+// weiter. Eine Person ohne Koordinaten wird damit zu `{ x: undefined }`, und
+// die Lichtrechnung rechnet ab da mit NaN: die Lux-Werte im Plan sind dann
+// leer oder „—", ohne dass irgendwo stünde, warum. Eine Wand ohne
+// Koordinaten zeichnet nirgends und wirft trotzdem Schatten in der Rechnung.
+//
+// Geprüft wird deshalb genau das, was `fromVenueExchange` ungeprüft benutzt.
+// Abgelehnt wird die DATEI, nicht der Eintrag: ein Raum, aus dem
+// stillschweigend eine Wand fehlt, ist schlimmer als einer, der gar nicht
+// erst lädt.
+//
+// DIESELBE Lässigkeit steht in den Schwester-Kopien (multicam-planner
+// `src/utils/venueExchange.ts`, cable-planner) und in `parseAvPlan` /
+// `parseInventory`. Das Schema ändert sich hier nicht — ein strengerer Leser
+// nimmt jede wohlgeformte Datei weiterhin an —, aber die anderen Leser sind
+// weiterhin lax. Steht als nächster Schritt derselben Form im Backlog (B-36).
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Wirft, wenn das Feld keine endliche Zahl ist. */
+const zahl = (o: Record<string, unknown>, feld: string, wo: string): void => {
+  if (!Number.isFinite(o[feld])) {
+    throw new Error(`${wo}: Feld „${feld}" ist keine endliche Zahl.`);
+  }
+};
+
+/** Wirft, wenn das Feld kein nicht-leerer Text ist. */
+const text = (o: Record<string, unknown>, feld: string, wo: string): void => {
+  if (typeof o[feld] !== 'string' || (o[feld] as string).trim() === '') {
+    throw new Error(`${wo}: Feld „${feld}" fehlt oder ist leer.`);
+  }
+};
+
+const objekt = (roh: unknown, wo: string): Record<string, unknown> => {
+  if (!roh || typeof roh !== 'object' || Array.isArray(roh)) {
+    throw new Error(`${wo}: kein Objekt.`);
+  }
+  return roh as Record<string, unknown>;
+};
+
+const liste = (roh: unknown, wo: string): unknown[] => {
+  if (roh === undefined) return [];
+  if (!Array.isArray(roh)) throw new Error(`${wo}: kein Array.`);
+  return roh;
+};
+
 /** Parst + validiert eine Austauschdatei. Wirft bei falschem Format. */
-export function parseVenueExchange(text: string): VenueExchange {
-  const data = JSON.parse(text) as Partial<VenueExchange>;
+export function parseVenueExchange(text_: string): VenueExchange {
+  const data = JSON.parse(text_) as Partial<VenueExchange>;
   if (!data || data.kind !== VENUE_EXCHANGE_KIND) {
     throw new Error('Keine gültige Venue-Austauschdatei (kind != venue-exchange).');
   }
@@ -223,7 +282,51 @@ export function parseVenueExchange(text: string): VenueExchange {
     throw new Error(`Nicht unterstützte Venue-Austausch-Version: ${data.formatVersion}`);
   }
   if (!data.venue) throw new Error('Venue-Austauschdatei ohne venue-Block.');
+  pruefeVenue(data.venue);
   return data as VenueExchange;
+}
+
+/**
+ * Der geteilte Raum, geprüft auf das, was `fromVenueExchange` ungeprüft
+ * benutzt. Exportiert, weil `parseAvPlan` denselben Block trägt und ihn
+ * bisher überhaupt nicht ansah.
+ */
+export function pruefeVenue(roh: unknown): void {
+  const v = objekt(roh, 'venue');
+  text(v, 'name', 'venue');
+  for (const feld of ['widthM', 'heightM'] as const) {
+    if (v[feld] !== undefined) zahl(v, feld, 'venue');
+  }
+
+  liste(v.persons, 'venue.persons').forEach((roh_, i) => {
+    const wo = `venue.persons[${i}]`;
+    const p = objekt(roh_, wo);
+    text(p, 'id', wo);
+    for (const feld of ['x', 'y', 'height'] as const) zahl(p, feld, wo);
+  });
+
+  liste(v.walls, 'venue.walls').forEach((roh_, i) => {
+    const wo = `venue.walls[${i}]`;
+    const w = objekt(roh_, wo);
+    text(w, 'id', wo);
+    for (const feld of ['x1', 'y1', 'x2', 'y2', 'height'] as const) zahl(w, feld, wo);
+  });
+
+  liste(v.stageObjects, 'venue.stageObjects').forEach((roh_, i) => {
+    const wo = `venue.stageObjects[${i}]`;
+    const o = objekt(roh_, wo);
+    text(o, 'id', wo);
+    for (const feld of ['x', 'y', 'width'] as const) zahl(o, feld, wo);
+  });
+
+  if (v.floorPlan !== undefined) {
+    const fp = objekt(v.floorPlan, 'venue.floorPlan');
+    text(fp, 'src', 'venue.floorPlan');
+    for (const feld of ['naturalWidth', 'naturalHeight', 'widthMeters', 'heightMeters',
+      'offsetX', 'offsetY', 'opacity'] as const) {
+      zahl(fp, feld, 'venue.floorPlan');
+    }
+  }
 }
 
 /**
