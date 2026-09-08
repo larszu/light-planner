@@ -120,7 +120,30 @@ const en: Record<string, string> = {
   'inventory.scanNone': 'No match.',
   'inventory.import': 'Import',
   'inventory.importErr': 'Not a valid inventory file (avplan-inventory).',
-  'inventory.importConfirm': 'REPLACE the existing inventory? Cancel = merge.',
+
+  // ── Import-Vorschau (E-15) ───────────────────────────────────────────────
+  // Der frueher hier stehende Schluessel `inventory.importConfirm` ist weg:
+  // die Rueckfrage „REPLACE the existing inventory? Cancel = merge." gibt es
+  // nicht mehr. Sie hatte zwei Antworten, und beide importierten.
+  'inventory.previewTitle': 'What this import changes',
+  'inventory.previewMerge': 'Merge',
+  'inventory.previewReplace': 'Replace',
+  'inventory.previewMergeHint': 'Carried forward — nothing is dropped.',
+  'inventory.previewReplaceHint': 'The existing inventory is discarded.',
+  'inventory.previewNew': 'new',
+  'inventory.previewChanged': 'changed',
+  'inventory.previewSame': 'unchanged',
+  'inventory.previewRemoved': 'dropped',
+  'inventory.previewUntouched': 'kept',
+  'inventory.previewCancel': 'Cancel',
+  'inventory.previewApply': 'Import',
+  // Der Platzhalter {n} wird vom Aufrufer ersetzt und muss stehen bleiben.
+  'inventory.previewRemoves': '{n} existing records will be dropped. This cannot be undone.',
+  'inventory.previewNothing': 'This file changes nothing in the inventory.',
+  'inventory.sorte.items': 'Items',
+  'inventory.sorte.nodes': 'Locations / cases',
+  'inventory.sorte.sets': 'Sets',
+  'inventory.sorte.units': 'Units',
   // Der Platzhalter {n} wird vom Aufrufer ersetzt und muss stehen bleiben.
   'inventory.importFull': '{n} objects read but NOT saved: local storage is full. Free some space, then import again.',
   'inventory.importDone': '{n} items imported.',

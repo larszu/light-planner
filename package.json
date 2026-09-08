@@ -45,7 +45,8 @@
     "docs:check": "node --experimental-strip-types scripts/docs-reachable-check.ts",
     "devport:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/dev-port-single-source.ts",
     "actions:check": "node --experimental-strip-types scripts/actions-node-runtime.ts",
-    "brand:check": "node --experimental-strip-types scripts/brand-tokens-check.ts"
+    "brand:check": "node --experimental-strip-types scripts/brand-tokens-check.ts",
+    "preview:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/inventory-import-preview-check.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^6.0.227",
