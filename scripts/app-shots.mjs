@@ -1,11 +1,12 @@
 // Screenshots the REAL app (index.html) for a UX review. Drives a little UI to
 // populate a scene, then captures 2D + 3D + a couple of panels.
-// Setup: npm i --no-save puppeteer-core @sparticuz/chromium ; dev server on 5174.
+// Setup: npm i --no-save puppeteer-core @sparticuz/chromium ; dev server via `npm run dev`.
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { mkdirSync } from 'node:fs';
+import { basisUrl } from './dev-server.mjs';
 
-const BASE = process.argv[2] || 'http://localhost:5174';
+const BASE = basisUrl();
 const OUT = '/tmp/ux';
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

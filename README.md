@@ -95,6 +95,14 @@ npm run dev          # web preview in the browser
 npm run electron:dev # the actual desktop app
 ```
 
+The dev server binds a fixed port with `strictPort` — the AV Planner Suite
+looks for the lighting planner there when it embeds it, so a port that quietly
+moves would leave the shell pointing at nothing. The number lives in
+`vite.config.ts` and nowhere else: the headless scripts under `scripts/` read
+it from there via `scripts/dev-server.mjs`, and `npm run devport:check` fails
+the build if any file names a different one. Pass a base URL as the first
+argument to point a script somewhere else.
+
 ---
 
 ## 🧪 Tech
