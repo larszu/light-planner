@@ -6,15 +6,18 @@
 // lean — the chromium binary is ~50 MB):
 //   npm i --no-save puppeteer-core @sparticuz/chromium
 //
-// Then, with the dev server running (npm run dev -- --port 5174 --strictPort):
-//   node scripts/render-shots.mjs http://localhost:5174
+// Then, with the dev server running (npm run dev):
+//   node scripts/render-shots.mjs
 //
 // Usage: node scripts/render-shots.mjs [baseURL]
+// Without an argument the base URL comes from `vite.config.ts` via
+// `scripts/dev-server.mjs` — the port lives in exactly one place.
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { basisUrl } from './dev-server.mjs';
 
-const BASE = process.argv[2] || 'http://localhost:5174';
+const BASE = basisUrl();
 const URL = `${BASE}/scene-harness.html`;
 const OUT = '/tmp/shots';
 mkdirSync(OUT, { recursive: true });

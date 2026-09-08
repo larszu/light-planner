@@ -242,6 +242,15 @@ jobs:
       - name: Dokumentation ist auffindbar
         run: npm run docs:check
 
+      # B-17 hat den Dev-Server auf einen festen Port genagelt; zehn Skripte
+      # unter scripts/ zielten bis 2026-09-08 weiter auf den alten. Der Fehler
+      # war stumm -- `npm run shots` sah aus wie ein Puppeteer-Problem. Dieser
+      # Lauf braucht keinen Browser und keinen Server: er liest den Port aus
+      # vite.config.ts und vergleicht ihn mit jeder waehlbaren
+      # localhost-Adresse im Repo.
+      - name: Der Dev-Port steht an genau einer Stelle
+        run: npm run devport:check
+
       # Zuletzt und bewusst: dieser Lauf prueft, dass die Liste darueber
       # vollstaendig ist. `mvr:check` fehlte hier bis 2026-09-04 — er
       # existierte, war gruen, und lief bei keinem Merge.

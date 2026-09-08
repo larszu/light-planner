@@ -43,6 +43,7 @@
     "i18n:check": "node --experimental-strip-types scripts/i18n-reachable-check.ts",
     "ci:complete": "node --experimental-strip-types scripts/ci-runs-every-check.ts",
     "docs:check": "node --experimental-strip-types scripts/docs-reachable-check.ts",
+    "devport:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/dev-port-single-source.ts",
     "actions:check": "node --experimental-strip-types scripts/actions-node-runtime.ts",
     "brand:check": "node --experimental-strip-types scripts/brand-tokens-check.ts"
   },

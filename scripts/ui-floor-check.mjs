@@ -3,8 +3,9 @@
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { mkdirSync } from 'node:fs';
+import { basisUrl } from './dev-server.mjs';
 
-const BASE = process.argv[2] || 'http://localhost:5174';
+const BASE = basisUrl();
 const OUT = '/tmp/uifloor';
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

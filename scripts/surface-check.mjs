@@ -1,12 +1,13 @@
 // Verifies the configurable floor / wall finishes in the realistic view.
 // Renders the harness in photo mode, cycles the floor through its presets and
 // the back wall through a couple of finishes, and writes screenshots.
-// Usage (dev server on 5174): node scripts/surface-check.mjs [baseURL]
+// Usage (dev server via `npm run dev`): node scripts/surface-check.mjs [baseURL]
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { mkdirSync } from 'node:fs';
+import { basisUrl } from './dev-server.mjs';
 
-const BASE = process.argv[2] || 'http://localhost:5174';
+const BASE = basisUrl();
 const URL = `${BASE}/scene-harness.html`;
 const OUT = '/tmp/surf';
 mkdirSync(OUT, { recursive: true });
