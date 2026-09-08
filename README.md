@@ -109,6 +109,19 @@ argument to point a script somewhere else.
 
 Electron · React · TypeScript · Three.js · Vite · electron-builder.
 
+**Source language:** `de`. The German string in `t('key', 'Deutsche Form')` is
+the source text — it is what appears when a key has no translation, so it is
+the text a contributor writes first. English lives in the dictionary under
+`src/i18n/`.
+
+This is a property of *this repository*, decided on 2026-09-08 (E-17/E-20):
+`cable-planner` is German-source as well, `multicam-planner` and
+`sony-camera-bridge` are English-source. Turning the direction around later
+means touching every string again for no visible gain, so it is not a
+formatting preference — `npm run lang:check` measures the fallbacks and fails
+on any line in the other language, and the machine-readable copy of this
+declaration sits in `package.json` under `avplan.sourceLanguage`.
+
 ---
 
 ## 📚 Documentation

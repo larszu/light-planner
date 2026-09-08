@@ -54,6 +54,11 @@ jobs:
         run: npm run storage:check
       - name: i18n — erreichbare Oberflaeche uebersetzt
         run: npm run i18n:check
+      # Quellsprache (E-17/E-20): dieses Repo ist deutsch-quellig, und das
+      # steht nicht nur da, es wird gemessen. Die Ausgabe nennt abweichende
+      # Zeilen NAMENTLICH — deshalb ein eigener Schritt.
+      - name: Quellsprache — Fallbacks sind deutsch
+        run: npm run lang:check
 
       # Nutzer-Rueckmeldung 2026-09-07: "die ui ist nicht konsistent. lege
       # globale ui regeln fest die fuer alle repos gelten." Die Regeln stehen
