@@ -86,19 +86,19 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
     return (
       <div className="modal-backdrop" onClick={onCancel}>
         <div className="modal project-modal" onClick={(e) => e.stopPropagation()}>
-          <h3>{t('dlg.proj.saveTitle', 'Projekt speichern')}</h3>
+          <h3>{t('dlg.proj.saveTitle', 'Save project')}</h3>
           <div className="editor-grid">
-            <label>{t('dlg.proj.name', 'Projektname')}*
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('dlg.proj.namePh', 'Mein Lichtplan')} />
+            <label>{t('dlg.proj.name', 'Project name')}*
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('dlg.proj.namePh', 'My lighting plan')} />
             </label>
-            <label>{t('dlg.proj.author', 'Autor')}
+            <label>{t('dlg.proj.author', 'Author')}
               <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder={t('dlg.proj.authorPh', 'Name')} />
             </label>
             <label>{t('dlg.proj.version', 'Version')}
               <input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="1.0" />
             </label>
-            <label>{t('dlg.proj.notes', 'Notizen')}
-              <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('dlg.proj.notesPh', 'Beschreibung…')} />
+            <label>{t('dlg.proj.notes', 'Notes')}
+              <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('dlg.proj.notesPh', 'Description…')} />
             </label>
           </div>
           {/* Drei Schluessel, weil zwei Auszeichnungen mitten im Absatz stehen
@@ -106,18 +106,18 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
               haeufigste Art, eine Uebersetzung unuebersetzbar zu machen -- hier
               ist jeder Teil fuer sich ein vollstaendiges Satzstueck. */}
           <p className="dialog-hint storage-hint">
-            <strong>{t('dlg.proj.whereHead', 'Wo wird gespeichert?')}</strong>{' '}
-            {t('dlg.proj.whereBody', '„Speichern" legt das Projekt im lokalen Speicher dieses Geräts/Browsers ab – ohne sichtbaren Dateipfad und an dieses Gerät gebunden. Für eine echte Datei mit frei wählbarem Speicherort nutze')}{' '}
-            <em>{t('dlg.proj.whereFile', '„Als Datei speichern…"')}</em>.
+            <strong>{t('dlg.proj.whereHead', 'Where does this go?')}</strong>{' '}
+            {t('dlg.proj.whereBody', '"Save" puts the project into this device\'s browser storage – with no visible file path, and tied to this device. For a real file in a location you choose, use')}{' '}
+            <em>{t('dlg.proj.whereFile', '"Save as file…"')}</em>.
           </p>
           <div className="modal-actions">
-            <button onClick={onCancel}>{t('common.cancel', 'Abbrechen')}</button>
+            <button onClick={onCancel}>{t('common.cancel', 'Cancel')}</button>
             {onSaveToFile && (
-              <button onClick={() => { onSaveToFile(); onCancel(); }} title={t('dlg.proj.toFileHint', 'Als Projektdatei an einem selbst gewählten Ort speichern')}>
-                {t('dlg.proj.toFile', 'Als Datei speichern…')}
+              <button onClick={() => { onSaveToFile(); onCancel(); }} title={t('dlg.proj.toFileHint', 'Save as a project file in a location you choose')}>
+                {t('dlg.proj.toFile', 'Save as file…')}
               </button>
             )}
-            <button className="primary" onClick={handleSave} disabled={!name.trim()}>{t('dlg.proj.saveDevice', 'Speichern (Gerät)')}</button>
+            <button className="primary" onClick={handleSave} disabled={!name.trim()}>{t('dlg.proj.saveDevice', 'Save (device)')}</button>
           </div>
         </div>
       </div>
@@ -128,11 +128,11 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal project-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{t('dlg.proj.loadTitle', 'Projekt laden')}</h3>
+        <h3>{t('dlg.proj.loadTitle', 'Load project')}</h3>
         {projects.length === 0 ? (
           <p className="dialog-hint">
-            {t('dlg.proj.empty', 'Keine im Gerät gespeicherten Projekte vorhanden.')}
-            {onLoadFromFile && ` ${t('dlg.proj.emptyFile', 'Eine Projektdatei (.lightplan.json) kannst du unten über „Aus Datei laden…" öffnen.')}`}
+            {t('dlg.proj.empty', 'No projects stored on this device.')}
+            {onLoadFromFile && ` ${t('dlg.proj.emptyFile', 'You can open a project file (.lightplan.json) below via "Load from file…".')}`}
           </p>
         ) : (
           <div className="project-list">
@@ -141,7 +141,7 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
                 <div className="project-list-info" onClick={() => onLoad(p.data, p.id)}>
                   <div className="project-list-name">{p.meta.name}</div>
                   <div className="project-list-meta">
-                    v{p.meta.version} · {p.meta.author || t('dlg.proj.noAuthor', 'Kein Autor')}
+                    v{p.meta.version} · {p.meta.author || t('dlg.proj.noAuthor', 'No author')}
                     {' · '}
                     {/* Das Gebietsschema war fest auf de-DE: ein englischer
                         Nutzer bekam sonst 04.09.2026 statt 04/09/2026. Eine
@@ -151,16 +151,16 @@ const ProjectDialog: React.FC<Props> = ({ mode, currentMeta, onSave, onLoad, onD
                   </div>
                   {p.meta.notes && <div className="project-list-notes">{p.meta.notes}</div>}
                 </div>
-                <button className="project-delete-btn" onClick={() => handleDelete(p.id)} title={t('common.delete', 'Löschen')}>✕</button>
+                <button className="project-delete-btn" onClick={() => handleDelete(p.id)} title={t('common.delete', 'Delete')}>✕</button>
               </div>
             ))}
           </div>
         )}
         <div className="modal-actions">
-          <button onClick={onCancel}>{t('common.close', 'Schließen')}</button>
+          <button onClick={onCancel}>{t('common.close', 'Close')}</button>
           {onLoadFromFile && (
-            <button className="primary" onClick={() => { onLoadFromFile(); onCancel(); }} title={t('dlg.proj.fromFileHint', 'Eine zuvor exportierte Projektdatei öffnen')}>
-              {t('dlg.proj.fromFile', 'Aus Datei laden…')}
+            <button className="primary" onClick={() => { onLoadFromFile(); onCancel(); }} title={t('dlg.proj.fromFileHint', 'Open a project file you exported earlier')}>
+              {t('dlg.proj.fromFile', 'Load from file…')}
             </button>
           )}
         </div>

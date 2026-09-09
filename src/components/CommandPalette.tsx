@@ -90,7 +90,7 @@ const CommandPalette: React.FC<Props> = ({ groups }) => {
         if (e.target === e.currentTarget) setOpen(false);
       }}
     >
-      <div className="cmdk-panel" role="dialog" aria-modal="true" aria-label={t('cmdk.title', 'Befehle')}>
+      <div className="cmdk-panel" role="dialog" aria-modal="true" aria-label={t('cmdk.title', 'Commands')}>
         <div className="panel-head">
           <input
             ref={inputRef}
@@ -115,11 +115,11 @@ const CommandPalette: React.FC<Props> = ({ groups }) => {
                 ausfuehren(treffer[aktiv]);
               }
             }}
-            placeholder={t('cmdk.placeholder', 'Befehl eingeben…')}
+            placeholder={t('cmdk.placeholder', 'Type a command…')}
           />
         </div>
         <ul className="cmdk-list">
-          {treffer.length === 0 && <li className="cmdk-empty">{t('cmdk.empty', 'Kein passender Befehl.')}</li>}
+          {treffer.length === 0 && <li className="cmdk-empty">{t('cmdk.empty', 'No matching command.')}</li>}
           {treffer.map((b, i) => (
             <li key={b.id}>
               <button

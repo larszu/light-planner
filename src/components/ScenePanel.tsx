@@ -99,20 +99,20 @@ const ScenePanel: React.FC<Props> = ({
   return (
     <div className={`scene-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="sp-header">
-        <span className="sp-title">🎬 {t('panel.scene.title', 'Szenen')}{scenes.length > 0 ? ` (${scenes.length})` : ''}</span>
-        <button className="sp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Aufklappen') : t('panel.collapse', 'Einklappen')}>
+        <span className="sp-title">🎬 {t('panel.scene.title', 'Scenes')}{scenes.length > 0 ? ` (${scenes.length})` : ''}</span>
+        <button className="sp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Expand') : t('panel.collapse', 'Collapse')}>
           {collapsed ? '▸' : '▾'}
         </button>
       </div>
 
       {!collapsed && (
         <div className="sp-body">
-          <button className="sp-save-btn" onClick={onSaveScene} disabled={fixtureCount === 0} title={t('panel.scene.saveHint', 'Aktuellen Look als neue Szene sichern')}>
-            ＋ {t('panel.scene.save', 'Aktuellen Look speichern')}
+          <button className="sp-save-btn" onClick={onSaveScene} disabled={fixtureCount === 0} title={t('panel.scene.saveHint', 'Store the current look as a new scene')}>
+            ＋ {t('panel.scene.save', 'Save the current look')}
           </button>
 
           {scenes.length === 0 ? (
-            <p className="sp-empty">{t('panel.scene.empty', 'Noch keine Szenen. Stelle deine Leuchten ein und speichere den Look.')}</p>
+            <p className="sp-empty">{t('panel.scene.empty', 'No scenes yet. Set your fixtures and save the look.')}</p>
           ) : (
             <ul className="sp-list">
               {ablauf.rows.map(({ item: s, depth, number, problem }) => {
@@ -156,7 +156,7 @@ const ScenePanel: React.FC<Props> = ({
                           <button
                             className="sp-ist sp-ist-start"
                             onClick={() => onCaptureActual(s.id, 'start')}
-                            title={t('panel.scene.captureStart', 'Beginn jetzt festhalten')}
+                            title={t('panel.scene.captureStart', 'Record the start now')}
                           >▶</button>
                         );
                       }
@@ -165,7 +165,7 @@ const ScenePanel: React.FC<Props> = ({
                           <button
                             className="sp-ist sp-ist-ende"
                             onClick={() => onCaptureActual(s.id, 'ende')}
-                            title={t('panel.scene.captureEnd', 'Ende jetzt festhalten')}
+                            title={t('panel.scene.captureEnd', 'Record the end now')}
                           >■</button>
                         );
                       }
@@ -178,8 +178,8 @@ const ScenePanel: React.FC<Props> = ({
                           className={`sp-ist sp-ist-fertig${luecke ? ' sp-ist-ohne-start' : ''}`}
                           title={
                             luecke
-                              ? t('panel.scene.captureGap', 'Ende ohne Beginn erfasst — die Dauer ist nicht messbar')
-                              : t('panel.scene.captured', 'Ist erfasst')
+                              ? t('panel.scene.captureGap', 'End recorded without a start - the duration cannot be measured')
+                              : t('panel.scene.captured', 'Actual recorded')
                           }
                         >
                           {luecke ? '–' : minuten(dauer)}
@@ -203,15 +203,15 @@ const ScenePanel: React.FC<Props> = ({
                       step={1}
                       value={s.timing?.plannedMinutes ?? ''}
                       placeholder="–"
-                      title={t('panel.scene.planned', 'Geplante Dauer in Minuten')}
+                      title={t('panel.scene.planned', 'Planned duration in minutes')}
                       onChange={(e) => {
                         const roh = e.target.value.trim();
                         onSetPlanned(s.id, roh === '' ? null : Number(roh));
                       }}
                     />
                     <div className="sp-item-actions">
-                      <button className="sp-mini" onClick={() => onMoveScene(s.id, 'up')} title={t('panel.scene.up', 'Nach oben — mit allem, was darunter hängt')}>↑</button>
-                      <button className="sp-mini" onClick={() => onMoveScene(s.id, 'down')} title={t('panel.scene.down', 'Nach unten — mit allem, was darunter hängt')}>↓</button>
+                      <button className="sp-mini" onClick={() => onMoveScene(s.id, 'up')} title={t('panel.scene.up', 'Move up — with everything below it')}>↑</button>
+                      <button className="sp-mini" onClick={() => onMoveScene(s.id, 'down')} title={t('panel.scene.down', 'Move down — with everything below it')}>↓</button>
                       {/* Ein- und Ausruecken ist eine EIGENE Handlung: eine
                           Szene, die beim Verschieben aus ihrem Song fiele,
                           waere genau die verlorene Teil-Stimmung. */}
@@ -219,17 +219,17 @@ const ScenePanel: React.FC<Props> = ({
                         className="sp-mini"
                         disabled={!vorgaenger(s.id) || !canParent(scenes, s.id, vorgaenger(s.id)).ok}
                         onClick={() => onReparentScene(s.id, vorgaenger(s.id))}
-                        title={t('panel.scene.indent', 'Unter die Szene darüber hängen')}
+                        title={t('panel.scene.indent', 'Nest under the scene above')}
                       >→</button>
                       <button
                         className="sp-mini"
                         disabled={!s.parentId}
                         onClick={() => onReparentScene(s.id, null)}
-                        title={t('panel.scene.outdent', 'Wieder nach oben holen')}
+                        title={t('panel.scene.outdent', 'Move back to the top level')}
                       >←</button>
-                      <button className="sp-mini" onClick={() => onUpdateScene(s.id)} title={t('panel.scene.overwrite', 'Mit aktuellem Look überschreiben')}>⟳</button>
-                      <button className="sp-mini" onClick={() => startRename(s)} title={t('panel.scene.rename', 'Umbenennen')}>✎</button>
-                      <button className="sp-mini sp-del" onClick={() => onDeleteScene(s.id)} title={t('panel.scene.delete', 'Szene löschen')}>🗑</button>
+                      <button className="sp-mini" onClick={() => onUpdateScene(s.id)} title={t('panel.scene.overwrite', 'Overwrite with the current look')}>⟳</button>
+                      <button className="sp-mini" onClick={() => startRename(s)} title={t('panel.scene.rename', 'Rename')}>✎</button>
+                      <button className="sp-mini sp-del" onClick={() => onDeleteScene(s.id)} title={t('panel.scene.delete', 'Delete scene')}>🗑</button>
                     </div>
                   </li>
                 );
@@ -250,15 +250,15 @@ const ScenePanel: React.FC<Props> = ({
               nur zwei Punkte erfasst wurden. */}
           {bilanz.gemessen > 0 && (
             <p className="sp-bilanz">
-              {t('panel.scene.measured', 'Erfasst')}: {bilanz.gemessen}
+              {t('panel.scene.measured', 'Recorded')}: {bilanz.gemessen}
               {bilanz.abweichungBasis > 0 ? (
                 <>
                   {' · '}
                   {vorzeichen(bilanz.abweichungSumme)}&nbsp;min{' '}
-                  {t('panel.scene.overPlanOf', 'gegen den Plan, aus')} {bilanz.abweichungBasis}
+                  {t('panel.scene.overPlanOf', 'against the plan, from')} {bilanz.abweichungBasis}
                 </>
               ) : (
-                <>{' · '}{t('panel.scene.noPlanYet', 'kein Vergleich — keine Dauer geplant')}</>
+                <>{' · '}{t('panel.scene.noPlanYet', 'nothing to compare - no duration planned')}</>
               )}
             </p>
           )}

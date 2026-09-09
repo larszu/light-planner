@@ -21,7 +21,7 @@ const AboutDialog: React.FC<Props> = ({ onClose }) => {
       <div className="about-tech">React · TypeScript · Three.js · Vite</div>
       <div className="about-copy">© {new Date().getFullYear()} · Alle Berechnungen bleiben nachvollziehbar.</div>
       <div className="modal-actions">
-        <button className="primary" onClick={onClose}>{t('about.close', 'Schließen')}</button>
+        <button className="primary" onClick={onClose}>{t('about.close', 'Close')}</button>
       </div>
     </div>
   </div>

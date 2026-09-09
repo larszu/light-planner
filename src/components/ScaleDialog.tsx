@@ -28,13 +28,13 @@ const ScaleDialog: React.FC<Props> = ({ measuredMeters, onApply, onCancel }) => 
   return (
     <div className="modal-overlay" onMouseDown={onCancel}>
       <div className="modal scale-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h3>📏 {t('dlg.scale.title', 'Maßstab kalibrieren')}</h3>
+        <h3>📏 {t('dlg.scale.title', 'Calibrate scale')}</h3>
         <p className="dialog-hint">
-          {t('dlg.scale.hintPre', 'Die gezeichnete Strecke ist aktuell')} <strong>{measuredMeters.toFixed(2)} m</strong>{' '}
-          {t('dlg.scale.hintPost', 'lang. Gib die echte Länge dieser Strecke ein – der Grundriss wird entsprechend skaliert.')}
+          {t('dlg.scale.hintPre', 'The line you drew currently measures')} <strong>{measuredMeters.toFixed(2)} m</strong>{' '}
+          {t('dlg.scale.hintPost', '. Enter its real length – the floor plan is scaled to match.')}
         </p>
         <div className="scale-input-row">
-          <label>{t('dlg.scale.realLength', 'Echte Länge')}</label>
+          <label>{t('dlg.scale.realLength', 'Real length')}</label>
           <input
             ref={inputRef}
             type="number"
@@ -51,13 +51,13 @@ const ScaleDialog: React.FC<Props> = ({ measuredMeters, onApply, onCancel }) => 
         </div>
         {valid && Math.abs(factor - 1) > 0.001 && (
           <p className="scale-factor-hint">
-            {t('dlg.scale.factorPre', 'Plan wird um Faktor')} <strong>{factor.toFixed(3)}×</strong>{' '}
-            {factor > 1 ? t('dlg.scale.enlarged', 'vergrößert') : t('dlg.scale.reduced', 'verkleinert')}.
+            {t('dlg.scale.factorPre', 'The plan is scaled by a factor of')} <strong>{factor.toFixed(3)}×</strong>{' '}
+            {factor > 1 ? t('dlg.scale.enlarged', 'up') : t('dlg.scale.reduced', 'down')}.
           </p>
         )}
         <div className="modal-actions">
-          <button className="btn-secondary" onClick={onCancel}>{t('common.cancel', 'Abbrechen')}</button>
-          <button className="btn-primary" onClick={submit} disabled={!valid}>{t('dlg.scale.apply', 'Übernehmen')}</button>
+          <button className="btn-secondary" onClick={onCancel}>{t('common.cancel', 'Cancel')}</button>
+          <button className="btn-primary" onClick={submit} disabled={!valid}>{t('dlg.scale.apply', 'Apply')}</button>
         </div>
       </div>
     </div>

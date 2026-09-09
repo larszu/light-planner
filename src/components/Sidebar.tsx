@@ -79,14 +79,14 @@ const Sidebar: React.FC<Props> = ({
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h2>{t('sidebar.title', 'Leuchten-Bibliothek')}</h2>
-        <span className="sidebar-hint">{t('sidebar.hint', 'Drag & Drop oder Klick')}</span>
+        <h2>{t('sidebar.title', 'Fixture library')}</h2>
+        <span className="sidebar-hint">{t('sidebar.hint', 'Drag & drop or click')}</span>
       </div>
 
       <div className="sidebar-search">
         <input
           type="text"
-          placeholder={t('sidebar.search', 'Suchen…')}
+          placeholder={t('sidebar.search', 'Search…')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -135,7 +135,7 @@ const Sidebar: React.FC<Props> = ({
                     {f.compatibleAttachments && f.compatibleAttachments.length > 0 && (
                       <div className="fixture-item-info attachment-hint">
                         🔧 {f.compatibleAttachments.length}{' '}
-                        {t('sidebar.attachments', 'Vorsätze verfügbar')}
+                        {t('sidebar.attachments', 'accessories available')}
                       </div>
                     )}
                   </button>
@@ -149,7 +149,7 @@ const Sidebar: React.FC<Props> = ({
 
       <div className="sidebar-footer">
         <button className="add-fixture-btn" onClick={() => setShowEditor(true)}>
-          {t('sidebar.addCustom', '+ Eigene Leuchte anlegen')}
+          {t('sidebar.addCustom', '+ Add custom fixture')}
         </button>
       </div>
 

@@ -47,7 +47,7 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
   const restore = (v: ProjectVersion) => {
     const frage = t(
       'version.restoreConfirm',
-      'Stand „{label}" laden? Nicht gesicherte Änderungen gehen verloren.',
+      'Load version „{label}"? Unsaved changes will be lost.',
     ).replace('{label}', v.label);
     if (window.confirm(frage)) onRestore(v.doc);
   };
@@ -77,7 +77,7 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
     if (entschieden.length === 0) return;
     const frage = t(
       'merge.confirm',
-      '{n} von {total} Einträgen übernehmen? Alles ohne Wahl bleibt, wie es hier ist.',
+      'Apply {n} of {total} entries? Anything without a choice stays as it is here.',
     ).replace('{n}', String(entschieden.length)).replace('{total}', String(plan.entries.length));
     if (!window.confirm(frage)) return;
     onRestore(applyMerge(currentDoc, theirDoc, plan.entries));
@@ -97,39 +97,39 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal tool-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="tool-head">
-          <h3><Icon name="undo" size={18} /> {t('version.title', 'Versionen & Vergleich')}</h3>
-          <button className="fp-icon-btn fp-close" onClick={onClose} title={t('common.close', 'Schließen')}>✕</button>
+          <h3><Icon name="undo" size={18} /> {t('version.title', 'Versions & comparison')}</h3>
+          <button className="fp-icon-btn fp-close" onClick={onClose} title={t('common.close', 'Close')}>✕</button>
         </div>
         <div className="tool-body">
           <div className="ver-list">
             <div className="ver-save">
-              <input value={label} placeholder={t('version.namePlaceholder', 'Version benennen (z. B. Stand Probe 1)…')}
+              <input value={label} placeholder={t('version.namePlaceholder', 'Name this version (e.g. after rehearsal 1)…')}
                 onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') onSave(); }} />
-              <button className="btn-primary" onClick={onSave}><Icon name="save" size={14} /> {t('version.save', 'Sichern')}</button>
+              <button className="btn-primary" onClick={onSave}><Icon name="save" size={14} /> {t('version.save', 'Save')}</button>
             </div>
             {versions.length === 0 ? (
-              <div className="ver-empty">{t('version.empty', 'Noch keine Versionen. Sichere den aktuellen Stand, um später zu vergleichen.')}</div>
+              <div className="ver-empty">{t('version.empty', 'No versions yet. Save the current state to compare against it later.')}</div>
             ) : versions.map((v) => (
               <div key={v.id} className={`ver-row ${v.id === selectedId ? 'on' : ''}`} onClick={() => setSelectedId(v.id)}>
                 <div className="ver-meta">
                   <b>{v.label}</b>
-                  <span>{fmt(v.savedAt)} · {v.doc.fixtures?.length ?? 0} {t('version.fixtures', 'Leuchten')}</span>
+                  <span>{fmt(v.savedAt)} · {v.doc.fixtures?.length ?? 0} {t('version.fixtures', 'fixtures')}</span>
                 </div>
-                <button className="ver-act" title={t('version.restore', 'Diesen Stand laden')} onClick={(e) => { e.stopPropagation(); restore(v); }}><Icon name="open" size={15} /></button>
-                <button className="ver-act danger" title={t('version.delete', 'Version löschen')} onClick={(e) => { e.stopPropagation(); onDelete(v.id); }}><Icon name="trash" size={15} /></button>
+                <button className="ver-act" title={t('version.restore', 'Load this version')} onClick={(e) => { e.stopPropagation(); restore(v); }}><Icon name="open" size={15} /></button>
+                <button className="ver-act danger" title={t('version.delete', 'Delete version')} onClick={(e) => { e.stopPropagation(); onDelete(v.id); }}><Icon name="trash" size={15} /></button>
               </div>
             ))}
           </div>
           <div className="tool-content ver-diff">
             {!selected ? (
-              <div className="tool-empty">{t('version.pick', 'Wähle links eine Version, um die Änderungen bis zum aktuellen Stand zu sehen.')}</div>
+              <div className="tool-empty">{t('version.pick', 'Pick a version on the left to see what changed since then.')}</div>
             ) : diff && diff.total === 0 && diff.unnamed.length === 0 ? (
               /* B-21: „Keine Unterschiede" nur, wenn AUCH die acht nicht
                  aufgeschluesselten Kategorien gleich sind. Sonst ist der Satz
                  keine Luecke in der Anzeige, sondern eine Falschaussage — und
                  der Nutzer verwirft daraufhin eine Version, die sich sehr wohl
                  unterscheidet. */
-              <div className="rig-clean">✓ {t('version.noDiff', 'Keine Unterschiede zum aktuellen Stand.')}</div>
+              <div className="rig-clean">✓ {t('version.noDiff', 'No differences from the current state.')}</div>
             ) : diff && (
               <>
                 {/* BEDARF 138 — der Weg zum Zusammenfuehren. Er haengt am
@@ -138,7 +138,7 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                 <div className="diff-summary">
                   <button className="btn-secondary" onClick={() => otherFileRef.current?.click()}>
                     <Icon name="import" size={14} />{' '}
-                    {t('merge.load', 'Andere Fassung laden (.avplan) und zusammenführen…')}
+                    {t('merge.load', 'Load the other copy (.avplan) and merge\u2026')}
                   </button>
                   <input
                     ref={otherFileRef}
@@ -159,7 +159,7 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                             // Benannt, nicht stumm: eine .avplan ohne
                             // Licht-Domaene ist kein kaputtes Zusammenfuehren,
                             // sondern die falsche Datei.
-                            setMergeError(t('merge.noLighting', 'Diese Datei enthält keine Licht-Domäne — es gibt nichts zusammenzuführen.'));
+                            setMergeError(t('merge.noLighting', 'This file carries no lighting domain \u2014 there is nothing to merge.'));
                             return;
                           }
                           const p = mergePlan(selected.doc, currentDoc, licht);
@@ -182,23 +182,23 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                   <div className="merge-plan">
                     <div className="diff-summary">
                       <b>{plan.entries.length}</b>{' '}
-                      {t('merge.entries', 'Unterschiede gegenüber')} „{otherName}" ·{' '}
-                      <b>{plan.counts.conflict}</b> {t('merge.conflicts', 'Konflikte')} ·{' '}
-                      <b>{openCount(plan.entries)}</b> {t('merge.open', 'ohne Wahl')}
+                      {t('merge.entries', 'differences against')} „{otherName}" ·{' '}
+                      <b>{plan.counts.conflict}</b> {t('merge.conflicts', 'conflicts')} ·{' '}
+                      <b>{openCount(plan.entries)}</b> {t('merge.open', 'without a choice')}
                     </div>
                     {plan.untouched.length > 0 && (
                       <div className="prop-derived">
-                        {t('merge.untouched', 'Nicht angefasst')}: {plan.untouched.join(', ')} —{' '}
-                        {t('merge.untouchedNote', 'diese Bereiche bleiben, wie sie hier sind. Eine Zusammenführung, die darüber schweigt, wird für vollständig gehalten.')}
+                        {t('merge.untouched', 'Not touched')}: {plan.untouched.join(', ')} —{' '}
+                        {t('merge.untouchedNote', 'these areas stay as they are here. A merge that says nothing about them is taken for complete.')}
                       </div>
                     )}
                     <table className="schedule-table">
                       <thead>
                         <tr>
-                          <th>{t('merge.what', 'Was')}</th>
-                          <th>{t('merge.object', 'Objekt')}</th>
-                          <th>{t('merge.diff', 'Unterschied')}</th>
-                          <th>{t('merge.take', 'Übernehmen')}</th>
+                          <th>{t('merge.what', 'What')}</th>
+                          <th>{t('merge.object', 'Object')}</th>
+                          <th>{t('merge.diff', 'Difference')}</th>
+                          <th>{t('merge.take', 'Take')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -218,11 +218,11 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                               <button
                                 className={e.choice === 'mine' ? 'btn-primary' : 'btn-secondary'}
                                 onClick={() => waehle(e.id, e.category, 'mine')}
-                              >{t('merge.mine', 'meine')}</button>{' '}
+                              >{t('merge.mine', 'mine')}</button>{' '}
                               <button
                                 className={e.choice === 'theirs' ? 'btn-primary' : 'btn-secondary'}
                                 onClick={() => waehle(e.id, e.category, 'theirs')}
-                              >{t('merge.theirs', 'ihre')}</button>
+                              >{t('merge.theirs', 'theirs')}</button>
                             </td>
                           </tr>
                         ))}
@@ -233,9 +233,9 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                         className="btn-primary"
                         disabled={plan.entries.every((e) => !e.choice)}
                         onClick={uebernehmen}
-                      >{t('merge.apply', 'Gewählte übernehmen')}</button>{' '}
+                      >{t('merge.apply', 'Apply the chosen ones')}</button>{' '}
                       <span className="prop-derived">
-                        {t('merge.applyNote', 'Nur Einträge mit Wahl. Alles andere bleibt, wie es hier ist — eine Vorbelegung wäre eine Entscheidung, die niemand getroffen hat.')}
+                        {t('merge.applyNote', 'Only entries with a choice. Everything else stays as it is here \u2014 a default would be a decision nobody made.')}
                       </span>
                     </div>
                   </div>
@@ -243,10 +243,10 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                 <div className="diff-summary">
                   <b>{diff.total}</b>{' '}
                   {diff.total === 1
-                    ? t('version.change', 'Änderung')
-                    : t('version.changes', 'Änderungen')}{' '}
-                  {t('version.since', 'seit')} „{selected.label}" →{' '}
-                  <b>{projectName || t('version.current', 'aktuell')}</b>
+                    ? t('version.change', 'change')
+                    : t('version.changes', 'changes')}{' '}
+                  {t('version.since', 'since')} „{selected.label}" →{' '}
+                  <b>{projectName || t('version.current', 'current')}</b>
                   {/* Die Zahl zaehlt nur, was aufgeschluesselt wurde. Was
                       darueber hinaus anders ist, steht daneben — nicht
                       stillschweigend in der Zahl versteckt und nicht
@@ -254,7 +254,7 @@ const VersionDialog: React.FC<Props> = ({ projectId, projectName, currentDoc, on
                   {diff.unnamed.length > 0 && (
                     <>
                       {' · '}
-                      {t('version.alsoChanged', '{cats} auch geändert (ohne Detail)')
+                      {t('version.alsoChanged', '{cats} also changed (no detail)')
                         .replace('{cats}', diff.unnamed.join(', '))}
                     </>
                   )}

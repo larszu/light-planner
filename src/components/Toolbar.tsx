@@ -95,18 +95,18 @@ const Toolbar: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation();
   const tools: { id: Tool; label: string; icon: string; hint?: string }[] = [
-    { id: 'select', label: t('tool.select', 'Auswahl'), icon: '⊹' },
-    { id: 'pan', label: t('tool.pan', 'Verschieben'), icon: '✋' },
-    { id: 'rect', label: t('tool.rect', 'Rechteck'), icon: '▭' },
-    { id: 'line', label: t('tool.line', 'Linie'), icon: '╱' },
-    { id: 'measure', label: t('tool.measure', 'Messen'), icon: '📏' },
+    { id: 'select', label: t('tool.select', 'Select'), icon: '⊹' },
+    { id: 'pan', label: t('tool.pan', 'Pan'), icon: '✋' },
+    { id: 'rect', label: t('tool.rect', 'Rectangle'), icon: '▭' },
+    { id: 'line', label: t('tool.line', 'Line'), icon: '╱' },
+    { id: 'measure', label: t('tool.measure', 'Measure'), icon: '📏' },
     { id: 'person', label: t('tool.person', 'Person'), icon: '🧑' },
-    { id: 'stage', label: t('tool.stage', 'Podest'), icon: '⬜' },
-    { id: 'stagepoly', label: t('tool.stagepoly', 'Bühne (Polygon)'), icon: '⬠' },
-    { id: 'truss', label: t('tool.truss', 'Traverse'), icon: '▤' },
-    { id: 'wall', label: t('tool.wall', 'Wand'), icon: '▬' },
-    { id: 'camera', label: t('tool.camera', 'Kamera'), icon: '🎥',
-      hint: t('tool.camera.hint', 'Kamera-Standpunkt setzen: einen Blickwinkel im Plan platzieren, um die 3D-Szene von dort anzusehen. (Das ist NICHT der Foto-Modus.)') },
+    { id: 'stage', label: t('tool.stage', 'Riser'), icon: '⬜' },
+    { id: 'stagepoly', label: t('tool.stagepoly', 'Stage (polygon)'), icon: '⬠' },
+    { id: 'truss', label: t('tool.truss', 'Truss'), icon: '▤' },
+    { id: 'wall', label: t('tool.wall', 'Wall'), icon: '▬' },
+    { id: 'camera', label: t('tool.camera', 'Camera'), icon: '🎥',
+      hint: t('tool.camera.hint', 'Set a camera position (not photo mode)') },
   ];
 
   return (
@@ -148,7 +148,7 @@ const Toolbar: React.FC<Props> = ({
       <div className="toolbar-separator" />
 
       <div className="toolbar-group">
-        <label className="tool-btn upload-btn" title="Gebäudeplan importieren (JPG, PNG oder PDF) – danach Maßstab kalibrieren">
+        <label className="tool-btn upload-btn" title={t('tb.importPlan', 'Import a floor plan (JPG, PNG or PDF) — then calibrate the scale')}>
           <span className="tool-icon">📐</span>
           <span className="tool-label">Grundriss</span>
           <input
@@ -221,7 +221,7 @@ const Toolbar: React.FC<Props> = ({
             <button
               className={`tool-btn ${photoMode ? 'active' : ''}`}
               onClick={onTogglePhotoMode}
-              title="Foto-Modus (Render-Stil): die ganze 3D-Szene fotorealistisch zeigen – echte Scheinwerfer, Schatten, Bloom, volumetrische Lichtkegel & realistische Personen. (Das ist KEIN Kamera-Werkzeug.)"
+              title={t('tb.photoMode', 'Photo mode (render style): show the whole 3D scene photorealistically — real fixtures, shadows, bloom, volumetric beams and realistic people. (This is NOT a camera tool.)')}
             >
               <span className="tool-icon">📷</span>
               <span className="tool-label">Foto</span>
@@ -241,7 +241,7 @@ const Toolbar: React.FC<Props> = ({
               </label>
             )}
             {photoMode && (
-              <label className="heat-scale-label" title="Dunst / Haze – Lichtkegel sind nur im Dunst sichtbar (wie in echt)">
+              <label className="heat-scale-label" title={t('tb.haze', 'Haze — beams are only visible in haze (as in reality)')}>
                 <span>🌫</span>
                 <input
                   type="range"
@@ -285,7 +285,7 @@ const Toolbar: React.FC<Props> = ({
           className="tool-btn auto-btn"
           onClick={onAutoThreePointConfig}
           disabled={!hasPersons}
-          title="3-Punkt mit Leuchtenauswahl"
+          title={t('tb.threePoint', 'Three-point lighting with fixture choice')}
         >
           <span className="tool-icon">⚙</span>
           <span className="tool-label">Konfig.</span>
@@ -294,7 +294,7 @@ const Toolbar: React.FC<Props> = ({
           className="tool-btn auto-btn"
           onClick={onAutoDistribute}
           disabled={!hasArea}
-          title="Fläche ausleuchten – Seiten (N/O/S/W) & Ziel-Lux wählbar. Markierte Fläche: gezeichnetes Rechteck, Podest oder Personen."
+          title={t('tb.washArea', 'Light an area — pick sides (N/E/S/W) and target lux. The area is the selected rectangle, riser or group of people.')}
         >
           <span className="tool-icon">🔆</span>
           <span className="tool-label">Verteilen</span>
@@ -303,7 +303,7 @@ const Toolbar: React.FC<Props> = ({
           className="tool-btn"
           onClick={onGenerateCeiling}
           disabled={!hasWalls}
-          title="Decke automatisch über alle Wände erzeugen (reflektiert Licht)"
+          title={t('tb.autoCeiling', 'Create a ceiling over all walls automatically (it reflects light)')}
         >
           <span className="tool-icon">⬓</span>
           <span className="tool-label">Decke</span>
@@ -322,15 +322,15 @@ const Toolbar: React.FC<Props> = ({
           <span className="tool-icon">⫶</span>
           <span className="tool-label">Y-Align</span>
         </button>
-        <button className="tool-btn" onClick={onAlignZ} disabled={!multiSelected} title="Auf gleiche Höhe (Z) ausrichten">
+        <button className="tool-btn" onClick={onAlignZ} disabled={!multiSelected} title={t('tb.alignZ', 'Align to the same height (Z)')}>
           <span className="tool-icon">⭥</span>
-          <span className="tool-label">Z-Höhe</span>
+          <span className="tool-label">{t('tb.alignZShort', 'Z height')}</span>
         </button>
-        <button className="tool-btn" onClick={onDistributeH} disabled={!multiSelected} title="Markierte waagerecht gleichmäßig verteilen">
+        <button className="tool-btn" onClick={onDistributeH} disabled={!multiSelected} title={t('tb.distributeH', 'Distribute the selection evenly, horizontally')}>
           <span className="tool-icon">⋯</span>
           <span className="tool-label">H-Dist</span>
         </button>
-        <button className="tool-btn" onClick={onDistributeV} disabled={!multiSelected} title="Markierte senkrecht gleichmäßig verteilen">
+        <button className="tool-btn" onClick={onDistributeV} disabled={!multiSelected} title={t('tb.distributeV', 'Distribute the selection evenly, vertically')}>
           <span className="tool-icon">⋮</span>
           <span className="tool-label">V-Dist</span>
         </button>
@@ -347,9 +347,9 @@ const Toolbar: React.FC<Props> = ({
             </button>
             <button className="tool-btn" onClick={onUngroupSelection} title="Gruppierung aufheben">
               <span className="tool-icon">✂</span>
-              <span className="tool-label">Lösen</span>
+              <span className="tool-label">{t('tb.detach', 'Detach')}</span>
             </button>
-            <button className="tool-btn" onClick={() => onRotateSelection(-45)} title="45° gegen Uhrzeigersinn um Person drehen">
+            <button className="tool-btn" onClick={() => onRotateSelection(-45)} title={t('tb.rotateCcw', 'Rotate 45° counter-clockwise around the person')}>
               <span className="tool-icon">↺</span>
               <span className="tool-label">−45°</span>
             </button>
@@ -368,9 +368,9 @@ const Toolbar: React.FC<Props> = ({
       <div className="toolbar-spacer" />
 
       <div className="toolbar-group">
-        <button className="tool-btn" onClick={onOpenSchedule} title="Geräteliste, DMX-Patch & Stromberechnung">
+        <button className="tool-btn" onClick={onOpenSchedule} title={t('tb.schedule', 'Instrument schedule, DMX patch and power calculation')}>
           <span className="tool-icon">📋</span>
-          <span className="tool-label">Geräteliste</span>
+          <span className="tool-label">{t('tb.scheduleShort', 'Schedule')}</span>
         </button>
         <button className="tool-btn" onClick={onSaveProject} title="Projekt speichern">
           <span className="tool-icon">💾</span>

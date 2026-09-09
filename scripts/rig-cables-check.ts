@@ -196,7 +196,15 @@ const lampe = (
   assert.equal(zeile[4], NOT_SET, 'die fehlende Laenge wird zur Zahl');
   assert.ok(NOT_SET.length > 0, 'ohne Zeichen ist die Zelle leer und sagt nichts');
   assert.deepEqual(tb.header, [...CABLE_HEADERS]);
-  assert.ok(LENGTH_BASIS_NOTE.length > 80 && /Untergrenze/.test(LENGTH_BASIS_NOTE),
+  // „lower bound" statt „Untergrenze": der Satz ist mit E-28 (2026-09-09) in
+  // die Quellsprache Englisch gewandert. Der Test prueft weiter DIESELBE
+  // Aussage — dass die Laengen ausdruecklich als Untergrenze bezeichnet
+  // werden —, nur am englischen Wort.
+  //
+  // Die deutsche Fassung steht seither in `src/i18n/de.ts` unter
+  // `sch.cbl.basis` und wird dort von `i18n:check` verlangt; sie kann also
+  // nicht stillschweigend verschwinden.
+  assert.ok(LENGTH_BASIS_NOTE.length > 80 && /lower bound/.test(LENGTH_BASIS_NOTE),
     'die Grundlage der Laengen wird nicht genannt');
 }
 

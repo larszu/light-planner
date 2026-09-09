@@ -53,31 +53,36 @@ function wirdImportiert(datei: string): boolean {
 const aufrufe = (s: string) => [...s.matchAll(/\bt\(\s*'([^']+)'/g)].map((m) => m[1]);
 
 /**
- * Die englischen Schluessel.
+ * Die Schluessel der UEBERSETZUNG — seit E-28 ist das Deutsch.
  *
- * ZWEI FORMEN. Hier steht das Woerterbuch inline in `i18n/index.ts`. Die
- * Suite-Kopie (`av-planner-suite/apps/light-planner`) hat es dagegen in
- * Domaenen-Teildicts unter `i18n/en/` zerlegt und komponiert es per Spread --
- * dort steht in `index.ts` kein einziger Schluessel, sondern nur `...base,
- * ...topbar, …`.
+ * Bis zum 2026-09-09 stand hier `en`: Deutsch war die Quellsprache, Englisch
+ * die Uebersetzung. Mit der Drehung ist es umgekehrt, und dieser Check misst
+ * seither dasselbe in der anderen Richtung: hat jeder erreichbare Schluessel
+ * eine deutsche Fassung?
+ *
+ * ZWEI FORMEN. Hier steht das Woerterbuch in `i18n/de.ts`. Die Suite-Kopie
+ * (`av-planner-suite/apps/light-planner`) zerlegt es in Domaenen-Teildicts
+ * unter `i18n/de/` und komponiert per Spread -- dort steht in der Hauptdatei
+ * kein einziger Schluessel, sondern nur `...base, ...topbar, …`.
  *
  * Der Check liest deshalb beide Formen. Sonst haette er in der Suite ein
  * leeres Woerterbuch gesehen und JEDEN erreichbaren Schluessel als fehlend
  * gemeldet -- ein Guard, der in der einen Kopie das Falsche meldet, ist so
  * unbrauchbar wie einer, der schweigt.
  */
-const en = (() => {
+const uebersetzt = (() => {
   /** Schluessel -> die Datei(en), die ihn definieren. */
   const herkunft = new Map<string, string[]>();
   const merken = (k: string, f: string) => herkunft.set(k, [...(herkunft.get(k) ?? []), f]);
 
-  const s = readFileSync(join(SRC, 'i18n/index.ts'), 'utf8');
-  const m = /const en[^=]*=\s*\{([\s\S]*?)\n\};/.exec(s);
-  assert.ok(m, 'Das en-Woerterbuch wurde nicht gefunden — der Check prueft sonst nichts');
-  for (const x of m[1].matchAll(/^\s*'([^']+)':/gm)) merken(x[1], 'i18n/index.ts');
+  const hauptDatei = 'i18n/de.ts';
+  const s = readFileSync(join(SRC, hauptDatei), 'utf8');
+  const m = /const de[^=]*=\s*\{([\s\S]*?)\n\};/.exec(s);
+  assert.ok(m, 'Das de-Woerterbuch wurde nicht gefunden — der Check prueft sonst nichts');
+  for (const x of m[1].matchAll(/^\s*'([^']+)':/gm)) merken(x[1], hauptDatei);
   // Teildicts, falls vorhanden.
   for (const f of dateien) {
-    if (!/\/i18n\/en\/[^/]+\.ts$/.test(f)) continue;
+    if (!/\/i18n\/de\/[^/]+\.ts$/.test(f)) continue;
     for (const x of inhalt.get(f)!.matchAll(/^\s*'([^']+)':/gm)) merken(x[1], relative(SRC, f));
   }
 
@@ -101,7 +106,7 @@ const en = (() => {
   const keys = new Set(herkunft.keys());
   assert.ok(
     keys.size > 20,
-    `Nur ${keys.size} englische Schluessel gefunden — das Muster passt vermutlich nicht mehr, ` +
+    `Nur ${keys.size} deutsche Schluessel gefunden — das Muster passt vermutlich nicht mehr, ` +
       'und der Check wuerde gleich reihenweise Fehltreffer melden.',
   );
   return keys;
@@ -120,41 +125,25 @@ for (const [f, s] of inhalt) {
   else tot.push([relative(SRC, f), ks.length]);
 }
 
-// ── 1. Jeder erreichbare Schluessel hat eine englische Fassung ──────────────
-const fehlend = [...erreichbar].filter((k) => !en.has(k)).sort();
+// ── 1. Jeder erreichbare Schluessel hat eine deutsche Fassung ───────────────
+const fehlend = [...erreichbar].filter((k) => !uebersetzt.has(k)).sort();
 assert.deepEqual(
   fehlend,
   [],
-  `Ohne englische Fassung, obwohl die Stelle gerendert wird: ${fehlend.join(', ')}. ` +
+  `Ohne deutsche Fassung, obwohl die Stelle gerendert wird: ${fehlend.join(', ')}. ` +
     'Genau so entstand der Zustand, den dieser Check verhindert: uebersetzt wurde, ' +
-    'was tot ist, waehrend die sichtbare Oberflaeche deutsch blieb.',
+    'was tot ist, waehrend die sichtbare Oberflaeche in der Quellsprache blieb.',
 );
 
-// ── 2. Kein deutscher Fallback ist in Wahrheit englisch ─────────────────────
+// ── 2. (entfallen mit E-28) ────────────────────────────────────────────────
 //
-// Deutsch ist die QUELLSPRACHE und steht inline als Fallback. Steht dort ein
-// englisches Wort, sieht ein deutscher Nutzer Englisch -- und der Schalter
-// aendert daran nichts, weil der Fallback greift. Genau das war bei
-// `t('common.edit', 'Edit')` der Fall.
-const ENGLISCH = /^(Edit|Save|Cancel|Delete|Close|Import|Export|Code|Item|Model|New|Add|Search|Filter)$/;
-const englischeFallbacks: string[] = [];
-for (const [f, s] of inhalt) {
-  for (const m of s.matchAll(/\bt\(\s*'([^']+)'\s*,\s*'((?:[^'\\]|\\.)*)'/g)) {
-    if (ENGLISCH.test(m[2])) englischeFallbacks.push(`${relative(SRC, f)}: t('${m[1]}', '${m[2]}')`);
-  }
-}
-/** Woerter, die im Deutschen und Englischen wirklich gleich sind. */
-const GLEICH_ERLAUBT = new Set(['Code', 'Import', 'Export']);
-const echteEnglische = englischeFallbacks.filter((z) => {
-  const w = /'([^']+)'\)$/.exec(z)?.[1] ?? '';
-  return !GLEICH_ERLAUBT.has(w);
-});
-assert.deepEqual(
-  echteEnglische,
-  [],
-  `Englischer Text als deutsche Quellsprache: ${echteEnglische.join(' | ')}. ` +
-    'Der Sprachschalter hilft dagegen nicht — der Fallback greift in beiden Sprachen.',
-);
+// Hier stand: „kein deutscher Fallback ist in Wahrheit englisch". Die Frage
+// gibt es nicht mehr — seit der Drehung IST der Fallback englisch. Die
+// Gegenrichtung („steht deutscher Text ungewickelt herum?") misst
+// `lang:check` mit dem Sprachmix-Zaehler, und zwar gruendlicher: er sieht
+// auch, was gar nicht in `t()` steht. Diesen Abschnitt umzudrehen hiesse,
+// zwei Laeufe fuer dieselbe Frage zu fuehren — und zwei Laeufe fuer dieselbe
+// Frage laufen auseinander.
 
 // ── 3. Der Sprachschalter ist erreichbar ────────────────────────────────────
 //

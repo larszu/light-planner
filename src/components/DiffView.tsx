@@ -1,5 +1,6 @@
 import React from 'react';
 import { categoryCount, ALLE_KATEGORIEN, KATEGORIE_NAMEN, type CategoryDiff, type ProjectDiff } from '../core/diff';
+import { useTranslation } from '../i18n';
 
 // B-21, zweite Haelfte: die Liste stand hier ein zweites Mal und war um acht
 // Eintraege kuerzer als der Vergleich. Sie kommt jetzt aus `core/diff` —
@@ -34,7 +35,9 @@ const Section: React.FC<{ label: string; diff: CategoryDiff }> = ({ label, diff 
 };
 
 // Renders a full project diff grouped by category (added / removed / changed).
-const DiffView: React.FC<{ diff: ProjectDiff }> = ({ diff }) => (
+const DiffView: React.FC<{ diff: ProjectDiff }> = ({ diff }) => {
+  const { t } = useTranslation();
+  return (
   <>
     {CATS.map((c) => <Section key={c.key} label={c.label} diff={diff[c.key]} />)}
     {/* B-21: was sich geaendert hat, aber nicht aufgeschluesselt wird. Es zu
@@ -42,20 +45,23 @@ const DiffView: React.FC<{ diff: ProjectDiff }> = ({ diff }) => (
         zeigen, die es nicht ist — und er verwirft sie daraufhin. */}
     {diff.unnamed.length > 0 && (
       <div className="diff-cat">
-        <div className="diff-cat-head">Nicht aufgeschlüsselt</div>
+        <div className="diff-cat-head">{t('diff.unbroken', 'Not itemised')}</div>
         <div className="diff-item chg">
           <span className="diff-badge">~</span>
           <div className="diff-chg-body">
             <b>{diff.unnamed.join(', ')}</b>
             <span className="diff-field">
-              unterscheiden sich — für sie kennt dieser Vergleich noch keine Felder.
-              Das ist ein Hinweis an die Entwicklung, kein Zustand des Plans.
+              {t(
+                'diff.unbrokenHint',
+                'differ — this comparison does not know any fields for them yet. That is a note for development, not a state of the plan.',
+              )}
             </span>
           </div>
         </div>
       </div>
     )}
   </>
-);
+  );
+};
 
 export default DiffView;

@@ -77,36 +77,36 @@ const TopBar: React.FC<Props> = (p) => {
       <div className="topbar-left">
         <div className="brand-logo"><img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" draggable={false} /></div>
         <b className="brand-name">LightPlanner</b>
-        <span className="brand-proj">{p.projectName || t('top.untitled', 'Unbenannt')}</span>
+        <span className="brand-proj">{p.projectName || t('top.untitled', 'Untitled')}</span>
 
         <div className="tb-menuwrap">
-          <button className={`tb-icon ${open === 'menu' ? 'on' : ''}`} title={t('top.menu', 'Menü')}
+          <button className={`tb-icon ${open === 'menu' ? 'on' : ''}`} title={t('top.menu', 'Menu')}
             onClick={() => setOpen(open === 'menu' ? null : 'menu')}><Icon name="menu" /></button>
           {open === 'menu' && (
             <div className="tb-dropdown">
-              <div className="tb-dd-sec">{t('top.file', 'Datei')}</div>
-              <button className="tb-dd-item" onClick={run(p.onNew)}><Icon name="plus" size={15} />{t('top.new', 'Neu')}<kbd>{t('top.kbdNew', 'Strg N')}</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onSave)}><Icon name="save" size={15} />{t('top.saveBrowser', 'Speichern (Browser)')}<kbd>{t('top.kbdSave', 'Strg S')}</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onLoad)}><Icon name="open" size={15} />{t('top.loadBrowser', 'Laden (Browser)…')}</button>
+              <div className="tb-dd-sec">{t('top.file', 'File')}</div>
+              <button className="tb-dd-item" onClick={run(p.onNew)}><Icon name="plus" size={15} />{t('top.new', 'New')}<kbd>{t('top.kbdNew', 'Ctrl N')}</kbd></button>
+              <button className="tb-dd-item" onClick={run(p.onSave)}><Icon name="save" size={15} />{t('top.saveBrowser', 'Save (browser)')}<kbd>{t('top.kbdSave', 'Ctrl S')}</kbd></button>
+              <button className="tb-dd-item" onClick={run(p.onLoad)}><Icon name="open" size={15} />{t('top.loadBrowser', 'Load (browser)…')}</button>
               <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onSaveToFile)}><Icon name="export" size={15} />{t('top.saveFile', 'Projekt als Datei…')}</button>
-              <button className="tb-dd-item" onClick={run(p.onLoadFromFile)}><Icon name="import" size={15} />{t('top.loadFile', 'Projekt aus Datei…')}</button>
+              <button className="tb-dd-item" onClick={run(p.onSaveToFile)}><Icon name="export" size={15} />{t('top.saveFile', 'Project to file…')}</button>
+              <button className="tb-dd-item" onClick={run(p.onLoadFromFile)}><Icon name="import" size={15} />{t('top.loadFile', 'Open project file…')}</button>
               <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onExportAvplan)} title={t('top.exportAvplanHint', 'Gesamtprojekt (Raum + Licht + Kameras + Verkabelung) verlustfrei exportieren — von allen drei Apps lesbar, fremde Daten bleiben erhalten')}><Icon name="export" size={15} />{t('top.exportAvplan', 'Gesamtprojekt exportieren (.avplan)…')}</button>
-              <button className="tb-dd-item" onClick={run(p.onImportAvplan)} title={t('top.importAvplanHint', 'Gesamtprojekt (.avplan) importieren — Licht wird bearbeitbar geladen, Kamera-/Verkabelungs-Daten bleiben verlustfrei erhalten')}><Icon name="import" size={15} />{t('top.importAvplan', 'Gesamtprojekt importieren (.avplan)…')}</button>
+              <button className="tb-dd-item" onClick={run(p.onExportAvplan)} title={t('top.exportAvplanHint', 'Export the whole project (venue + light + cameras + cabling) losslessly — readable by all three apps, foreign data is preserved')}><Icon name="export" size={15} />{t('top.exportAvplan', 'Export whole project (.avplan)…')}</button>
+              <button className="tb-dd-item" onClick={run(p.onImportAvplan)} title={t('top.importAvplanHint', 'Import a whole project (.avplan) — light is loaded editable, camera/cabling data is preserved losslessly')}><Icon name="import" size={15} />{t('top.importAvplan', 'Import whole project (.avplan)…')}</button>
               <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onExportVenue)} title={t('top.exportVenueHint', 'Geteilten Raum (Wände, Bühne, Personen, Floor-Plan) exportieren — importierbar im MultiCam-Planner')}><Icon name="export" size={15} />{t('top.exportVenue', 'Venue exportieren (.venue.json)…')}</button>
-              <button className="tb-dd-item" onClick={run(p.onImportVenue)} title={t('top.importVenueHint', 'Geteilten Raum importieren — ersetzt Wände, Bühne, Personen, Floor-Plan; Lampen bleiben')}><Icon name="import" size={15} />{t('top.importVenue', 'Venue importieren…')}</button>
+              <button className="tb-dd-item" onClick={run(p.onExportVenue)} title={t('top.exportVenueHint', 'Export the shared venue (walls, stage, people, floor plan) — importable in MultiCam Planner')}><Icon name="export" size={15} />{t('top.exportVenue', 'Export venue (.venue.json)…')}</button>
+              <button className="tb-dd-item" onClick={run(p.onImportVenue)} title={t('top.importVenueHint', 'Import a shared venue — replaces walls, stage, people and floor plan; fixtures stay')}><Icon name="import" size={15} />{t('top.importVenue', 'Import venue…')}</button>
               <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onExportPlot)}><Icon name="schedule" size={15} />{t('top.printPlot', 'Lichtplan drucken (PDF, Titelblock + Legende)…')}</button>
-              <button className="tb-dd-item" onClick={run(() => p.onExport('png'))}>{t('top.exportPng', 'Export als PNG…')}</button>
-              <button className="tb-dd-item" onClick={run(() => p.onExport('jpg'))}>{t('top.exportJpg', 'Export als JPG…')}</button>
-              <button className="tb-dd-item" onClick={run(() => p.onExport('pdf'))}>{t('top.exportPdf', 'Export als PDF (Bild)…')}</button>
-              <div className="tb-dd-sec">{t('top.edit', 'Bearbeiten')}</div>
-              <button className="tb-dd-item" onClick={run(p.onUndo)}><Icon name="undo" size={15} />{t('top.undo', 'Rückgängig')}<kbd>{t('top.kbdUndo', 'Strg Z')}</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onRedo)}><Icon name="redo" size={15} />{t('top.redo', 'Wiederholen')}<kbd>{t('top.kbdRedo', 'Strg Y')}</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onChanges)}><Icon name="tag" size={15} />{t('top.changes', 'Verlauf & Änderungen…')}</button>
-              <button className="tb-dd-item" onClick={run(p.onVersions)}><Icon name="layers" size={15} />{t('top.versions', 'Versionen & Vergleich…')}</button>
+              <button className="tb-dd-item" onClick={run(p.onExportPlot)}><Icon name="schedule" size={15} />{t('top.printPlot', 'Print light plot (PDF, title block + legend)…')}</button>
+              <button className="tb-dd-item" onClick={run(() => p.onExport('png'))}>{t('top.exportPng', 'Export as PNG…')}</button>
+              <button className="tb-dd-item" onClick={run(() => p.onExport('jpg'))}>{t('top.exportJpg', 'Export as JPG…')}</button>
+              <button className="tb-dd-item" onClick={run(() => p.onExport('pdf'))}>{t('top.exportPdf', 'Export as PDF (image)…')}</button>
+              <div className="tb-dd-sec">{t('top.edit', 'Edit')}</div>
+              <button className="tb-dd-item" onClick={run(p.onUndo)}><Icon name="undo" size={15} />{t('top.undo', 'Undo')}<kbd>{t('top.kbdUndo', 'Ctrl Z')}</kbd></button>
+              <button className="tb-dd-item" onClick={run(p.onRedo)}><Icon name="redo" size={15} />{t('top.redo', 'Redo')}<kbd>{t('top.kbdRedo', 'Ctrl Y')}</kbd></button>
+              <button className="tb-dd-item" onClick={run(p.onChanges)}><Icon name="tag" size={15} />{t('top.changes', 'History & changes…')}</button>
+              <button className="tb-dd-item" onClick={run(p.onVersions)}><Icon name="layers" size={15} />{t('top.versions', 'Versions & comparison…')}</button>
               <div className="tb-dd-div" />
               {/* B-13, letzter Schritt. Der Schalter lag bisher NUR in
                   `MenuBar.tsx` -- einer Datei, die niemand importiert und die
@@ -121,109 +121,109 @@ const TopBar: React.FC<Props> = (p) => {
               <button className="tb-dd-item" onClick={run(() => setLanguage(language === 'de' ? 'en' : 'de'))}>
                 <span className="tb-glyph">🌐</span>
                 {/* Der Knopf nennt das ZIEL, nicht den aktuellen Zustand. */}
-                {language === 'de' ? t('top.langToEn', 'Sprache: English') : t('top.langToDe', 'Language: Deutsch')}
+                {language === 'de' ? t('top.langToEn', 'Language: English') : t('top.langToDe', 'Language: Deutsch')}
               </button>
               <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onAbout)}><Icon name="info" size={15} />{t('top.about', 'Über LightPlanner')}</button>
+              <button className="tb-dd-item" onClick={run(p.onAbout)}><Icon name="info" size={15} />{t('top.about', 'About LightPlanner')}</button>
             </div>
           )}
         </div>
       </div>
 
       {/* ── center: mode switch ── */}
-      <div className="tb-modeswitch" role="tablist" aria-label={t('top.view', 'Ansicht')}>
-        <button className={m === '2d' ? 'on' : ''} onClick={() => p.onSetMode('2d')}><Icon name="plan2d" size={15} />{t('top.plan2d', '2D-Plan')}</button>
+      <div className="tb-modeswitch" role="tablist" aria-label={t('top.view', 'View')}>
+        <button className={m === '2d' ? 'on' : ''} onClick={() => p.onSetMode('2d')}><Icon name="plan2d" size={15} />{t('top.plan2d', '2D plan')}</button>
         <button className={m === '3d' ? 'on' : ''} onClick={() => p.onSetMode('3d')}><Icon name="cube3d" size={15} />{t('top.view3d', '3D')}</button>
-        <button className={m === 'photo' ? 'on' : ''} onClick={() => p.onSetMode('photo')} title={t('top.renderHint', 'Render: fotorealistische Vorschau der 3D-Szene (echte Scheinwerfer, Schatten, Lichtkegel, realistische Personen)')}><Icon name="photo" size={15} />{t('top.render', 'Render')}</button>
+        <button className={m === 'photo' ? 'on' : ''} onClick={() => p.onSetMode('photo')} title={t('top.renderHint', 'Render: photoreal preview of the 3D scene (real fixtures, shadows, beams, realistic people)')}><Icon name="photo" size={15} />{t('top.render', 'Render')}</button>
       </div>
 
       {/* ── right: display toggles, render settings, actions ── */}
       <div className="topbar-right">
-        <button className={`tb-icon ${p.showHeatMap ? 'on' : ''}`} title={t('top.heatmap', 'Heatmap (Beleuchtungsstärke einfärben)')} onClick={p.onToggleHeatMap}><Icon name="heatmap" /></button>
+        <button className={`tb-icon ${p.showHeatMap ? 'on' : ''}`} title={t('top.heatmap', 'Heat-map (colour by illuminance)')} onClick={p.onToggleHeatMap}><Icon name="heatmap" /></button>
 
         <div className="tb-menuwrap">
-          <button className={`tb-icon ${open === 'render' ? 'on' : ''}`} title={t('top.displaySettings', 'Anzeige & Render-Einstellungen')}
+          <button className={`tb-icon ${open === 'render' ? 'on' : ''}`} title={t('top.displaySettings', 'Display & render settings')}
             onClick={() => setOpen(open === 'render' ? null : 'render')}><Icon name="settings" /></button>
           {open === 'render' && (
             <div className="tb-dropdown tb-render">
               {(p.viewMode === '3d' && p.photoMode) ? (
                 <>
                   <div className="tb-dd-sec">{t('top.render', 'Render')}</div>
-                  <label className="tb-slider"><span>{t('top.exposure', 'Belichtung')}</span>
+                  <label className="tb-slider"><span>{t('top.exposure', 'Exposure')}</span>
                     <input type="range" min={0.2} max={3} step={0.05} value={p.exposure} onChange={(e) => p.onExposureChange(+e.target.value)} />
                     <em>{p.exposure.toFixed(2)}</em></label>
-                  <label className="tb-slider"><span>{t('top.ambience', 'Ambiente')}</span>
+                  <label className="tb-slider"><span>{t('top.ambience', 'Ambience')}</span>
                     <input type="range" min={0} max={1.5} step={0.05} value={p.ambience} onChange={(e) => p.onAmbienceChange(+e.target.value)} />
                     <em>{Math.round(p.ambience * 100)}%</em></label>
-                  <label className="tb-slider"><span>{t('top.haze', 'Dunst / Haze')}</span>
+                  <label className="tb-slider"><span>{t('top.haze', 'Haze')}</span>
                     <input type="range" min={0} max={1} step={0.02} value={p.haze} onChange={(e) => p.onHazeChange(+e.target.value)} />
                     <em>{Math.round(p.haze * 100)}%</em></label>
-                  <button className="tb-dd-item" onClick={p.onToggleBeams}><Icon name="beam" size={15} />{t('top.beams', 'Lichtkegel')}<span className={`tb-check ${p.showBeams ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
-                  <div className="tb-dd-sec">{t('top.floor', 'Boden')}</div>
+                  <button className="tb-dd-item" onClick={p.onToggleBeams}><Icon name="beam" size={15} />{t('top.beams', 'Beams')}<span className={`tb-check ${p.showBeams ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
+                  <div className="tb-dd-sec">{t('top.floor', 'Floor')}</div>
                   <div className="tb-chips">
                     {FLOOR_PRESETS.map((fp) => (
                       <button key={fp.id} className={`tb-chip ${p.floor.preset === fp.id ? 'on' : ''}`}
                         onClick={() => p.onFloorChange({ preset: fp.id as FloorPresetId, color: fp.defaultColor })}>{fp.label}</button>
                     ))}
                   </div>
-                  <label className="tb-slider"><span>{t('top.floorColor', 'Bodenfarbe')}</span>
+                  <label className="tb-slider"><span>{t('top.floorColor', 'Floor colour')}</span>
                     <input type="color" value={p.floor.color} onChange={(e) => p.onFloorChange({ ...p.floor, color: e.target.value })} />
                     <em>{floorPreset(p.floor.preset).label}</em></label>
                 </>
               ) : (
-                <div className="tb-hint">{t('top.renderOnlyHint', 'Belichtung, Boden & Lichtkegel erscheinen nur im Render-Modus.')}</div>
+                <div className="tb-hint">{t('top.renderOnlyHint', 'Exposure, floor and beams appear in Render mode only.')}</div>
               )}
               {p.showHeatMap && (
                 <>
-                  <div className="tb-dd-sec">{t('top.heatmapSection', 'Heatmap')}</div>
-                  <label className="tb-slider"><span>{t('top.scaleMax', 'Skala max')}</span>
+                  <div className="tb-dd-sec">{t('top.heatmapSection', 'Heat-map')}</div>
+                  <label className="tb-slider"><span>{t('top.scaleMax', 'Scale max')}</span>
                     <input type="number" min={10} max={100000} step={10} value={p.heatMapScale} onChange={(e) => p.onHeatMapScaleChange(+e.target.value)} />
                     <em>lx</em></label>
-                  <label className="tb-slider"><span>{t('top.target', 'Zielwert')}</span>
+                  <label className="tb-slider"><span>{t('top.target', 'Target')}</span>
                     <input type="number" min={0} max={100000} step={10} value={p.heatMapTarget} onChange={(e) => p.onHeatMapTargetChange(+e.target.value)} />
                     <em>lx</em></label>
                 </>
               )}
-              <div className="tb-dd-sec">{t('top.sun', 'Sonne / Tageslicht')}</div>
-              <button className="tb-dd-item" onClick={() => p.onSunChange({ ...p.sun, enabled: !p.sun.enabled })} title={t('top.sunHint', 'Echte Sonne: Tageslicht & Schatten aus Standort, Datum und Uhrzeit – fällt durch Fenster in den Raum.')}>
-                <span className="tb-glyph">☀</span>{t('top.sunOn', 'Sonne aktiv')}<span className={`tb-check ${p.sun.enabled ? 'on' : ''}`}><Icon name="check" size={13} /></span>
+              <div className="tb-dd-sec">{t('top.sun', 'Sun / daylight')}</div>
+              <button className="tb-dd-item" onClick={() => p.onSunChange({ ...p.sun, enabled: !p.sun.enabled })} title={t('top.sunHint', 'Real sun: daylight & shadows from location, date and time – falls through windows into the room.')}>
+                <span className="tb-glyph">☀</span>{t('top.sunOn', 'Sun active')}<span className={`tb-check ${p.sun.enabled ? 'on' : ''}`}><Icon name="check" size={13} /></span>
               </button>
               {p.sun.enabled && (
                 <>
-                  <label className="tb-slider"><span>{t('top.date', 'Datum')}</span>
+                  <label className="tb-slider"><span>{t('top.date', 'Date')}</span>
                     <input type="date" value={p.sun.date} onChange={(e) => p.onSunChange({ ...p.sun, date: e.target.value })} /></label>
-                  <label className="tb-slider"><span>{t('top.time', 'Uhrzeit')}</span>
+                  <label className="tb-slider"><span>{t('top.time', 'Time')}</span>
                     <input type="time" value={p.sun.time} onChange={(e) => p.onSunChange({ ...p.sun, time: e.target.value })} /></label>
-                  <label className="tb-slider"><span>{t('top.latitude', 'Breite')}</span>
+                  <label className="tb-slider"><span>{t('top.latitude', 'Latitude')}</span>
                     <input type="number" min={-90} max={90} step={0.5} value={p.sun.latitude} onChange={(e) => p.onSunChange({ ...p.sun, latitude: +e.target.value })} /><em>°</em></label>
-                  <label className="tb-slider"><span>{t('top.longitude', 'Länge')}</span>
+                  <label className="tb-slider"><span>{t('top.longitude', 'Longitude')}</span>
                     <input type="number" min={-180} max={180} step={0.5} value={p.sun.longitude} onChange={(e) => p.onSunChange({ ...p.sun, longitude: +e.target.value })} /><em>°</em></label>
-                  <label className="tb-slider"><span>{t('top.north', 'Norden ↻')}</span>
+                  <label className="tb-slider"><span>{t('top.north', 'North ↻')}</span>
                     <input type="range" min={0} max={359} step={1} value={p.sun.northDeg} onChange={(e) => p.onSunChange({ ...p.sun, northDeg: +e.target.value })} /><em>{Math.round(p.sun.northDeg)}°</em></label>
-                  <label className="tb-slider"><span>{t('top.intensity', 'Intensität')}</span>
+                  <label className="tb-slider"><span>{t('top.intensity', 'Intensity')}</span>
                     <input type="number" min={0} max={120000} step={1000} value={p.sun.intensity} onChange={(e) => p.onSunChange({ ...p.sun, intensity: +e.target.value })} /><em>lx</em></label>
                   <div className="tb-hint">{p.sunInfo
-                    ? t('top.sunPos', 'Sonnenstand: {alt}° über dem Horizont · Azimut {az}° (0 = N). Fällt durch Fenster in den Raum.')
+                    ? t('top.sunPos', 'Sun position: {alt}° above the horizon · azimuth {az}° (0 = N). Falls through windows into the room.')
                         .replace('{alt}', p.sunInfo.altitudeDeg.toFixed(0))
                         .replace('{az}', p.sunInfo.azimuthDeg.toFixed(0))
-                    : t('top.sunBelow', 'Sonne steht unter dem Horizont – kein direktes Tageslicht.')}</div>
+                    : t('top.sunBelow', 'The sun is below the horizon – no direct daylight.')}</div>
                 </>
               )}
               <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={p.onToggleSnap}><Icon name="snap" size={15} />{t('top.snap', 'Einrasten')}<span className={`tb-check ${p.snapStep > 0 ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
-              <button className="tb-dd-item" onClick={p.onToggleFocusNotes} title={t('top.focusNotesHint', 'Fokus-Notizen je Scheinwerfer im 2D-Plan einblenden')}><Icon name="tag" size={15} />{t('top.focusNotes', 'Fokus-Notizen (Plan)')}<span className={`tb-check ${p.showFocusNotes ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
+              <button className="tb-dd-item" onClick={p.onToggleSnap}><Icon name="snap" size={15} />{t('top.snap', 'Snap')}<span className={`tb-check ${p.snapStep > 0 ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
+              <button className="tb-dd-item" onClick={p.onToggleFocusNotes} title={t('top.focusNotesHint', 'Show per-fixture focus notes in the 2D plan')}><Icon name="tag" size={15} />{t('top.focusNotes', 'Focus notes (plan)')}<span className={`tb-check ${p.showFocusNotes ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
             </div>
           )}
         </div>
 
-        <button className="tb-icon" title={t('top.importFloorPlan', 'Grundriss importieren (JPG/PNG/PDF)')} onClick={() => fileRef.current?.click()}><Icon name="import" /></button>
+        <button className="tb-icon" title={t('top.importFloorPlan', 'Import floor plan (JPG/PNG/PDF)')} onClick={() => fileRef.current?.click()}><Icon name="import" /></button>
         <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) p.onUploadFloorPlan(f); e.target.value = ''; }} />
 
         <span className="tb-div" />
-        <button className="tb-btn" onClick={p.onOpenSchedule}><Icon name="schedule" size={15} />{t('top.schedule', 'Geräteliste')}</button>
+        <button className="tb-btn" onClick={p.onOpenSchedule}><Icon name="schedule" size={15} />{t('top.schedule', 'Schedule')}</button>
         <button className="tb-btn" onClick={() => p.onExport('png')}><Icon name="export" size={15} />{t('top.export', 'Export')}</button>
-        <button className="tb-btn primary" onClick={p.onSave}><Icon name="save" size={15} />{t('top.save', 'Speichern')}</button>
+        <button className="tb-btn primary" onClick={p.onSave}><Icon name="save" size={15} />{t('top.save', 'Save')}</button>
       </div>
     </header>
   );

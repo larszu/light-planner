@@ -54,11 +54,30 @@ jobs:
         run: npm run storage:check
       - name: i18n — erreichbare Oberflaeche uebersetzt
         run: npm run i18n:check
-      # Quellsprache (E-17/E-20): dieses Repo ist deutsch-quellig, und das
-      # steht nicht nur da, es wird gemessen. Die Ausgabe nennt abweichende
-      # Zeilen NAMENTLICH — deshalb ein eigener Schritt.
-      - name: Quellsprache — Fallbacks sind deutsch
+      # Quellsprache (E-28): dieses Repo ist ENGLISCH-quellig, und das steht
+      # nicht nur da, es wird gemessen. Die Ausgabe nennt abweichende Zeilen
+      # NAMENTLICH — deshalb ein eigener Schritt.
+      - name: Quellsprache — Fallbacks sind englisch
         run: npm run lang:check
+
+      # WARUM DIESER SCHRITT NEU IST, und warum er ausgerechnet hier auffiel.
+      #
+      # Die CI hat bisher gebaut, aber nie typgeprueft. Vite baut mit esbuild
+      # und wirft Typen weg, ohne sie anzusehen — ein `Cannot find name 't'`
+      # kommt durch den Build und faellt erst im Browser auf.
+      #
+      # Dazu kam eine zweite Falle: `npx tsc --noEmit` OHNE `-p` prueft in
+      # diesem Repo NICHTS. Die Wurzel-`tsconfig.json` ist ein Solution-Root
+      # mit `"files": []` und zwei Referenzen; tsc nimmt die leere Dateiliste
+      # und meldet Erfolg. Genau so ist beim Sprachwechsel eine Datei mit
+      # einem echten Typfehler als „0 Fehler" durchgegangen — der Fehler war
+      # da, der Befehl hat nur nicht hingesehen.
+      #
+      # Deshalb hier mit `-p tsconfig.app.json`, und deshalb als eigener
+      # Schritt: ein Typfehler soll seinen eigenen roten Haken bekommen und
+      # nicht in der Bau-Ausgabe untergehen.
+      - name: Typen (tsconfig.app.json — die Wurzel-tsconfig prueft nichts)
+        run: npx tsc -p tsconfig.app.json --noEmit
 
       # Nutzer-Rueckmeldung 2026-09-07: "die ui ist nicht konsistent. lege
       # globale ui regeln fest die fuer alle repos gelten." Die Regeln stehen
