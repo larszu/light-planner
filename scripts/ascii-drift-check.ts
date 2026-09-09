@@ -56,7 +56,13 @@ const HARMLOS = new Set(
   [
     // Deutsch mit echter Vokalfolge
     'neu', 'neue', 'neuer', 'neues', 'neuen', 'aktuell', 'aktuelle', 'aktuellem',
-    'manuell', 'manuelle', 'lebensdauer', 'dauer', 'schauen', 'quelle',
+    'manuell', 'manuelle', 'lebensdauer', 'dauer', 'schauen',
+    // 2026-09-09: „Zuschauer" kam mit `orderAccess.ts` dazu. Zu-schauen, nicht
+    // „Zuschueren" — die Silbengrenze faellt zwischen u und e, genau wie bei
+    // „schauen" und „Lebensdauer" darueber. Der Waechter wurde rot an einer
+    // richtigen Aenderung; deshalb steht das Wort hier und nicht der Umlaut
+    // im Quelltext.
+    'zuschauer', 'quelle',
     'quellen', 'steuer', 'steuerung', 'sequenz', 'frequenz', 'zuerst', 'quer',
     'aktuellen', 'aktueller', 'aktuelles', 'aktuell',
     // Englisch, Bezeichner und Farben, die als Text auftauchen
