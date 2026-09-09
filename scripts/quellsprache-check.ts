@@ -298,20 +298,56 @@ if (abweichend.length) {
   process.exit(1);
 }
 
+// Die Gegenprobe zum Messwerkzeug selbst — an fester Probe, nicht am Repo.
+//
+// WARUM NICHT AM REPO. Der naheliegende Weg waere eine Untergrenze auf der
+// Zahl der gefundenen Texte („mindestens 100"). Der Wert davon faellt aber
+// genau dann, wenn die Arbeit gelingt: je mehr gewickelt ist, desto weniger
+// ungewickelter Text bleibt uebrig. Eine solche Schwelle muesste bei jedem
+// Fortschritt nachgezogen werden und waere nach dem zweiten Nachziehen nur
+// noch Zierrat. Die gemessene Zahl steht deshalb in der Ausgabe (152 am
+// 2026-09-09) — als Angabe, nicht als Schwelle.
+//
+// Die Probe dagegen ist unabhaengig von der Repo-Groesse und haelt genau die
+// Fehlformen fest, die diesen Zaehler Zeit gekostet haben: der Kommentar als
+// Literal, das Vergleichs-`>` als Tag-Ende, die Rueckfrage im Backtick. Ohne
+// sie waere ein kaputtes Muster die gefaehrlichste Art gruen: es findet
+// nichts, und Nichts sieht hier aus wie ein Ergebnis.
+const PROBE = [
+  '<button title="Delete this cable">',
+  '<span>Not connected yet</span>',
+  'window.confirm(`Delete "${name}" and its ${n} shots?`)',
+  // Die beiden Kommentar-Zeilen tragen mit Absicht Muster, die OHNE den
+  // Kommentarfilter treffen wuerden — eine ohne waere wirkungslos: was kein
+  // `>` und kein `title=` enthaelt, findet der Zaehler ohnehin nicht, und die
+  // Probe belegte dann nichts.
+  '// title="Legacy tooltip, no longer shown"',
+  '/* <b>Old markup left in a comment</b> */',
+  'if (a.length > 2) return b < c',
+  'const n = a>b ? 1 : 2; const m = c<d',
+  "t('cable.remove', 'Delete this cable')",
+].join('\n');
+
+// Sortiert verglichen: in welcher Reihenfolge Attribute, Rueckfragen und
+// Textknoten herausfallen, ist eine Eigenschaft der Schleifen und keine
+// Zusicherung — ein Waechter, der bei einer umgestellten Schleife anschlaegt,
+// meldet Fehlalarme.
+assert.deepEqual(
+  sichtbareTexte(PROBE, true).slice().sort(),
+  [
+    'Delete "${name}" and its ${n} shots?',
+    'Delete this cable',
+    'Not connected yet',
+  ].sort(),
+  'Die Probe des Sprachmix-Musters schlaegt fehl: es findet entweder echte ' +
+    'Beschriftungen nicht mehr oder wieder Kommentare und Quelltext. Beides ' +
+    'macht die gemeldete Null wertlos.',
+);
+
 const { funde: mix, gesehen } = messeSprachmix(erklaert);
 console.log(
   `Sprachmix: ${mix.length} ungewickelte Zeichenkette(n) in der anderen Sprache ` +
     `(Grenze ${MIX_GRENZE}, ${gesehen} sichtbare Texte geprueft).`,
-);
-
-// Die Gegenprobe zur Null: ein kaputtes Tag-Muster findet ebenfalls nichts und
-// meldete dann Erfolg — die gefaehrlichste Art gruen. Gemessen am 2026-09-09:
-// 152 sichtbare Texte. Die Schwelle liegt weit darunter und soll den
-// Totalausfall fangen, nicht bei jeder Umformulierung anschlagen.
-assert.ok(
-  gesehen >= 100,
-  `Nur ${gesehen} sichtbare Texte gefunden (erwartet: >= 100). Das Attribut- ` +
-    'oder das JSX-Muster ist kaputt — die Null oben bedeutet dann nichts.',
 );
 
 if (mix.length > MIX_GRENZE) {
