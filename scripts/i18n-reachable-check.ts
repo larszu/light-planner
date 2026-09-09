@@ -60,10 +60,19 @@ const aufrufe = (s: string) => [...s.matchAll(/\bt\(\s*'([^']+)'/g)].map((m) => 
  * seither dasselbe in der anderen Richtung: hat jeder erreichbare Schluessel
  * eine deutsche Fassung?
  *
- * ZWEI FORMEN. Hier steht das Woerterbuch in `i18n/de.ts`. Die Suite-Kopie
- * (`av-planner-suite/apps/light-planner`) zerlegt es in Domaenen-Teildicts
- * unter `i18n/de/` und komponiert per Spread -- dort steht in der Hauptdatei
- * kein einziger Schluessel, sondern nur `...base, ...topbar, …`.
+ * EINE FORM, seit dem 2026-09-09 auch in der Suite-Kopie. Das Woerterbuch
+ * steht in `i18n/de.ts`, ein Schluessel je Zeile.
+ *
+ * Vorher zerlegte die Suite-Kopie das ENGLISCHE Woerterbuch in sechs
+ * Domaenen-Teildicts unter `i18n/en/` (base, topbar, panels, app, dialogs,
+ * inventory) und komponierte per Spread; dieser Check musste beide Formen
+ * kennen. Mit der Drehung sind die Teildicts weggefallen — der englische
+ * Text steht jetzt an der Aufrufstelle. Der Schnitt nach Domaenen haette
+ * sich sonst fuer Deutsch wiederholt und fuer jede weitere Sprache noch
+ * einmal.
+ *
+ * Der Zweig fuer die Teildicts bleibt trotzdem stehen: er kostet nichts und
+ * faengt eine Kopie ab, die spaeter wieder so gebaut wird.
  *
  * Der Check liest deshalb beide Formen. Sonst haette er in der Suite ein
  * leeres Woerterbuch gesehen und JEDEN erreichbaren Schluessel als fehlend
@@ -229,7 +238,7 @@ for (const [f, s] of inhalt) {
 ohneT.sort((a, b) => b[1] - a[1]);
 const stellenGesamt = ohneT.reduce((n, [, v]) => n + v, 0);
 
-console.log(`✓ i18n: alle ${erreichbar.size} erreichbaren Schluessel haben eine englische Fassung`);
+console.log(`✓ i18n: alle ${erreichbar.size} erreichbaren Schluessel haben eine deutsche Fassung`);
 if (tot.length) {
   console.log('  nicht gerendert, aber uebersetzt (B-13):');
   for (const [f, n] of tot) console.log(`    ${f} — ${n} t()-Aufrufe`);

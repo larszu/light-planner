@@ -109,7 +109,7 @@ export function klassifiziere(roh: string): 'de' | 'en' | null {
  * geteiltes Exemplar bei der zweiten Datei mitten im Text weitersuchen wuerde.
  */
 export const fallbackMuster = () =>
-  /\b(?:t|translate)\(\s*(?:[A-Za-z]+\s*,\s*)?(['"])[^'"]+\1\s*,\s*(['"])((?:[^\\]|\\.)*?)\2/g;
+  /\b(?:t|tr|translate)\(\s*(?:[A-Za-z]+\s*,\s*)?(['"])[^'"]+\1\s*,\s*(['"])((?:[^\\]|\\.)*?)\2(?=\s*[,)])/g;
 
 function alleDateien(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
