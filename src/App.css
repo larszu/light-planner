@@ -1241,6 +1241,96 @@ kbd {
   border-color: var(--accent);
 }
 
+
+/* ── Schieberegler ─────────────────────────────────────────────────────────
+ *
+ * Nutzer-Meldung 2026-09-09: „Passe auch die Ui von allen slidern an sodass
+ * man sie gut bedienen kann."
+ *
+ * WAS VORHER DASTAND: nichts ausser `accent-color`. Damit blieb das
+ * Aussehen des Browsers stehen — und dessen Regler ist in WebKit rund
+ * 16 px hoch, mit einem Griff, den man auf einem Tablet suchen muss.
+ *
+ * WCAG 2.2, Erfolgskriterium 2.5.8 („Target Size (Minimum)", Stufe AA) nennt
+ * 24 px als Mindestmass fuer eine Trefferflaeche; Apples Richtlinie 44 pt.
+ *
+ * WAS SICH AENDERT, und warum in dieser Reihenfolge:
+ *
+ *  1. Das ELEMENT wird 24 px hoch — nicht die Bahn. Die Bahn bleibt schmal
+ *     (6 px) und wird in die Mitte gezeichnet; die restlichen 18 px sind
+ *     unsichtbare Trefferflaeche. Ein dicker Balken waere die naheliegende
+ *     und falsche Loesung: er wuerde jede Zeile sprengen, in der ein Regler
+ *     neben einer Beschriftung sitzt.
+ *  2. Der Griff wird 18 px — und bleibt ECKIG. Ein runder Griff mitten in
+ *     einer eckigen Oberflaeche waere ein Fremdkoerper; das Haus legt
+ *     „keine Rundungen" fest, und `brand:check` haelt es fest.
+ *  3. `touch-action: manipulation` nimmt die 300-ms-Wartezeit auf
+ *     Doppeltipp weg. Ohne sie fuehlt sich jeder Regler auf einem Tablet
+ *     traege an, und zwar unabhaengig von seiner Groesse.
+ *  4. Ein sichtbarer Fokusring. Der Regler ist mit Pfeiltasten bedienbar —
+ *     das war er vorher auch, nur sah man nicht, wann er dran ist.
+ *
+ * Firefox braucht seine eigenen Pseudo-Elemente; ohne sie bleibt es dort
+ * beim Standardaussehen, und die Messung staende nur fuer einen Browser.
+ */
+/* Ein Selektor, nicht zwei: `input[type="range"]` und `input[type='range']`
+   sind dasselbe — die Anfuehrungsart gehoert zum Selektor-Text und nicht zum
+   HTML. Der erste Anlauf schrieb beide hin, was nichts nuetzt und den
+   Waechter die Regel nicht finden liess. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 24px;            /* Trefferflaeche, nicht Bahnhoehe */
+  background: transparent; /* die Bahn zeichnen die Pseudo-Elemente */
+  outline: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border: 2px solid var(--panel-alt);
+  /* Der Griff sitzt auf der Bahn, nicht daneben: (6 px Bahn - 18 px Griff)
+     / 2 = -6 px, plus 1 px Rahmen der Bahn. */
+  margin-top: -7px;
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border: 2px solid var(--panel-alt);
+  cursor: pointer;
+}
+/* Der Fokusring als OUTLINE und nicht als Schatten, und das ist keine
+   Geschmacksfrage: `brand:check` verbietet `box-shadow` (ADR-007, „keine
+   Schatten") und verlangt fuer den Fokus `outline: 2px solid var(--signal)`
+   mit `outline-offset: 3px`. Der erste Anlauf hier war ein Schatten am
+   Griff — der Waechter hat ihn zurueckgewiesen, und der Ring am ganzen
+   Element ist ohnehin der bessere: er zeigt, dass DER REGLER dran ist,
+   nicht nur sein Griff. */
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+}
+input[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .slider-row {
   grid-template-columns: 1fr 45px;
 }
