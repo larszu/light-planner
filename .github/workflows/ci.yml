@@ -75,6 +75,14 @@ jobs:
       - name: Zoom bleibt im Canvas (kein passives preventDefault)
         run: npm run zoom:check
 
+      # Die Canvas-Steuerung ist dieselbe wie im cable-planner: Zug auf leerer
+      # Flaeche schiebt, Shift+Zug zieht den Rahmen, Shift/Ctrl/Meta waehlen
+      # additiv. Vorher war es hier andersherum, und der Nutzer nannte es
+      # ausdruecklich als den Grund, warum sich die beiden Planer verschieden
+      # anfuehlten.
+      - name: Canvas-Steuerung wie im cable-planner
+        run: npm run canvas:check
+
       # WARUM DIESER SCHRITT NEU IST, und warum er ausgerechnet hier auffiel.
       #
       # Die CI hat bisher gebaut, aber nie typgeprueft. Vite baut mit esbuild

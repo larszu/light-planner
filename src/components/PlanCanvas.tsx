@@ -143,6 +143,16 @@ const PlanCanvas: React.FC<Props> = ({
     planOrigY?: number;
     additive?: boolean;
     pendingSelectId?: string;
+    /**
+     * Ein Schub, der auf leerer Flaeche im Auswahl-Werkzeug begann.
+     *
+     * Er braucht das Flag, weil ein Klick ohne Bewegung dort weiterhin die
+     * Auswahl aufheben muss — vorher erledigte das der Rahmen-Zweig, der
+     * genau dafuer eine Mindest-Strecke von 0,15 m pruefte. Das Hand-Werkzeug,
+     * die mittlere Maustaste und die Leertaste setzen es NICHT: wer bewusst
+     * schiebt, will seine Auswahl behalten.
+     */
+    deselectOnClick?: boolean;
   } | null>(null);
   const measureEndRef = useRef<{ x: number; y: number } | null>(null);
   const marqueeEndRef = useRef<{ x: number; y: number } | null>(null);
@@ -1252,6 +1262,16 @@ const PlanCanvas: React.FC<Props> = ({
       draw();
       return;
     }
+    if (activeTool === 'marquee') {
+      // Das Werkzeug fuer die Finger. Seit ein Zug auf leerer Flaeche schiebt,
+      // braucht der Rahmen Shift — und die gibt es auf einem Tablet nicht.
+      // Ohne diesen Zweig waere die Rahmen-Auswahl fuer Touch-Bedienung mit
+      // der Umstellung verschwunden, und zwar unbemerkt.
+      marqueeEndRef.current = { x: wx, y: wy };
+      dragRef.current = { type: 'marquee', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy,
+        additive: e.shiftKey || e.ctrlKey || e.metaKey };
+      return;
+    }
     if (activeTool === 'measure') {
       measureEndRef.current = { x: wx, y: wy };
       dragRef.current = { type: 'draw-measure', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy };
@@ -1267,7 +1287,12 @@ const PlanCanvas: React.FC<Props> = ({
     }
 
     if (activeTool === 'select') {
-      const ctrl = e.ctrlKey || e.metaKey;
+      // Additive Auswahl auf Shift UND Ctrl/Meta — dieselbe Belegung wie im
+      // cable-planner (`multiSelectionKeyCode={['Shift','Control','Meta']}`).
+      // Dort steht als Begruendung, warum Shift dazugehoert: sonst wechselt
+      // man staendig den Modifier zwischen "Rahmen ziehen" und "noch eines
+      // dazu waehlen".
+      const ctrl = e.shiftKey || e.ctrlKey || e.metaKey;
       // A layer that is hidden or locked is not pickable.
       const pickable = (k: keyof Layers) => layers[k].visible && !layers[k].locked;
       // Check aim-point handles first (only for selected fixture)
@@ -1439,9 +1464,33 @@ const PlanCanvas: React.FC<Props> = ({
           return;
         }
       }
-      // Empty space → start a box / marquee selection
-      marqueeEndRef.current = { x: wx, y: wy };
-      dragRef.current = { type: 'marquee', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy, additive: ctrl };
+      // ── Leere Flaeche ────────────────────────────────────────────────
+      //
+      // HIER LAG DER UNTERSCHIED, den der Nutzer gemeldet hat: "in light
+      // planner gibt es verschieben und auswahl. bei cable planner und
+      // multicam planner ist die canvas steuerung intuitiver."
+      //
+      // Vorher zog ein einfacher Zug auf leerer Flaeche einen AUSWAHLRAHMEN.
+      // Wer die Zeichnung verschieben wollte, musste erst das Hand-Werkzeug
+      // waehlen oder die Leertaste halten — zwei Zustaende fuer das, was in
+      // den beiden anderen Planern eine Geste ist. Der cable-planner setzt
+      // `panOnDrag` auf `true` und legt den Rahmen auf Shift
+      // (`selectionKeyCode='Shift'`); genau diese Belegung steht jetzt hier.
+      //
+      // Warum herum und nicht andersherum: Schieben ist die Geste, die man
+      // in einem Plan hundertmal macht, Rahmenziehen ein paar Mal. Die
+      // haeufigere gehoert auf die Geste ohne Taste.
+      //
+      // Das Hand-Werkzeug, die mittlere Maustaste und die Leertaste bleiben
+      // unveraendert — wer sie gewohnt ist, merkt nichts.
+      if (e.shiftKey) {
+        marqueeEndRef.current = { x: wx, y: wy };
+        dragRef.current = { type: 'marquee', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy,
+          additive: e.ctrlKey || e.metaKey };
+        return;
+      }
+      dragRef.current = { type: 'pan', startScreenX: sx, startScreenY: sy, startWorldX: wx, startWorldY: wy,
+        origOffsetX: viewRef.current.offsetX, origOffsetY: viewRef.current.offsetY, deselectOnClick: true };
     }
   };
 
@@ -1616,6 +1665,13 @@ const PlanCanvas: React.FC<Props> = ({
         if (w > 0.3 && h > 0.3) onAddStageElement(x0, y0, w, h);
         else onAddStageElement(d.startWorldX, d.startWorldY);
         measureEndRef.current = null;
+      }
+      // Klick auf leere Flaeche, ohne zu ziehen → Auswahl aufheben. Dieselbe
+      // Schwelle (0,15 m) wie beim Rahmen, damit ein Zittern der Hand nicht
+      // als Schub durchgeht und die Auswahl stehen bleibt.
+      if (d.type === 'pan' && d.deselectOnClick
+        && Math.hypot(ewx - d.startWorldX, ewy - d.startWorldY) < 0.15) {
+        onSelect(null);
       }
       if (d.type === 'marquee') {
         const x0 = Math.min(d.startWorldX, ewx), x1 = Math.max(d.startWorldX, ewx);

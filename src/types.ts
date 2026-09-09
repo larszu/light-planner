@@ -404,7 +404,18 @@ export interface Truss {
   label: string;
 }
 
-export type Tool = 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'stagepoly' | 'truss' | 'wall' | 'camera';
+/**
+ * Die Werkzeuge der 2D-Ansicht.
+ *
+ * `marquee` kam 2026-09-09 dazu, zusammen mit der Umstellung der
+ * Canvas-Steuerung auf die Belegung des cable-planners (Zug schiebt,
+ * Shift+Zug zieht den Rahmen). Der Grund ist das Tablet: dort gibt es keine
+ * Shift-Taste, und ohne dieses Werkzeug waere der Auswahlrahmen mit der
+ * Umstellung fuer Touch-Bedienung verschwunden. `pan` bleibt aus dem
+ * gespiegelten Grund — es schiebt auch dann, wenn der Finger auf einem
+ * Objekt landet.
+ */
+export type Tool = 'select' | 'pan' | 'marquee' | 'rect' | 'line' | 'measure' | 'person' | 'stage' | 'stagepoly' | 'truss' | 'wall' | 'camera';
 export type ViewMode = '2d' | '3d';
 
 export interface ViewTransform {
