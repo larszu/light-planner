@@ -425,6 +425,13 @@ body {
 
 .plan-canvas {
   display: block;
+  /* Die Pinch-Geste gehoert dem Plan, nicht dem Browser.
+     Ohne `touch-action: none` faengt der Browser Zwei-Finger-Gesten auf
+     Tablets ab, BEVOR ein Ereignis im Programm ankommt — dann nuetzt auch
+     der nicht-passive Radhandler in `PlanCanvas.tsx` nichts mehr, und die
+     ganze Website zoomt statt des Canvas. Die beiden gehoeren zusammen;
+     `zoom:check` haelt beide Haelften fest. */
+  touch-action: none;
 }
 
 .cursor-lux-display {
