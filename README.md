@@ -109,17 +109,22 @@ argument to point a script somewhere else.
 
 Electron · React · TypeScript · Three.js · Vite · electron-builder.
 
-**Source language:** `de`. The German string in `t('key', 'Deutsche Form')` is
+**Source language:** `en`. The English string in `t('key', 'English text')` is
 the source text — it is what appears when a key has no translation, so it is
-the text a contributor writes first. English lives in the dictionary under
-`src/i18n/`.
+the text a contributor writes first. Translations live under `src/i18n/`, one
+file per language (`de.ts` today).
 
-This is a property of *this repository*, decided on 2026-09-08 (E-17/E-20):
-`cable-planner` is German-source as well, `multicam-planner` and
-`sony-camera-bridge` are English-source. Turning the direction around later
-means touching every string again for no visible gain, so it is not a
-formatting preference — `npm run lang:check` measures the fallbacks and fails
-on any line in the other language, and the machine-readable copy of this
+**Decided on 2026-09-09 (E-28), and it replaces E-17/E-20:** *every* repository
+in the suite is English-source. German is the first translation; further
+languages of the target audience follow. Before E-28 the source language was a
+property of each repository — this one and `cable-planner` were German-source —
+which meant a German-only contributor and an English-only one wrote in
+different places depending on the repo.
+
+Adding a language touches no logic: drop a `src/i18n/<code>.ts` next to `de.ts`,
+register it in `src/i18n/index.ts`, done. `npm run lang:check` measures the
+fallbacks, fails on any line in the other language, and separately counts
+visible text that was never wrapped at all. The machine-readable copy of this
 declaration sits in `package.json` under `avplan.sourceLanguage`.
 
 ---

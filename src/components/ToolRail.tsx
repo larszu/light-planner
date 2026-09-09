@@ -26,21 +26,21 @@ type TFn = (key: string, de: string) => string;
 
 const groupsFor = (t: TFn): Group[] => [
   [
-    { id: 'select', icon: 'select', label: t('tool.select', 'Auswahl'), hint: t('tool.select.hint', 'Auswählen & bewegen — V') },
-    { id: 'pan', icon: 'pan', label: t('tool.pan', 'Ansicht'), hint: t('tool.pan.hint', 'Ansicht verschieben — Leertaste/H') },
+    { id: 'select', icon: 'select', label: t('tool.select', 'Select'), hint: t('tool.select.hint', 'Select & move — V') },
+    { id: 'pan', icon: 'pan', label: t('tool.pan', 'Pan'), hint: t('tool.pan.hint', 'Pan the view — space/H') },
   ],
   [
-    { id: 'person', icon: 'person', label: t('tool.person', 'Person'), hint: t('tool.person.hint', 'Person platzieren') },
-    { id: 'stage', icon: 'podium', label: t('tool.stage', 'Podest'), hint: t('tool.stage.hint', 'Podest (rechteckig) zeichnen') },
-    { id: 'stagepoly', icon: 'stage', label: t('tool.stagepoly', 'Bühne'), hint: t('tool.stagepoly.hint', 'Bühne als Polygon zeichnen') },
-    { id: 'truss', icon: 'truss', label: t('tool.truss', 'Traverse'), hint: t('tool.truss.hint', 'Traverse ziehen') },
-    { id: 'wall', icon: 'wall', label: t('tool.wall', 'Wand'), hint: t('tool.wall.hint', 'Wand-Pfad zeichnen') },
-    { id: 'camera', icon: 'camera', label: t('tool.camera', 'Kamera'), hint: t('tool.camera.hint', 'Kamera-Standpunkt setzen (kein Foto-Modus)') },
+    { id: 'person', icon: 'person', label: t('tool.person', 'Person'), hint: t('tool.person.hint', 'Place a person') },
+    { id: 'stage', icon: 'podium', label: t('tool.stage', 'Riser'), hint: t('tool.stage.hint', 'Draw a rectangular riser') },
+    { id: 'stagepoly', icon: 'stage', label: t('tool.stagepoly', 'Stage (polygon)'), hint: t('tool.stagepoly.hint', 'Draw a stage as a polygon') },
+    { id: 'truss', icon: 'truss', label: t('tool.truss', 'Truss'), hint: t('tool.truss.hint', 'Drag a truss') },
+    { id: 'wall', icon: 'wall', label: t('tool.wall', 'Wall'), hint: t('tool.wall.hint', 'Draw a wall path') },
+    { id: 'camera', icon: 'camera', label: t('tool.camera', 'Camera'), hint: t('tool.camera.hint', 'Set a camera position (not photo mode)') },
   ],
   [
-    { id: 'rect', icon: 'rect', label: t('tool.rect', 'Rechteck'), hint: t('tool.rect.hint', 'Rechteck / Markierung zeichnen') },
-    { id: 'line', icon: 'line', label: t('tool.line', 'Linie'), hint: t('tool.line.hint', 'Linie zeichnen') },
-    { id: 'measure', icon: 'measure', label: t('tool.measure', 'Messen'), hint: t('tool.measure.hint', 'Strecke messen') },
+    { id: 'rect', icon: 'rect', label: t('tool.rect', 'Rectangle'), hint: t('tool.rect.hint', 'Draw a rectangle / marker') },
+    { id: 'line', icon: 'line', label: t('tool.line', 'Line'), hint: t('tool.line.hint', 'Draw a line') },
+    { id: 'measure', icon: 'measure', label: t('tool.measure', 'Measure'), hint: t('tool.measure.hint', 'Measure a distance') },
   ],
 ];
 
@@ -48,7 +48,7 @@ const ToolRail: React.FC<Props> = ({ activeTool, onToolChange }) => {
   const { t } = useTranslation();
   const GROUPS = groupsFor(t);
   return (
-  <nav className="toolrail" role="toolbar" aria-label={t('tool.rail', 'Werkzeuge')}>
+  <nav className="toolrail" role="toolbar" aria-label={t('tool.rail', 'Tools')}>
     {GROUPS.map((group, gi) => (
       <React.Fragment key={gi}>
         {gi > 0 && <div className="toolrail-div" />}

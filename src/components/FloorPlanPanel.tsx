@@ -40,13 +40,13 @@ const FloorPlanPanel: React.FC<Props> = ({
     <div className={`floorplan-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="fp-header">
         <span className="fp-title" title={floorPlan.name}>
-          📐 {floorPlan.name || t('panel.floor.title', 'Grundriss')}
+          📐 {floorPlan.name || t('panel.floor.title', 'Floor plan')}
         </span>
         <div className="fp-header-actions">
-          <button className="fp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Aufklappen') : t('panel.collapse', 'Einklappen')}>
+          <button className="fp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Expand') : t('panel.collapse', 'Collapse')}>
             {collapsed ? '▸' : '▾'}
           </button>
-          <button className="fp-icon-btn fp-close" onClick={onRemove} title={t('panel.floor.remove', 'Grundriss entfernen')}>✕</button>
+          <button className="fp-icon-btn fp-close" onClick={onRemove} title={t('panel.floor.remove', 'Remove floor plan')}>✕</button>
         </div>
       </div>
 
@@ -55,7 +55,7 @@ const FloorPlanPanel: React.FC<Props> = ({
           {/* Multi-page PDF navigation */}
           {pages > 1 && (
             <div className="fp-row fp-pages">
-              <span>{t('panel.floor.page', 'Seite')}</span>
+              <span>{t('panel.floor.page', 'Page')}</span>
               <div className="fp-page-nav">
                 <button
                   className="fp-step-btn"
@@ -81,7 +81,7 @@ const FloorPlanPanel: React.FC<Props> = ({
               📏 Maßstab kalibrieren
             </button>
             <div className="fp-row">
-              <span>{t('panel.floor.width', 'Breite')}</span>
+              <span>{t('panel.floor.width', 'Width')}</span>
               <div className="fp-input-unit">
                 <input
                   type="number"
@@ -96,11 +96,11 @@ const FloorPlanPanel: React.FC<Props> = ({
               </div>
             </div>
             <div className="fp-row fp-derived">
-              <span>{t('panel.floor.height', 'Höhe')}</span>
+              <span>{t('panel.floor.height', 'Height')}</span>
               <span>{floorPlan.heightMeters.toFixed(2)} m</span>
             </div>
             <div className="fp-row fp-derived">
-              <span>{t('panel.floor.scale', 'Maßstab')}</span>
+              <span>{t('panel.floor.scale', 'Scale')}</span>
               <span>{pxPerM.toFixed(0)} px/m</span>
             </div>
           </div>
@@ -127,7 +127,7 @@ const FloorPlanPanel: React.FC<Props> = ({
               </div>
             </div>
             <div className="fp-row">
-              <span>{t('panel.floor.opacity', 'Deckkraft')}</span>
+              <span>{t('panel.floor.opacity', 'Opacity')}</span>
               <input
                 className="fp-opacity"
                 type="range" min={0.1} max={1} step={0.05}
@@ -137,7 +137,7 @@ const FloorPlanPanel: React.FC<Props> = ({
               <span className="fp-opacity-val">{Math.round(floorPlan.opacity * 100)}%</span>
             </div>
             <label className="fp-row fp-lock">
-              <span>{t('panel.floor.lock', 'Sperren')}</span>
+              <span>{t('panel.floor.lock', 'Lock')}</span>
               <input
                 type="checkbox"
                 checked={floorPlan.locked}

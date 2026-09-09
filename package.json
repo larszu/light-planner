@@ -2,7 +2,7 @@
   "name": "light-planner",
   "private": true,
   "avplan": {
-    "sourceLanguage": "de"
+    "sourceLanguage": "en"
   },
   "version": "1.0.0",
   "type": "module",

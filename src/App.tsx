@@ -792,7 +792,7 @@ const App: React.FC = () => {
       setProjectMeta(meta);
       setProjectDialogMode(null);
     } catch (err) {
-      window.alert(`Projekt konnte nicht gespeichert werden:\n${err instanceof Error ? err.message : err}`);
+      window.alert(`${t('app.saveFailed', 'Could not save the project:')}\n${err instanceof Error ? err.message : err}`);
     }
   }, [fixtures, shapes, persons, stageElements, customFixtures, fixtureGroups, trusses, walls, ceilings, scenes, workNotes, dmxProtocol, phaseTemplate, cameras, layers, floor, sun, floorPlan, projectId]);
 
@@ -1028,7 +1028,7 @@ const App: React.FC = () => {
   const handleNew = useCallback(() => {
     const hasContent = fixtures.length || persons.length || stageElements.length
       || trusses.length || walls.length || ceilings.length || shapes.length || !!floorPlan;
-    if (hasContent && !window.confirm('Neues Projekt anlegen? Nicht gespeicherte Änderungen am aktuellen Projekt gehen verloren.')) return;
+    if (hasContent && !window.confirm(t('app.newConfirm', 'Start a new project? Unsaved changes to the current project will be lost.'))) return;
     const now = new Date().toISOString();
     handleLoadProject({
       meta: { name: 'Neues Projekt', author: '', version: '1.0', createdAt: now, updatedAt: now },
@@ -1079,7 +1079,7 @@ const App: React.FC = () => {
         setPlanMode('none');
       })
       .catch((err) => {
-        window.alert(`Grundriss konnte nicht geladen werden:\n${err?.message ?? err}`);
+        window.alert(`${t('app.floorPlanFailed', 'Could not load the floor plan:')}\n${err?.message ?? err}`);
       });
   }, []);
 
@@ -1279,7 +1279,7 @@ const App: React.FC = () => {
   const planPxPerMeterRef = useRef(40);
   const handleExportPlot = useCallback(async () => {
     const srcCanvas = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
-    if (viewMode !== '2d' || !srcCanvas) { window.alert('Lichtplan-Druck: bitte in der 2D-Plan-Ansicht ausführen.'); return; }
+    if (viewMode !== '2d' || !srcCanvas) { window.alert(t('app.printNeeds2d', 'Printing the light plan: please do this from the 2D plan view.')); return; }
     // Stand-Angabe fuer das Blatt (ADR-004). Fuer den PLAN-Ausdruck zaehlen
     // auch Positionen — sie sind darauf zu sehen; eine verschobene Leuchte
     // macht ein anderes Blatt. Der Vergleichswert kommt aus dem juengsten
@@ -1381,7 +1381,7 @@ const App: React.FC = () => {
       const data = raw as ProjectData;
       handleLoadProject(data);
     } catch (err) {
-      window.alert(`Projektdatei konnte nicht geladen werden:\n${err instanceof Error ? err.message : err}`);
+      window.alert(`${t('app.openFailed', 'Could not load the project file:')}\n${err instanceof Error ? err.message : err}`);
     }
   }, [handleLoadProject, host]);
 
@@ -1667,7 +1667,7 @@ const App: React.FC = () => {
               onViewChange={(s) => { planPxPerMeterRef.current = s; }}
             />
           ) : (
-            <Suspense fallback={<div className="loading-3d">{t('app.loading3d', '3D-Ansicht wird geladen…')}</div>}>
+            <Suspense fallback={<div className="loading-3d">{t('app.loading3d', 'Loading the 3D view…')}</div>}>
               <Scene3D
                 ref={scene3DRef}
                 fixtures={fixtures}
@@ -1716,32 +1716,32 @@ const App: React.FC = () => {
           />
           {fixtureToPlace && viewMode === '2d' && (
             <div className="placing-hint">
-              {t('app.placePre', 'Klicke auf den Plan um')} <strong>{fixtureToPlace.name}</strong> {t('app.placePost', 'zu platzieren · ESC zum Abbrechen')}
+              {t('app.placePre', 'Click the plan to place')} <strong>{fixtureToPlace.name}</strong> {t('app.placePost', '· ESC to cancel')}
             </div>
           )}
           {activeTool === 'wall' && viewMode === '2d' && (
             <div className="placing-hint">
-              🧱 <strong>{t('app.wallPath', 'Wand-Pfad')}</strong>{t('app.wallPathHint', ': Punkte nacheinander klicken · Startpunkt klicken schließt den Raum ·')} <kbd>Shift</kbd> {t('app.wallPathAngle', '= 15°-Winkel · Doppelklick/')}<kbd>ESC</kbd> {t('app.ends', 'beendet')}
+              🧱 <strong>{t('app.wallPath', 'Wall path')}</strong>{t('app.wallPathHint', ': click points one after another · clicking the first point closes the room ·')} <kbd>Shift</kbd> {t('app.wallPathAngle', '= 15° angles · double-click/')}<kbd>ESC</kbd> {t('app.ends', 'ends it')}
             </div>
           )}
           {activeTool === 'stagepoly' && viewMode === '2d' && (
             <div className="placing-hint">
-              ⬠ <strong>{t('app.stagePoly', 'Bühne (Polygon)')}</strong>{t('app.stagePolyHint', ': Eckpunkte klicken · Startpunkt klicken oder Doppelklick/')}<kbd>Enter</kbd> {t('app.stagePolyClose', 'schließt die Fläche ·')} <kbd>ESC</kbd> {t('app.cancels', 'bricht ab')}
+              ⬠ <strong>{t('app.stagePoly', 'Stage (polygon)')}</strong>{t('app.stagePolyHint', ': click the corners · click the first point or double-click/')}<kbd>Enter</kbd> {t('app.stagePolyClose', 'closes the shape ·')} <kbd>ESC</kbd> {t('app.cancels', 'cancels')}
             </div>
           )}
           {activeTool === 'camera' && viewMode === '2d' && (
             <div className="placing-hint">
-              🎥 <strong>{t('app.camera', 'Kamera')}</strong>{t('app.cameraHint', ': Klicke, um eine Kamera zu setzen · dann Blickziel & Bildwinkel einstellen und „Durch Kamera schauen"')}
+              🎥 <strong>{t('app.camera', 'Camera')}</strong>{t('app.cameraHint', ': click to place a camera · then set its target & field of view and use „Look through camera"')}
             </div>
           )}
           {planMode === 'calibrate' && viewMode === '2d' && (
             <div className="placing-hint plan-calibrate-hint">
-              📏 {t('app.calibratePre', 'Ziehe eine Linie entlang einer')} <strong>{t('app.calibrateKnown', 'bekannten Strecke')}</strong> {t('app.calibratePost', '(z. B. eine Wand) · ESC zum Abbrechen')}
+              📏 {t('app.calibratePre', 'Drag a line along a')} <strong>{t('app.calibrateKnown', 'known distance')}</strong> {t('app.calibratePost', '(e.g. a wall) · ESC to cancel')}
             </div>
           )}
           {planMode === 'move' && viewMode === '2d' && (
             <div className="placing-hint plan-calibrate-hint">
-              ✋ {t('app.movePlan', 'Ziehe den Grundriss, um ihn auszurichten · ESC zum Beenden')}
+              ✋ {t('app.movePlan', 'Drag the floor plan to align it · ESC to finish')}
             </div>
           )}
           {floorPlan && viewMode === '2d' && (
@@ -1907,10 +1907,10 @@ const App: React.FC = () => {
       <button
         type="button"
         onClick={() => setInventoryOpen(true)}
-        title={t('app.inventoryTitle', 'Lager / Bestand')}
+        title={t('app.inventoryTitle', 'Inventory / stock')}
         style={{ position: 'fixed', bottom: 16, left: 16, zIndex: 150, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 999, cursor: 'pointer' }}
       >
-        <Icon name="library" size={16} /> {t('app.inventory', 'Lager')}
+        <Icon name="library" size={16} /> {t('app.inventory', 'Inventory')}
       </button>
       {inventoryOpen && <InventoryDialog onClose={() => setInventoryOpen(false)} />}
     </div>

@@ -30,7 +30,7 @@ const LayersPanel: React.FC<Props> = ({ layers, counts, onToggleVisible, onToggl
     <div className={`layers-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="lp-header">
         <span className="lp-title">🗂 Ebenen</span>
-        <button className="lp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Aufklappen') : t('panel.collapse', 'Einklappen')}>
+        <button className="lp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Expand') : t('panel.collapse', 'Collapse')}>
           {collapsed ? '▸' : '▾'}
         </button>
       </div>
@@ -44,12 +44,12 @@ const LayersPanel: React.FC<Props> = ({ layers, counts, onToggleVisible, onToggl
                 <button
                   className="lp-eye"
                   onClick={() => onToggleVisible(key)}
-                  title={l.visible ? t('panel.layers.hide', 'Ausblenden') : t('panel.layers.show', 'Einblenden')}
+                  title={l.visible ? t('panel.layers.hide', 'Hide') : t('panel.layers.show', 'Show')}
                 >{l.visible ? '👁' : '🚫'}</button>
                 <button
                   className={`lp-lock ${l.locked ? 'on' : ''}`}
                   onClick={() => onToggleLocked(key)}
-                  title={l.locked ? t('panel.layers.unlock', 'Entsperren') : t('panel.layers.lock', 'Sperren (nicht auswählbar)')}
+                  title={l.locked ? t('panel.layers.unlock', 'Unlock') : t('panel.layers.lock', 'Lock (not selectable)')}
                 >{l.locked ? '🔒' : '🔓'}</button>
                 <span className="lp-name"><span className="lp-ico">{icon}</span>{label}</span>
                 <span className="lp-count">{n}</span>

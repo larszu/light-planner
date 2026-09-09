@@ -57,16 +57,16 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal three-point-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{t('dlg.3pt.title', '3-Punkt-Beleuchtung konfigurieren')}</h3>
+        <h3>{t('dlg.3pt.title', 'Configure three-point lighting')}</h3>
         <p className="dialog-hint">
-          {t('dlg.3pt.hint', 'Beleuchtung im Stil eines Kameramanns: Key definiert die Helligkeit, Fill wird über das Kontrastverhältnis berechnet, Back als Akzent.')}
+          {t('dlg.3pt.hint', 'Lighting the way a cinematographer would: the key sets the brightness, the fill follows from the contrast ratio, the back light is the accent.')}
         </p>
 
         {/* Target Lux */}
         <div className="three-point-role">
-          <div className="three-point-role-label">🎯 {t('dlg.3pt.goal', 'Beleuchtungsziel')}</div>
+          <div className="three-point-role-label">🎯 {t('dlg.3pt.goal', 'Lighting target')}</div>
           <div className="three-point-dim">
-            <span>{t('dlg.3pt.keyTarget', 'Key-Ziel')}</span>
+            <span>{t('dlg.3pt.keyTarget', 'Key target')}</span>
             <input type="number" min={0} max={100000} step={10}
               value={localTargetLux}
               onChange={(e) => setLocalTargetLux(Number(e.target.value))}
@@ -76,38 +76,38 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
           </div>
           <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
             {useTargetMode
-              ? t('dlg.3pt.dimmedTo', 'Key wird auf {key} lx gedimmt, Fill auf {fill} lx')
+              ? t('dlg.3pt.dimmedTo', 'Key is dimmed to {key} lx, fill to {fill} lx')
                   .replace('{key}', String(localTargetLux))
                   .replace('{fill}', String(Math.round(localTargetLux / contrastRatio)))
-              : t('dlg.3pt.manual', 'Manuell: Key-Dimmer wird direkt verwendet')}
+              : t('dlg.3pt.manual', 'Manual: the key dimmer is used as set')}
           </div>
         </div>
 
         {/* Position: truss + distance so throws aren't random */}
         <div className="three-point-role">
-          <div className="three-point-role-label">📐 {t('dlg.3pt.position', 'Position der Leuchten')}</div>
+          <div className="three-point-role-label">📐 {t('dlg.3pt.position', 'Fixture positions')}</div>
           <select value={trussId} onChange={(e) => setTrussId(e.target.value)}>
-            <option value="">{t('dlg.3pt.freePos', 'Freie Position (kein Truss)')}</option>
+            <option value="">{t('dlg.3pt.freePos', 'Free position (no truss)')}</option>
             {trusses.map((tr, i) => (
-              <option key={tr.id} value={tr.id}>{tr.label || `${t('dlg.3pt.trussN', 'Traverse')} ${i + 1}`} · h={tr.height} m</option>
+              <option key={tr.id} value={tr.id}>{tr.label || `${t('dlg.3pt.trussN', 'Truss')} ${i + 1}`} · h={tr.height} m</option>
             ))}
           </select>
           <label className="three-point-dim" style={{ marginTop: 6 }}>
-            <span>{t('dlg.3pt.distance', 'Abstand zur Person')}</span>
+            <span>{t('dlg.3pt.distance', 'Distance to the person')}</span>
             <input type="range" min={1.5} max={12} step={0.5} value={distance}
               onChange={(e) => setDistance(Number(e.target.value))} />
             <span className="dim-val">{distance.toFixed(1)} m</span>
           </label>
           <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
             {trussId
-              ? t('dlg.3pt.onTruss', 'Key & Fill werden auf den Truss gesetzt (gleiche Höhe & saubere Abstände). Back bleibt hinter der Person.')
-              : t('dlg.3pt.noTruss', 'Ohne Truss: Key/Fill stehen im eingestellten Abstand zur Person (statt zufällig).')}
+              ? t('dlg.3pt.onTruss', 'Key and fill go onto the truss (same height, clean spacing). The back light stays behind the person.')
+              : t('dlg.3pt.noTruss', 'Without a truss: key and fill stand at the distance set here (instead of at random).')}
           </div>
         </div>
 
         {/* Contrast Ratio */}
         <div className="three-point-role">
-          <div className="three-point-role-label">⚖ {t('dlg.3pt.ratio', 'Kontrastverhältnis (Key : Fill)')}</div>
+          <div className="three-point-role-label">⚖ {t('dlg.3pt.ratio', 'Contrast ratio (key : fill)')}</div>
           <select value={contrastRatio}
             onChange={(e) => setContrastRatio(Number(e.target.value))}>
             {CONTRAST_PRESETS.map((p) => (
@@ -115,7 +115,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
             ))}
           </select>
           <div className="three-point-dim" style={{ marginTop: 6 }}>
-            <span>{t('dlg.3pt.backStrength', 'Back-Stärke')}</span>
+            <span>{t('dlg.3pt.backStrength', 'Back strength')}</span>
             <input type="range" min={0.3} max={2.0} step={0.1}
               value={backRatio}
               onChange={(e) => setBackRatio(Number(e.target.value))} />
@@ -125,7 +125,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
 
         {/* Fixture selectors */}
         <div className="three-point-role">
-          <div className="three-point-role-label">🔆 {t('dlg.3pt.key', 'Key (Hauptlicht)')}</div>
+          <div className="three-point-role-label">🔆 {t('dlg.3pt.key', 'Key (main light)')}</div>
           <select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
             {fixtureLibrary.map((f) => (
               <option key={f.id} value={f.id}>{f.name} ({f.manufacturer}) – {f.beamAngle}°</option>
@@ -142,7 +142,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
         </div>
 
         <div className="three-point-role">
-          <div className="three-point-role-label">🌤 {t('dlg.3pt.fill', 'Fill (Fülllicht)')}</div>
+          <div className="three-point-role-label">🌤 {t('dlg.3pt.fill', 'Fill')}</div>
           <select value={fillId} onChange={(e) => setFillId(e.target.value)}>
             {fixtureLibrary.map((f) => (
               <option key={f.id} value={f.id}>{f.name} ({f.manufacturer}) – {f.beamAngle}°</option>
@@ -150,28 +150,28 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
           </select>
           <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
             {useTargetMode
-              ? t('dlg.3pt.calcLux', 'Dimmer wird berechnet: ~{lx} lx')
+              ? t('dlg.3pt.calcLux', 'Dimmer is calculated: ~{lx} lx')
                   .replace('{lx}', String(Math.round(localTargetLux / contrastRatio)))
-              : t('dlg.3pt.calcRatio', 'Dimmer wird berechnet: Key/{ratio}')
+              : t('dlg.3pt.calcRatio', 'Dimmer is calculated: key/{ratio}')
                   .replace('{ratio}', String(contrastRatio))}
           </div>
         </div>
 
         <div className="three-point-role">
-          <div className="three-point-role-label">✨ {t('dlg.3pt.back', 'Back (Spitzlicht)')}</div>
+          <div className="three-point-role-label">✨ {t('dlg.3pt.back', 'Back (rim light)')}</div>
           <select value={backId} onChange={(e) => setBackId(e.target.value)}>
             {fixtureLibrary.map((f) => (
               <option key={f.id} value={f.id}>{f.name} ({f.manufacturer}) – {f.beamAngle}°</option>
             ))}
           </select>
           <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 4 }}>
-            {t('dlg.3pt.backIntensity', 'Back-Intensität:')} {backRatio.toFixed(1)}× Key
+            {t('dlg.3pt.backIntensity', 'Back intensity:')} {backRatio.toFixed(1)}× Key
           </div>
         </div>
 
         <div className="modal-actions">
-          <button onClick={onCancel}>{t('common.cancel', 'Abbrechen')}</button>
-          <button className="primary" onClick={handleSubmit}>{t('dlg.3pt.generate', 'Generieren')}</button>
+          <button onClick={onCancel}>{t('common.cancel', 'Cancel')}</button>
+          <button className="primary" onClick={handleSubmit}>{t('dlg.3pt.generate', 'Generate')}</button>
         </div>
       </div>
     </div>

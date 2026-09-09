@@ -9,7 +9,7 @@ import { gelLibrary } from '../core/gelLibrary';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
 import { isEstimate, isStaleSource } from '../types';
-import { useTranslation, translate } from '../i18n';
+import { useTranslation, translate, format } from '../i18n';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -156,16 +156,16 @@ const PropertyPanel: React.FC<Props> = ({
           className={`hide-toggle ${f.hidden ? 'is-hidden' : ''}`}
           onClick={() => onUpdateFixture(f.id, { hidden: !f.hidden })}
           title={f.hidden
-            ? t('prop.showAgain', 'Leuchte wieder einblenden')
-            : t('prop.hideTemp', 'Leuchte vorübergehend ausblenden (zählt nicht zur Heatmap)')}
+            ? t('prop.showAgain', 'Show this fixture again')
+            : t('prop.hideTemp', 'Hide this fixture temporarily (excluded from the heat-map)')}
         >
-          {f.hidden ? `👁 ${t('prop.show', 'Einblenden')}` : `🚫 ${t('prop.hide', 'Vorübergehend ausblenden')}`}
+          {f.hidden ? `👁 ${t('prop.show', 'Show')}` : `🚫 ${t('prop.hide', 'Hide temporarily')}`}
         </button>
-        {f.hidden && <div className="hide-note">{t('prop.hiddenNote', 'Ausgeblendet – diese Leuchte fließt aktuell nicht in die Heatmap ein. Die Werte unten zeigen ihren Beitrag, sobald sie wieder eingeblendet ist.')}</div>}
+        {f.hidden && <div className="hide-note">{t('prop.hiddenNote', 'Hidden – this fixture is currently excluded from the heat-map. The values below show its contribution once it is visible again.')}</div>}
 
         {/* Fixture swap */}
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.swapFixture', 'Leuchte tauschen')}</span>
+          <span className="prop-section-title">{t('prop.swapFixture', 'Swap fixture')}</span>
           <label className="prop-field">
             <span>Typ</span>
             <select
@@ -217,13 +217,13 @@ const PropertyPanel: React.FC<Props> = ({
               <button className="nudge-btn" onClick={() => onUpdateFixture(f.id, { y: f.y + 0.5, aimY: f.aimY + 0.5 })}>▶</button>
             </div>
           </label>
-          {numField(t('prop.height', 'Höhe (m)'), f.mountingHeight, (v) => onUpdateFixture(f.id, { mountingHeight: v }), 0.5, 0.5, 30)}
+          {numField(t('prop.height', 'Height (m)'), f.mountingHeight, (v) => onUpdateFixture(f.id, { mountingHeight: v }), 0.5, 0.5, 30)}
         </div>
 
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.aim', 'Ausrichtung')}</span>
-          {numField(t('prop.aimX', 'Ziel X (m)'), f.aimX, (v) => onUpdateFixture(f.id, { aimX: v }))}
-          {numField(t('prop.aimY', 'Ziel Y (m)'), f.aimY, (v) => onUpdateFixture(f.id, { aimY: v }))}
+          <span className="prop-section-title">{t('prop.aim', 'Aim')}</span>
+          {numField(t('prop.aimX', 'Target X (m)'), f.aimX, (v) => onUpdateFixture(f.id, { aimX: v }))}
+          {numField(t('prop.aimY', 'Target Y (m)'), f.aimY, (v) => onUpdateFixture(f.id, { aimY: v }))}
           <label className="prop-field">
             <span>Pan ({panDeg.toFixed(1)}°)</span>
             <input type="range" min={-180} max={180} step={1} value={panDeg}
@@ -238,7 +238,7 @@ const PropertyPanel: React.FC<Props> = ({
         </div>
 
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.light', 'Licht')}</span>
+          <span className="prop-section-title">{t('prop.light', 'Light')}</span>
           {effectiveZoomRange && (
             <label className="prop-field">
               <span>Zoom ({effectiveBeamAngle.toFixed(0)}°)</span>
@@ -271,23 +271,23 @@ const PropertyPanel: React.FC<Props> = ({
         {/* Beam details – beam vs field vs cutoff vs zoom, with explanation */}
         <div className="prop-section">
           <span className="prop-section-title">
-            {t('prop.beamDetails', 'Strahl-Details')}
-            <button type="button" className="beam-help-toggle" onClick={() => setBeamHelp((v) => !v)} title={t('prop.whatIsThis', 'Was bedeutet das?')}>ℹ</button>
+            {t('prop.beamDetails', 'Beam details')}
+            <button type="button" className="beam-help-toggle" onClick={() => setBeamHelp((v) => !v)} title={t('prop.whatIsThis', 'What does this mean?')}>ℹ</button>
           </span>
           <div className="beam-angles">
             <div><span className="ba-dot ba-beam" /> {t('prop.beam50', 'Beam (50 %)')} <strong>{effectiveBeamAngle.toFixed(1)}°</strong></div>
             <div><span className="ba-dot ba-field" /> {t('prop.field10', 'Field (10 %)')} <strong>{effFieldAngle.toFixed(1)}°</strong></div>
-            {effCutoff != null && <div><span className="ba-dot ba-cut" /> {t('prop.cutoff', 'Cutoff (2,5 %)')} <strong>{effCutoff.toFixed(1)}°</strong></div>}
+            {effCutoff != null && <div><span className="ba-dot ba-cut" /> {t('prop.cutoff', 'Cutoff (2.5 %)')} <strong>{effCutoff.toFixed(1)}°</strong></div>}
             {effectiveZoomRange
-              ? <div><span className="ba-dot ba-zoom" /> {t('prop.zoomRange', 'Zoom-Bereich')} <strong>{effectiveZoomRange[0]}–{effectiveZoomRange[1]}°</strong></div>
-              : <div><span className="ba-dot ba-zoom" /> {t('prop.zoom', 'Zoom')} <strong>{t('prop.zoomFixed', 'fest')}</strong></div>}
+              ? <div><span className="ba-dot ba-zoom" /> {t('prop.zoomRange', 'Zoom range')} <strong>{effectiveZoomRange[0]}–{effectiveZoomRange[1]}°</strong></div>
+              : <div><span className="ba-dot ba-zoom" /> {t('prop.zoom', 'Zoom')} <strong>{t('prop.zoomFixed', 'fixed')}</strong></div>}
           </div>
           {beamHelp && (
             <div className="beam-help">
-              <p><strong>{t('prop.help.beamTitle', 'Beam-Winkel (50 %)')}</strong> {t('prop.help.beamBody', '– der helle Kern: Winkel, bei dem die Intensität auf 50 % des Maximums abfällt (Hotspot/FWHM).')}</p>
-              <p><strong>{t('prop.help.fieldTitle', 'Field-Winkel (10 %)')}</strong> {t('prop.help.fieldBody', '– der nutzbare Rand: bei 10 % des Maximums. Immer größer als der Beam-Winkel.')}</p>
-              <p><strong>{t('prop.help.cutoffTitle', 'Cutoff (2,5 %)')}</strong> {t('prop.help.cutoffBody', '– wo das Licht praktisch endet.')}</p>
-              <p><strong>{t('prop.help.zoomTitle', 'Zoom-Bereich')}</strong> {t('prop.help.zoomBody', '– bei Zoom-Geräten der einstellbare Beam-Winkel (eng ↔ weit). Beam & Field beschreiben die Strahlform bei der aktuellen Zoom-Stellung.')}</p>
+              <p><strong>{t('prop.help.beamTitle', 'Beam angle (50 %)')}</strong> {t('prop.help.beamBody', '– the bright core: the angle at which intensity has fallen to 50 % of the maximum (hotspot/FWHM).')}</p>
+              <p><strong>{t('prop.help.fieldTitle', 'Field angle (10 %)')}</strong> {t('prop.help.fieldBody', '– the usable edge: at 10 % of the maximum. Always wider than the beam angle.')}</p>
+              <p><strong>{t('prop.help.cutoffTitle', 'Cutoff (2.5 %)')}</strong> {t('prop.help.cutoffBody', '– where the light effectively ends.')}</p>
+              <p><strong>{t('prop.help.zoomTitle', 'Zoom range')}</strong> {t('prop.help.zoomBody', '– on zoom fixtures the adjustable beam angle (narrow ↔ wide). Beam & field describe the beam shape at the current zoom setting.')}</p>
             </div>
           )}
         </div>
@@ -295,9 +295,9 @@ const PropertyPanel: React.FC<Props> = ({
         {/* Attachment selector */}
         {f.fixture.compatibleAttachments && f.fixture.compatibleAttachments.length > 0 && (
           <div className="prop-section">
-            <span className="prop-section-title">{t('prop.attachment', 'Vorsatz / Attachment')}</span>
+            <span className="prop-section-title">{t('prop.attachment', 'Attachment')}</span>
             <label className="prop-field">
-              <span>{t('prop.mounted', 'Montiert')}</span>
+              <span>{t('prop.mounted', 'Mounted')}</span>
               <select
                 value={f.activeAttachmentId ?? ''}
                 onChange={(e) => onUpdateFixture(f.id, {
@@ -305,7 +305,7 @@ const PropertyPanel: React.FC<Props> = ({
                   currentBeamAngle: undefined, // reset zoom when switching
                 })}
               >
-                <option value="">{t('prop.noAttachment', 'Kein Vorsatz (Bare)')}</option>
+                <option value="">{t('prop.noAttachment', 'No attachment (bare)')}</option>
                 {f.fixture.compatibleAttachments.map((att) => (
                   <option key={att.id} value={att.id}>
                     {att.name} ({att.type}) +{att.weightAdditional}kg
@@ -315,7 +315,7 @@ const PropertyPanel: React.FC<Props> = ({
             </label>
             {activeAtt && (
               <div className="prop-derived">
-                {t('prop.type', 'Typ')}: {activeAtt.type}<br />
+                {t('prop.type', 'Type')}: {activeAtt.type}<br />
                 {activeAtt.beamAngleOverride && `Beam: ${activeAtt.beamAngleOverride}°`}
                 {activeAtt.zoomRangeOverride && ` (${activeAtt.zoomRangeOverride[0]}–${activeAtt.zoomRangeOverride[1]}°)`}
                 {activeAtt.photometricOverride && (
@@ -328,9 +328,9 @@ const PropertyPanel: React.FC<Props> = ({
 
         {/* Gel Filter Selector (CTO/CTB/Frost) */}
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.gel', 'Filter / Gel')}</span>
+          <span className="prop-section-title">{t('prop.gel', 'Filter / gel')}</span>
           <label className="prop-field">
-            <span>{t('prop.gelAdd', 'Gel hinzufügen')}</span>
+            <span>{t('prop.gelAdd', 'Add gel')}</span>
             <select
               value=""
               onChange={(e) => {
@@ -339,20 +339,20 @@ const PropertyPanel: React.FC<Props> = ({
                 onUpdateFixture(f.id, { gelFilterIds: [...current, e.target.value] });
               }}
             >
-              <option value="">{t('prop.pick', '– Auswählen –')}</option>
-              <optgroup label={t('prop.gelCto', 'CTO (Warm)')}>
+              <option value="">{t('prop.pick', '– Select –')}</option>
+              <optgroup label={t('prop.gelCto', 'CTO (warm)')}>
                 {gelLibrary.filter((g) => g.type === 'CTO').map((g) => (
-                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% {t('prop.gelLoss', 'Verlust')})</option>
+                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% {t('prop.gelLoss', 'loss')})</option>
                 ))}
               </optgroup>
-              <optgroup label={t('prop.gelCtb', 'CTB (Kalt)')}>
+              <optgroup label={t('prop.gelCtb', 'CTB (cool)')}>
                 {gelLibrary.filter((g) => g.type === 'CTB').map((g) => (
-                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% {t('prop.gelLoss', 'Verlust')})</option>
+                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% {t('prop.gelLoss', 'loss')})</option>
                 ))}
               </optgroup>
-              <optgroup label={t('prop.gelFrost', 'Frost / Diffusion')}>
+              <optgroup label={t('prop.gelFrost', 'Frost / diffusion')}>
                 {gelLibrary.filter((g) => g.type === 'frost').map((g) => (
-                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% {t('prop.gelLoss', 'Verlust')})</option>
+                  <option key={g.id} value={g.id}>{g.brand} {g.code} {g.name} ({Math.round((1 - g.transmissionFactor) * 100)}% {t('prop.gelLoss', 'loss')})</option>
                 ))}
               </optgroup>
             </select>
@@ -380,8 +380,8 @@ const PropertyPanel: React.FC<Props> = ({
         {/* Barn doors (Flügeltore) + where the gels sit – the two interact */}
         <div className="prop-section">
           <span className="prop-section-title">
-            {t('prop.barnTitle', 'Flügeltore & Folien-Position')}
-            <button type="button" className="beam-help-toggle" onClick={() => setBarnHelp((v) => !v)} title={t('prop.explainDiff', 'Unterschiede erklären')}>ℹ</button>
+            {t('prop.barnTitle', 'Barn doors & gel position')}
+            <button type="button" className="beam-help-toggle" onClick={() => setBarnHelp((v) => !v)} title={t('prop.explainDiff', 'Explain the difference')}>ℹ</button>
           </span>
           {(() => {
             const bd = f.barnDoors ?? { top: 0, bottom: 0, left: 0, right: 0 };
@@ -396,24 +396,24 @@ const PropertyPanel: React.FC<Props> = ({
             );
             return (
               <>
-                {flapRow(t('prop.top', 'Oben'), bd.top, (v) => setBarn({ top: v }))}
-                {flapRow(t('prop.bottom', 'Unten'), bd.bottom, (v) => setBarn({ bottom: v }))}
-                {flapRow(t('prop.left', 'Links'), bd.left, (v) => setBarn({ left: v }))}
-                {flapRow(t('prop.right', 'Rechts'), bd.right, (v) => setBarn({ right: v }))}
+                {flapRow(t('prop.top', 'Top'), bd.top, (v) => setBarn({ top: v }))}
+                {flapRow(t('prop.bottom', 'Bottom'), bd.bottom, (v) => setBarn({ bottom: v }))}
+                {flapRow(t('prop.left', 'Left'), bd.left, (v) => setBarn({ left: v }))}
+                {flapRow(t('prop.right', 'Right'), bd.right, (v) => setBarn({ right: v }))}
                 <div className="reflectance-presets">
-                  <button className="refl-btn" onClick={() => onUpdateFixture(f.id, { barnDoors: undefined })}>{t('prop.barnOpenAll', 'Alle öffnen')}</button>
-                  <button className="refl-btn" onClick={() => setBarn({ top: 0.6, bottom: 0.6 })}>{t('prop.barnTopBottom', 'Ober/Unter ½')}</button>
-                  <button className="refl-btn" onClick={() => setBarn({ left: 0.6, right: 0.6 })}>{t('prop.barnSides', 'Seiten ½')}</button>
+                  <button className="refl-btn" onClick={() => onUpdateFixture(f.id, { barnDoors: undefined })}>{t('prop.barnOpenAll', 'Open all')}</button>
+                  <button className="refl-btn" onClick={() => setBarn({ top: 0.6, bottom: 0.6 })}>{t('prop.barnTopBottom', 'Top/bottom ½')}</button>
+                  <button className="refl-btn" onClick={() => setBarn({ left: 0.6, right: 0.6 })}>{t('prop.barnSides', 'Sides ½')}</button>
                 </div>
-                <div className="prop-derived">{t('prop.barnNote', 'Schneiden den Strahl seitlich ab (im Bezugsrahmen der Leuchte, mit Rotation gedreht) – fließt direkt in die Heatmap ein.')}</div>
+                <div className="prop-derived">{t('prop.barnNote', 'They cut the beam from the side (in the fixture’s own frame of reference, rotated with it) – and feed straight into the heat-map.')}</div>
               </>
             );
           })()}
-          <div className="prop-field-sub">{t('prop.gelPlacement', 'Folien-Position (Filterrahmen vs. vor den Toren):')}</div>
+          <div className="prop-field-sub">{t('prop.gelPlacement', 'Gel position (filter frame vs. in front of the barn doors):')}</div>
           <div className="gel-placement-toggle">
             {([
-              ['frame', t('prop.gelInFrame', 'Im Rahmen (an Linse)')],
-              ['front', t('prop.gelInFront', 'Vor den Flügeltoren')],
+              ['frame', t('prop.gelInFrame', 'In the frame (at the lens)')],
+              ['front', t('prop.gelInFront', 'In front of the barn doors')],
             ] as const).map(([val, lbl]) => (
               <button key={val} type="button"
                 className={`gp-btn${(f.gelPlacement ?? 'frame') === val ? ' active' : ''}`}
@@ -422,28 +422,28 @@ const PropertyPanel: React.FC<Props> = ({
           </div>
           <div className="prop-derived gel-placement-note">
             {(f.gelPlacement ?? 'frame') === 'frame'
-              ? t('prop.gelFrameNote', 'Folie im Farbrahmen direkt an der Linse → scharfer Flügeltor-Schnitt. Sie steht aber am heißesten, kräftige Farben (Dunkelblau/Grün) brennen am schnellsten aus.')
-              : t('prop.gelFrontNote', 'Folie hängt vor den Toren → die beleuchtete Folie wird zur neuen, größeren Quelle, der Schnitt wird weicher. Mit echtem Frost werden die Tore praktisch wirkungslos. Dafür bleibt die Folie kühler und hält länger.')}
+              ? t('prop.gelFrameNote', 'Gel in the colour frame right at the lens → a crisp barn-door cut. It also sits in the hottest spot, so saturated colours (deep blue/green) burn out fastest.')
+              : t('prop.gelFrontNote', 'Gel hung in front of the doors → the lit gel becomes the new, larger source and the cut gets softer. With real frost the doors become practically useless. In exchange the gel runs cooler and lasts longer.')}
           </div>
           {barnHelp && (
             <div className="beam-help">
-              <p><strong>{t('prop.barnHelp.orderTitle', 'Reihenfolge im Scheinwerfer:')}</strong> {t('prop.barnHelp.orderBody', 'Lampe → Linse → Farbrahmen (Runner) → Flügeltore (mit eigenem Folienschlitz davor).')}</p>
-              <p><strong>{t('prop.barnHelp.heatTitle', 'Wärme & Lebensdauer:')}</strong> {t('prop.barnHelp.heatBody', 'Je näher an der Linse, desto heißer. Folie im Rahmen verblasst/verbrennt am schnellsten (IR-Absorption); vor den Toren läuft sie kühler und hält länger.')}</p>
-              <p><strong>{t('prop.barnHelp.opticsTitle', 'Optik:')}</strong> {t('prop.barnHelp.opticsBody', 'Diffusion weiter weg = weicher (die beleuchtete Folie wird zur Quelle). Vor die Tore gehängt hebt sie deren Schnitt auf – für einen sauberen Schnitt gehört die Folie in den Rahmen hinter die Tore.')}</p>
+              <p><strong>{t('prop.barnHelp.orderTitle', 'Order inside the fixture:')}</strong> {t('prop.barnHelp.orderBody', 'Lamp → lens → colour frame (runner) → barn doors (with their own gel slot in front).')}</p>
+              <p><strong>{t('prop.barnHelp.heatTitle', 'Heat & service life:')}</strong> {t('prop.barnHelp.heatBody', 'The closer to the lens, the hotter. Gel in the frame fades/burns fastest (IR absorption); in front of the doors it runs cooler and lasts longer.')}</p>
+              <p><strong>{t('prop.barnHelp.opticsTitle', 'Optics:')}</strong> {t('prop.barnHelp.opticsBody', 'Diffusion further away = softer (the lit gel becomes the source). Hung in front of the doors it cancels their cut – for a clean cut the gel belongs in the frame behind the doors.')}</p>
             </div>
           )}
         </div>
 
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.patch', 'Patch / Paperwork')}</span>
-          {patchConflicts.has(f.id) && <div className="patch-conflict">⚠ {t('prop.dmxClash', 'DMX-Adresse überschneidet sich')}</div>}
+          <span className="prop-section-title">{t('prop.patch', 'Patch / paperwork')}</span>
+          {patchConflicts.has(f.id) && <div className="patch-conflict">⚠ {t('prop.dmxClash', 'DMX address overlaps')}</div>}
           <label className="prop-field">
-            <span>{t('prop.channel', 'Kanal')}</span>
+            <span>{t('prop.channel', 'Channel')}</span>
             <input type="number" min={0} value={f.channel ?? ''}
               onChange={(e) => onUpdateFixture(f.id, { channel: e.target.value === '' ? undefined : Number(e.target.value) })} />
           </label>
           <label className="prop-field">
-            <span>{t('prop.unitNo', 'Unit-Nr.')}</span>
+            <span>{t('prop.unitNo', 'Unit no.')}</span>
             <input type="text" value={f.unitNumber ?? ''}
               onChange={(e) => onUpdateFixture(f.id, { unitNumber: e.target.value || undefined })} />
           </label>
@@ -453,16 +453,16 @@ const PropertyPanel: React.FC<Props> = ({
               onChange={(e) => onUpdateFixture(f.id, { universe: e.target.value === '' ? undefined : Number(e.target.value) })} />
           </label>
           <label className="prop-field">
-            <span>{t('prop.dmxAddr', 'DMX-Adr.')}</span>
+            <span>{t('prop.dmxAddr', 'DMX addr.')}</span>
             <input type="number" min={1} max={512} value={f.dmxAddress ?? ''}
               onChange={(e) => onUpdateFixture(f.id, { dmxAddress: e.target.value === '' ? undefined : Number(e.target.value) })} />
           </label>
           <div className="prop-derived">
-            {t('prop.footprint', 'Footprint')}: {footprint(f) > 0 ? `${footprint(f)} DMX-Ch` : t('prop.dimmer1ch', 'Dimmer (1 Ch)')}
+            {t('prop.footprint', 'Footprint')}: {footprint(f) > 0 ? `${footprint(f)} DMX-Ch` : t('prop.dimmer1ch', 'Dimmer (1 ch)')}
           </div>
           <label className="prop-field">
-            <span>{t('prop.purpose', 'Zweck')}</span>
-            <input type="text" value={f.purpose ?? ''} placeholder={t('prop.purposePh', 'z. B. Frontlicht')}
+            <span>{t('prop.purpose', 'Purpose')}</span>
+            <input type="text" value={f.purpose ?? ''} placeholder={t('prop.purposePh', 'e.g. front light')}
               onChange={(e) => onUpdateFixture(f.id, { purpose: e.target.value || undefined })} />
           </label>
         </div>
@@ -470,8 +470,8 @@ const PropertyPanel: React.FC<Props> = ({
         {/* Editable technical data – every value can be checked & adjusted per lamp */}
         <div className="prop-section">
           <span className="prop-section-title">
-            {t('prop.specs', 'Technische Daten (anpassbar)')}
-            <button type="button" className="beam-help-toggle" onClick={() => setShowSpecs((v) => !v)} title={t('prop.toggle', 'Ein-/ausklappen')}>{showSpecs ? '▾' : '▸'}</button>
+            {t('prop.specs', 'Technical data (editable)')}
+            <button type="button" className="beam-help-toggle" onClick={() => setShowSpecs((v) => !v)} title={t('prop.toggle', 'Collapse/expand')}>{showSpecs ? '▾' : '▸'}</button>
           </span>
           {showSpecs && (() => {
             const setSpec = (patch: Partial<Fixture>) => onUpdateFixture(f.id, { fixture: { ...f.fixture, ...patch } });
@@ -490,7 +490,7 @@ const PropertyPanel: React.FC<Props> = ({
                 return (
                   <span
                     className="spec-src spec-src-stale"
-                    title={t('prop.srcStale', 'Beleg bezog sich auf {value}: {source}\nDer Wert wurde seitdem von Hand geändert.')
+                    title={t('prop.srcStale', 'The evidence referred to {value}: {source}\nThe value has been changed by hand since.')
                       .replace('{value}', String(entry.value))
                       .replace('{source}', entry.source)}
                   >
@@ -502,7 +502,7 @@ const PropertyPanel: React.FC<Props> = ({
               return (
                 <span
                   className={est ? 'spec-src spec-src-est' : 'spec-src'}
-                  title={`${est ? t('prop.estimated', 'Geschätzt') : t('prop.evidence', 'Beleg')}: ${entry.source}`}
+                  title={`${est ? t('prop.estimated', 'Estimated') : t('prop.evidence', 'Evidence')}: ${entry.source}`}
                 >
                   {est ? '≈' : '✓'}
                 </span>
@@ -517,49 +517,49 @@ const PropertyPanel: React.FC<Props> = ({
             const photo = f.fixture.photometric;
             return (
               <>
-                <label className="prop-field"><span>{t('prop.manufacturer', 'Hersteller')}</span>
+                <label className="prop-field"><span>{t('prop.manufacturer', 'Manufacturer')}</span>
                   <input type="text" value={f.fixture.manufacturer} onChange={(e) => setSpec({ manufacturer: e.target.value })} /></label>
-                <label className="prop-field"><span>{t('prop.type', 'Typ')}</span>
+                <label className="prop-field"><span>{t('prop.type', 'Type')}</span>
                   <input type="text" value={f.fixture.name} onChange={(e) => setSpec({ name: e.target.value })} /></label>
-                {sNum(t('prop.wattage', 'Leistung (W)'), f.fixture.wattage, (v) => setSpec({ wattage: v }), 1, undefined, 'wattage')}
-                {sNum(t('prop.lumens', 'Lichtstrom (lm)'), f.fixture.lumens, (v) => setSpec({ lumens: v }), 50, t('prop.lumensHint', 'Gesamt-Lichtstrom (Fallback, wenn keine Lux-Referenz)'), 'lumens')}
-                {sNum(t('prop.beamSpec', 'Beam 50 % (°)'), f.fixture.beamAngle, (v) => setSpec({ beamAngle: v }), 0.5, t('prop.beamSpecHint', 'Heller Kern (FWHM)'), 'beamAngle')}
-                {sNum(t('prop.fieldSpec', 'Field 10 % (°)'), f.fixture.fieldAngle, (v) => setSpec({ fieldAngle: v }), 0.5, t('prop.fieldSpecHint', 'Nutzbarer Rand – treibt die Berechnung (σ)'), 'fieldAngle')}
-                {sNum(t('prop.cutoffSpec', 'Cutoff 2,5 % (°)'), f.fixture.cutoffAngle, (v) => setSpec({ cutoffAngle: v || undefined }), 0.5, t('prop.cutoffSpecHint', 'Wo das Licht endet (optional)'), 'cutoffAngle')}
-                <label className="prop-field"><span>{t('prop.beamShape', 'Strahlform')}</span>
+                {sNum(t('prop.wattage', 'Power (W)'), f.fixture.wattage, (v) => setSpec({ wattage: v }), 1, undefined, 'wattage')}
+                {sNum(t('prop.lumens', 'Luminous flux (lm)'), f.fixture.lumens, (v) => setSpec({ lumens: v }), 50, t('prop.lumensHint', 'Total luminous flux (fallback when there is no lux reference)'), 'lumens')}
+                {sNum(t('prop.beamSpec', 'Beam 50 % (°)'), f.fixture.beamAngle, (v) => setSpec({ beamAngle: v }), 0.5, t('prop.beamSpecHint', 'Bright core (FWHM)'), 'beamAngle')}
+                {sNum(t('prop.fieldSpec', 'Field 10 % (°)'), f.fixture.fieldAngle, (v) => setSpec({ fieldAngle: v }), 0.5, t('prop.fieldSpecHint', 'Usable edge – drives the calculation (σ)'), 'fieldAngle')}
+                {sNum(t('prop.cutoffSpec', 'Cutoff 2.5 % (°)'), f.fixture.cutoffAngle, (v) => setSpec({ cutoffAngle: v || undefined }), 0.5, t('prop.cutoffSpecHint', 'Where the light ends (optional)'), 'cutoffAngle')}
+                <label className="prop-field"><span>{t('prop.beamShape', 'Beam shape')}</span>
                   <select value={f.fixture.beamShape} onChange={(e) => setSpec({ beamShape: e.target.value as BeamShape })}>
-                    <option value="circular">{t('prop.shapeCircular', 'Kreisförmig')}</option><option value="elliptical">{t('prop.shapeElliptical', 'Elliptisch')}</option>
-                    <option value="linear">{t('prop.shapeLinear', 'Linear')}</option><option value="rectangular">{t('prop.shapeRect', 'Rechteckig')}</option>
+                    <option value="circular">{t('prop.shapeCircular', 'Circular')}</option><option value="elliptical">{t('prop.shapeElliptical', 'Elliptical')}</option>
+                    <option value="linear">{t('prop.shapeLinear', 'Linear')}</option><option value="rectangular">{t('prop.shapeRect', 'Rectangular')}</option>
                   </select></label>
                 {f.fixture.beamShape !== 'circular' && sNum(t('prop.beamRatio', 'Beam W:H'), f.fixture.beamRatioWH, (v) => setSpec({ beamRatioWH: v }), 0.1)}
-                <label className="prop-field"><span>{t('prop.lensType', 'Linsentyp')}</span>
+                <label className="prop-field"><span>{t('prop.lensType', 'Lens type')}</span>
                   <select value={f.fixture.lensType} onChange={(e) => setSpec({ lensType: e.target.value as LensType })}>
-                    <option value="fixed">{t('prop.lensFixed', 'Fest')}</option><option value="zoom">{t('prop.lensZoom', 'Zoom')}</option><option value="interchangeable">{t('prop.lensInter', 'Wechselbar')}</option>
-                    <option value="fresnel">Fresnel</option><option value="pc">PC</option><option value="reflector">{t('prop.lensReflector', 'Reflektor')}</option>
+                    <option value="fixed">{t('prop.lensFixed', 'Fixed')}</option><option value="zoom">{t('prop.lensZoom', 'Zoom')}</option><option value="interchangeable">{t('prop.lensInter', 'Interchangeable')}</option>
+                    <option value="fresnel">Fresnel</option><option value="pc">PC</option><option value="reflector">{t('prop.lensReflector', 'Reflector')}</option>
                   </select></label>
-                <label className="prop-field"><span>{t('prop.mount', 'Befestigung')}</span>
+                <label className="prop-field"><span>{t('prop.mount', 'Mount')}</span>
                   <select value={f.fixture.mountType} onChange={(e) => setSpec({ mountType: e.target.value as MountType })}>
                     {Object.keys(MOUNT_LABELS).map((k) => <option key={k} value={k}>{mountLabel(language, k)}</option>)}
                   </select></label>
                 {f.fixture.zoomRange && (
-                  <div className="prop-field"><span>{t('prop.zoomRangeSpec', 'Zoom-Bereich (°)')}</span>
+                  <div className="prop-field"><span>{t('prop.zoomRangeSpec', 'Zoom range (°)')}</span>
                     <span className="zoom-range-edit">
                       <input type="number" step={0.5} value={f.fixture.zoomRange[0]} onChange={(e) => setSpec({ zoomRange: [Number(e.target.value), f.fixture.zoomRange![1]] })} />
                       <input type="number" step={0.5} value={f.fixture.zoomRange[1]} onChange={(e) => setSpec({ zoomRange: [f.fixture.zoomRange![0], Number(e.target.value)] })} />
                     </span>
                   </div>
                 )}
-                {sNum(t('prop.cct', 'Farbtemp. (K, 0=RGBW)'), f.fixture.colorTemp, (v) => setSpec({ colorTemp: v }), 100)}
-                {sNum(t('prop.weight', 'Gewicht (kg)'), f.fixture.weight, (v) => setSpec({ weight: v }), 0.1)}
+                {sNum(t('prop.cct', 'Colour temp. (K, 0=RGBW)'), f.fixture.colorTemp, (v) => setSpec({ colorTemp: v }), 100)}
+                {sNum(t('prop.weight', 'Weight (kg)'), f.fixture.weight, (v) => setSpec({ weight: v }), 0.1)}
                 {sNum('CRI', f.fixture.cri, (v) => setSpec({ cri: v || undefined }), 1)}
                 {sNum('TLCI', f.fixture.tlci, (v) => setSpec({ tlci: v || undefined }), 1)}
-                {sNum(t('prop.dmxChannels', 'DMX-Kanäle'), f.fixture.dmxChannels, (v) => setSpec({ dmxChannels: v || undefined }), 1)}
-                <label className="prop-field"><span>{t('prop.ipRating', 'IP-Schutzart')}</span>
+                {sNum(t('prop.dmxChannels', 'DMX channels'), f.fixture.dmxChannels, (v) => setSpec({ dmxChannels: v || undefined }), 1)}
+                <label className="prop-field"><span>{t('prop.ipRating', 'IP rating')}</span>
                   <input type="text" value={f.fixture.ipRating ?? ''} onChange={(e) => setSpec({ ipRating: e.target.value || undefined })} /></label>
-                <div className="prop-field-sub">{t('prop.photoRef', 'Photometrische Referenz (treibt die Lux-Berechnung):')}</div>
-                {sNum(t('prop.refLux', 'Ref. Lux'), photo?.lux, (v) => setSpec({ photometric: { ...(photo ?? { lux: v, distance: 1 }), lux: v } }), 100)}
-                {sNum(t('prop.refDistance', 'Ref. Abstand (m)'), photo?.distance, (v) => setSpec({ photometric: { ...(photo ?? { lux: 10000, distance: v }), distance: v } }), 0.5)}
-                {sNum(t('prop.refBeam', 'Ref. bei Beam (°)'), photo?.beamAngle, (v) => setSpec({ photometric: { ...(photo ?? { lux: 10000, distance: 1 }), beamAngle: v } }), 0.5, t('prop.refBeamHint', 'Beam-Winkel, bei dem die Lux-Referenz gemessen wurde'))}
+                <div className="prop-field-sub">{t('prop.photoRef', 'Photometric reference (drives the lux calculation):')}</div>
+                {sNum(t('prop.refLux', 'Ref. lux'), photo?.lux, (v) => setSpec({ photometric: { ...(photo ?? { lux: v, distance: 1 }), lux: v } }), 100)}
+                {sNum(t('prop.refDistance', 'Ref. distance (m)'), photo?.distance, (v) => setSpec({ photometric: { ...(photo ?? { lux: 10000, distance: v }), distance: v } }), 0.5)}
+                {sNum(t('prop.refBeam', 'Ref. at beam (°)'), photo?.beamAngle, (v) => setSpec({ photometric: { ...(photo ?? { lux: 10000, distance: 1 }), beamAngle: v } }), 0.5, t('prop.refBeamHint', 'Beam angle at which the lux reference was measured'))}
               </>
             );
           })()}
@@ -568,8 +568,8 @@ const PropertyPanel: React.FC<Props> = ({
         {/* Calculation trace – fully visible & manually verifiable */}
         <div className="prop-section">
           <span className="prop-section-title">
-            {t('prop.calcTitle', 'Rechenweg (Lux am Zielpunkt)')}
-            <button type="button" className="beam-help-toggle" onClick={() => setShowCalc((v) => !v)} title={t('prop.calcShow', 'Rechenweg zeigen')}>{showCalc ? '▾' : '▸'}</button>
+            {t('prop.calcTitle', 'Calculation (lux at the target point)')}
+            <button type="button" className="beam-help-toggle" onClick={() => setShowCalc((v) => !v)} title={t('prop.calcShow', 'Show the calculation')}>{showCalc ? '▾' : '▸'}</button>
           </span>
           {showCalc && (() => {
             const b = explainLux(f, f.aimX, f.aimY);
@@ -584,31 +584,31 @@ const PropertyPanel: React.FC<Props> = ({
                 <table className="calc-table">
                   <tbody>
                     {b.source === 'photometric'
-                      ? <tr><td>{t('prop.calc.reference', 'Referenz')}</td><td>{fmt(b.refLux!)} lx @ {b.refDistance} m</td><td>→ I₀ = lx·d² = <b>{fmt(b.basePeakCd)} cd</b></td></tr>
-                      : <tr><td>{t('prop.calc.source', 'Quelle')}</td><td>{fmt(f.fixture.lumens)} lm</td><td>→ I₀ = <b>{fmt(b.basePeakCd)} cd</b></td></tr>}
+                      ? <tr><td>{t('prop.calc.reference', 'Reference')}</td><td>{fmt(b.refLux!)} lx @ {b.refDistance} m</td><td>→ I₀ = lx·d² = <b>{fmt(b.basePeakCd)} cd</b></td></tr>
+                      : <tr><td>{t('prop.calc.source', 'Source')}</td><td>{fmt(f.fixture.lumens)} lm</td><td>→ I₀ = <b>{fmt(b.basePeakCd)} cd</b></td></tr>}
                     {b.source === 'photometric' && Math.abs(b.zoomComp - 1) > 0.001 &&
-                      <tr><td>{t('prop.calc.zoomComp', 'Zoom-Komp.')}</td><td>×{b.zoomComp.toFixed(3)}</td><td>Field {b.fieldAngleDeg.toFixed(1)}°</td></tr>}
+                      <tr><td>{t('prop.calc.zoomComp', 'Zoom comp.')}</td><td>×{b.zoomComp.toFixed(3)}</td><td>Field {b.fieldAngleDeg.toFixed(1)}°</td></tr>}
                     <tr><td>{t('prop.calc.peak', 'Peak I₀')}</td><td colSpan={2}><b>{fmt(b.peakCd)} cd</b></td></tr>
                     <tr><td>{t('prop.calc.dimmer', 'Dimmer')}</td><td>×{(b.dimming * 100).toFixed(0)} %</td><td>{b.dimming.toFixed(2)}</td></tr>
                     {b.gel < 1 && <tr><td>{t('prop.calc.gel', 'Gel')}</td><td>×{(b.gel * 100).toFixed(0)} %</td><td>{b.gel.toFixed(2)}</td></tr>}
                     <tr><td>{t('prop.calc.gauss', 'Gauss')}</td><td>×{b.gauss.toFixed(3)}</td><td>θ = {b.offAxisDeg.toFixed(1)}°</td></tr>
-                    {f.barnDoors && <tr><td>{t('prop.calc.barn', 'Flügeltore')}</td><td>×{b.barnDoor.toFixed(3)}</td><td>{b.barnDoor > 0.999
-                      ? t('prop.calc.barnClear', 'Zielpunkt nicht geschnitten')
+                    {f.barnDoors && <tr><td>{t('prop.calc.barn', 'Barn doors')}</td><td>×{b.barnDoor.toFixed(3)}</td><td>{b.barnDoor > 0.999
+                      ? t('prop.calc.barnClear', 'target point not cut')
                       : (f.gelPlacement ?? 'frame') === 'front'
-                        ? t('prop.calc.barnSoft', 'weich (vor Toren)')
-                        : t('prop.calc.barnSharp', 'scharf (im Rahmen)')}</td></tr>}
-                    <tr><td>cos θ<sub>{t('prop.calc.incidence', 'einf.')}</sub></td><td>×{b.cosIncidence.toFixed(3)}</td><td>h = {f.mountingHeight} m</td></tr>
+                        ? t('prop.calc.barnSoft', 'soft (in front of the doors)')
+                        : t('prop.calc.barnSharp', 'sharp (in the frame)')}</td></tr>}
+                    <tr><td>cos θ<sub>{t('prop.calc.incidence', 'inc.')}</sub></td><td>×{b.cosIncidence.toFixed(3)}</td><td>h = {f.mountingHeight} m</td></tr>
                     <tr><td>÷ d²</td><td>d = {b.distance.toFixed(2)} m</td><td>d² = {fmt(b.distance * b.distance, 1)}</td></tr>
                     <tr className="calc-result"><td>= E</td><td colSpan={2}><b>{fmt(b.lux)} lx</b></td></tr>
                   </tbody>
                 </table>
-                <div className="calc-note">{t('prop.calc.note', 'Alle Werte stammen aus den anpassbaren Daten oben – so lässt sich jeder Schritt nachrechnen. (Elliptische Korrektur bei nicht-runden Strahlen hier vereinfacht.)')}</div>
+                <div className="calc-note">{t('prop.calc.note', 'Every value comes from the editable data above – so each step can be checked by hand. (Elliptical correction for non-round beams is simplified here.)')}</div>
               </div>
             );
           })()}
         </div>
 
-        <button className="delete-btn" onClick={() => onDelete(f.id)}>{t('prop.deleteFixture', 'Leuchte löschen')}</button>
+        <button className="delete-btn" onClick={() => onDelete(f.id)}>{t('prop.deleteFixture', 'Delete fixture')}</button>
       </div>
     );
   }
@@ -621,42 +621,42 @@ const PropertyPanel: React.FC<Props> = ({
         <div className="prop-section">
           {numField('X (m)', p.x, (v) => onUpdatePerson(p.id, { x: v }))}
           {numField('Y (m)', p.y, (v) => onUpdatePerson(p.id, { y: v }))}
-          {numField(t('prop.size', 'Größe (m)'), p.height, (v) => onUpdatePerson(p.id, { height: v }), 0.05, 0.5, 2.5)}
+          {numField(t('prop.size', 'Height (m)'), p.height, (v) => onUpdatePerson(p.id, { height: v }), 0.05, 0.5, 2.5)}
           <label className="prop-field">
             <span>{t('prop.name', 'Name')}</span>
             <input type="text" value={p.label || ''} onChange={(e) => onUpdatePerson(p.id, { label: e.target.value })} />
           </label>
         </div>
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.poseTitle', 'Haltung & Blick (Foto-Ansicht)')}</span>
+          <span className="prop-section-title">{t('prop.poseTitle', 'Pose & facing (photo view)')}</span>
           <label className="prop-field">
-            <span>{t('prop.pose', 'Haltung')}</span>
+            <span>{t('prop.pose', 'Pose')}</span>
             <select value={p.pose ?? 'standing'} onChange={(e) => onUpdatePerson(p.id, { pose: e.target.value as 'standing' | 'sitting' })}>
-              <option value="standing">{t('prop.standing', 'Stehend')}</option>
-              <option value="sitting">{t('prop.sitting', 'Sitzend')}</option>
+              <option value="standing">{t('prop.standing', 'Standing')}</option>
+              <option value="sitting">{t('prop.sitting', 'Sitting')}</option>
             </select>
           </label>
           <label className="prop-field">
-            <span>{t('prop.facing', 'Blickrichtung')} ({Math.round(p.facing ?? 270)}°)</span>
+            <span>{t('prop.facing', 'Facing')} ({Math.round(p.facing ?? 270)}°)</span>
             <input type="range" min={0} max={360} step={5} value={p.facing ?? 270}
               onChange={(e) => onUpdatePerson(p.id, { facing: Number(e.target.value) })} />
           </label>
           <div className="reflectance-presets">
             {[
-              [`↑ ${t('prop.faceStage', 'Bühne')}`, 90],
-              [`↓ ${t('prop.faceAudience', 'Publikum')}`, 270],
-              [`← ${t('prop.faceLeft', 'Links')}`, 180],
-              [`→ ${t('prop.faceRight', 'Rechts')}`, 0],
+              [`↑ ${t('prop.faceStage', 'Stage')}`, 90],
+              [`↓ ${t('prop.faceAudience', 'Audience')}`, 270],
+              [`← ${t('prop.faceLeft', 'Left')}`, 180],
+              [`→ ${t('prop.faceRight', 'Right')}`, 0],
             ].map(([lbl, v]) => (
               <button key={lbl as string} className="refl-btn" onClick={() => onUpdatePerson(p.id, { facing: v as number })}>{lbl}</button>
             ))}
           </div>
-          <div className="prop-derived">{t('prop.poseNote', 'Sitzend pairt gut mit einem Podest/Stuhl darunter. Wirkt im 3D-Foto-Modus.')}</div>
+          <div className="prop-derived">{t('prop.poseNote', 'Sitting pairs well with a riser or chair underneath. Takes effect in the 3D photo mode.')}</div>
         </div>
         <button className="auto-btn wide" onClick={() => onAutoThreePointForPerson(p.id)}>
-          💡 {t('prop.threePoint', '3-Punkt-Licht erzeugen')}
+          💡 {t('prop.threePoint', 'Generate three-point light')}
         </button>
-        <button className="delete-btn" onClick={() => onDelete(p.id)}>{t('prop.deletePerson', 'Person löschen')}</button>
+        <button className="delete-btn" onClick={() => onDelete(p.id)}>{t('prop.deletePerson', 'Delete person')}</button>
       </div>
     );
   }
@@ -668,47 +668,47 @@ const PropertyPanel: React.FC<Props> = ({
       const bw = Math.max(...xs) - Math.min(...xs), bd = Math.max(...ys) - Math.min(...ys);
       return (
         <div className="property-panel">
-          <h3>{t('prop.stagePoly', 'Bühne (Polygon)')}</h3>
+          <h3>{t('prop.stagePoly', 'Stage (polygon)')}</h3>
           <div className="prop-section">
-            <div className="prop-derived lux-readout">{se.points.length} {t('prop.vertices', 'Eckpunkte')} · {t('prop.bbox', 'Hülle')} {bw.toFixed(1)} × {bd.toFixed(1)} m</div>
-            {numField(t('prop.height', 'Höhe (m)'), se.height, (v) => onUpdateStageElement(se.id, { height: v }), 0.1, 0, 5)}
+            <div className="prop-derived lux-readout">{se.points.length} {t('prop.vertices', 'vertices')} · {t('prop.bbox', 'Bounds')} {bw.toFixed(1)} × {bd.toFixed(1)} m</div>
+            {numField(t('prop.height', 'Height (m)'), se.height, (v) => onUpdateStageElement(se.id, { height: v }), 0.1, 0, 5)}
             <label className="prop-field">
-              <span>{t('prop.label', 'Bezeichnung')}</span>
+              <span>{t('prop.label', 'Label')}</span>
               <input type="text" value={se.label || ''} onChange={(e) => onUpdateStageElement(se.id, { label: e.target.value })} />
             </label>
-            <div className="prop-derived">{t('prop.stagePolyNote', 'Frei gezeichnete Bühne. Ziehen verschiebt sie samt Umriss.')}</div>
+            <div className="prop-derived">{t('prop.stagePolyNote', 'Freely drawn stage. Dragging moves it together with its outline.')}</div>
           </div>
-          <button className="delete-btn" onClick={() => onDelete(se.id)}>{t('prop.deleteStage', 'Bühne löschen')}</button>
+          <button className="delete-btn" onClick={() => onDelete(se.id)}>{t('prop.deleteStage', 'Delete stage')}</button>
         </div>
       );
     }
     return (
       <div className="property-panel">
-        <h3>{t('prop.stageElement', 'Bühnen-Element')}</h3>
+        <h3>{t('prop.stageElement', 'Stage element')}</h3>
         <div className="prop-section">
           {numField('X (m)', se.x, (v) => onUpdateStageElement(se.id, { x: v }))}
           {numField('Y (m)', se.y, (v) => onUpdateStageElement(se.id, { y: v }))}
-          {numField(t('prop.width', 'Breite (m)'), se.width, (v) => onUpdateStageElement(se.id, { width: v }), 0.5, 0.5)}
-          {numField(t('prop.depth', 'Tiefe (m)'), se.depth, (v) => onUpdateStageElement(se.id, { depth: v }), 0.5, 0.5)}
-          {numField(se.height2 != null ? t('prop.heightFront', 'Höhe vorne (m)') : t('prop.height', 'Höhe (m)'), se.height, (v) => onUpdateStageElement(se.id, { height: v }), 0.1, 0.1, 5)}
+          {numField(t('prop.width', 'Width (m)'), se.width, (v) => onUpdateStageElement(se.id, { width: v }), 0.5, 0.5)}
+          {numField(t('prop.depth', 'Depth (m)'), se.depth, (v) => onUpdateStageElement(se.id, { depth: v }), 0.5, 0.5)}
+          {numField(se.height2 != null ? t('prop.heightFront', 'Height at the front (m)') : t('prop.height', 'Height (m)'), se.height, (v) => onUpdateStageElement(se.id, { height: v }), 0.1, 0.1, 5)}
           <label className="prop-field">
-            <span>{t('prop.heightBack', 'Höhe hinten (m)')}</span>
-            <input type="number" step={0.1} min={0} value={se.height2 ?? ''} placeholder={t('prop.flat', '= flach')}
+            <span>{t('prop.heightBack', 'Height at the back (m)')}</span>
+            <input type="number" step={0.1} min={0} value={se.height2 ?? ''} placeholder={t('prop.flat', '= flat')}
               onChange={(e) => onUpdateStageElement(se.id, { height2: e.target.value === '' ? undefined : Number(e.target.value) })} />
           </label>
           {numField(t('prop.rotation', 'Rotation (°)'), se.rotation, (v) => onUpdateStageElement(se.id, { rotation: v }), 15, 0, 360)}
           <label className="prop-field">
-            <span>{t('prop.label', 'Bezeichnung')}</span>
+            <span>{t('prop.label', 'Label')}</span>
             <input type="text" value={se.label || ''} onChange={(e) => onUpdateStageElement(se.id, { label: e.target.value })} />
           </label>
           <div className="prop-derived">
             {se.height2 != null && Math.abs(se.height2 - se.height) > 0.01
-              ? t('prop.rampNote', 'Rampe / Schräge: {a} m → {b} m (über {d} m Tiefe)')
+              ? t('prop.rampNote', 'Ramp / slope: {a} m → {b} m (over {d} m of depth)')
                   .replace('{a}', String(se.height)).replace('{b}', String(se.height2)).replace('{d}', String(se.depth))
-              : t('prop.stageTip', 'Tipp: „Höhe hinten" setzen ergibt eine Rampe/Schräge. Ecken ziehen ändert die Größe.')}
+              : t('prop.stageTip', 'Tip: setting „height at the back" turns it into a ramp. Dragging the corners changes its size.')}
           </div>
         </div>
-        <button className="delete-btn" onClick={() => onDelete(se.id)}>{t('prop.deleteElement', 'Element löschen')}</button>
+        <button className="delete-btn" onClick={() => onDelete(se.id)}>{t('prop.deleteElement', 'Delete element')}</button>
       </div>
     );
   }
@@ -718,22 +718,22 @@ const PropertyPanel: React.FC<Props> = ({
     const len = Math.hypot(tr.x2 - tr.x1, tr.y2 - tr.y1);
     return (
       <div className="property-panel">
-        <h3>{t('prop.truss', 'Traverse')}</h3>
+        <h3>{t('prop.truss', 'Truss')}</h3>
         <div className="prop-section">
-          <div className="prop-derived lux-readout">{t('prop.length', 'Länge')}: {len.toFixed(2)} m</div>
+          <div className="prop-derived lux-readout">{t('prop.length', 'Length')}: {len.toFixed(2)} m</div>
           {numField(t('prop.startX', 'Start X (m)'), tr.x1, (v) => onUpdateTruss(tr.id, { x1: v }))}
           {numField(t('prop.startY', 'Start Y (m)'), tr.y1, (v) => onUpdateTruss(tr.id, { y1: v }))}
-          {numField(t('prop.endX', 'Ende X (m)'), tr.x2, (v) => onUpdateTruss(tr.id, { x2: v }))}
-          {numField(t('prop.endY', 'Ende Y (m)'), tr.y2, (v) => onUpdateTruss(tr.id, { y2: v }))}
-          {numField(t('prop.trimHeight', 'Trimm-Höhe (m)'), tr.height, (v) => onUpdateTruss(tr.id, { height: v }), 0.5, 0, 30)}
-          {numField(t('prop.capacity', 'Traglast (kg)'), tr.capacity ?? DEFAULT_TRUSS_CAPACITY, (v) => onUpdateTruss(tr.id, { capacity: v }), 10, 0, 5000)}
+          {numField(t('prop.endX', 'End X (m)'), tr.x2, (v) => onUpdateTruss(tr.id, { x2: v }))}
+          {numField(t('prop.endY', 'End Y (m)'), tr.y2, (v) => onUpdateTruss(tr.id, { y2: v }))}
+          {numField(t('prop.trimHeight', 'Trim height (m)'), tr.height, (v) => onUpdateTruss(tr.id, { height: v }), 0.5, 0, 30)}
+          {numField(t('prop.capacity', 'Load capacity (kg)'), tr.capacity ?? DEFAULT_TRUSS_CAPACITY, (v) => onUpdateTruss(tr.id, { capacity: v }), 10, 0, 5000)}
           <label className="prop-field">
-            <span>{t('prop.label', 'Bezeichnung')}</span>
+            <span>{t('prop.label', 'Label')}</span>
             <input type="text" value={tr.label || ''} onChange={(e) => onUpdateTruss(tr.id, { label: e.target.value })} />
           </label>
-          <div className="prop-derived">{t('prop.trussLoadNote', 'Last & Auslastung pro Traverse siehe Geräteliste → „Last pro Traverse".')}</div>
+          <div className="prop-derived">{t('prop.trussLoadNote', 'Load & utilisation per truss: see the schedule → „Load per truss".')}</div>
         </div>
-        <button className="delete-btn" onClick={() => onDelete(tr.id)}>{t('prop.deleteTruss', 'Traverse löschen')}</button>
+        <button className="delete-btn" onClick={() => onDelete(tr.id)}>{t('prop.deleteTruss', 'Delete truss')}</button>
       </div>
     );
   }
@@ -744,23 +744,23 @@ const PropertyPanel: React.FC<Props> = ({
     const tilt = (Math.atan2(c.height, Math.max(0.01, hDist)) * 180) / Math.PI;
     return (
       <div className="property-panel">
-        <h3>🎥 {t('prop.camera', 'Kamera')}</h3>
+        <h3>🎥 {t('prop.camera', 'Camera')}</h3>
         <button className="auto-btn wide" onClick={() => onLookThroughCamera(c.id)}>
-          🎬 {t('prop.lookThrough', 'Durch diese Kamera schauen')}
+          🎬 {t('prop.lookThrough', 'Look through this camera')}
         </button>
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.posAndView', 'Position & Blick')}</span>
+          <span className="prop-section-title">{t('prop.posAndView', 'Position & view')}</span>
           {numField('X (m)', c.x, (v) => onUpdateCamera(c.id, { x: v }))}
           {numField('Y (m)', c.y, (v) => onUpdateCamera(c.id, { y: v }))}
-          {numField(t('prop.eyeHeight', 'Augenhöhe (m)'), c.height, (v) => onUpdateCamera(c.id, { height: v }), 0.1, 0.1, 30)}
-          {numField(t('prop.aimX', 'Ziel X (m)'), c.aimX, (v) => onUpdateCamera(c.id, { aimX: v }))}
-          {numField(t('prop.aimY', 'Ziel Y (m)'), c.aimY, (v) => onUpdateCamera(c.id, { aimY: v }))}
-          <div className="prop-derived">{t('prop.camView', 'Blick')} {hDist.toFixed(1)} m {t('prop.camFar', 'weit')} · {t('prop.camApprox', 'ca.')} {tilt.toFixed(0)}° {t('prop.camDown', 'nach unten')}</div>
+          {numField(t('prop.eyeHeight', 'Eye height (m)'), c.height, (v) => onUpdateCamera(c.id, { height: v }), 0.1, 0.1, 30)}
+          {numField(t('prop.aimX', 'Target X (m)'), c.aimX, (v) => onUpdateCamera(c.id, { aimX: v }))}
+          {numField(t('prop.aimY', 'Target Y (m)'), c.aimY, (v) => onUpdateCamera(c.id, { aimY: v }))}
+          <div className="prop-derived">{t('prop.camView', 'Looks')} {hDist.toFixed(1)} m {t('prop.camFar', 'far')} · {t('prop.camApprox', 'approx.')} {tilt.toFixed(0)}° {t('prop.camDown', 'downwards')}</div>
         </div>
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.lens', 'Objektiv')}</span>
+          <span className="prop-section-title">{t('prop.lens', 'Lens')}</span>
           <label className="prop-field">
-            <span>{t('prop.fov', 'Bildwinkel')} ({c.fov}°)</span>
+            <span>{t('prop.fov', 'Field of view')} ({c.fov}°)</span>
             <input type="range" min={10} max={110} step={1} value={c.fov}
               onChange={(e) => onUpdateCamera(c.id, { fov: Number(e.target.value) })} />
           </label>
@@ -768,19 +768,19 @@ const PropertyPanel: React.FC<Props> = ({
             {[
               [`${t('prop.fovTele', 'Tele')} 35°`, 35],
               [`${t('prop.fovNormal', 'Normal')} 50°`, 50],
-              [`${t('prop.fovWide', 'Weit')} 75°`, 75],
+              [`${t('prop.fovWide', 'Wide')} 75°`, 75],
               [`${t('prop.fovUltra', 'Ultra')} 95°`, 95],
             ].map(([lbl, v]) => (
               <button key={lbl as string} className="refl-btn" onClick={() => onUpdateCamera(c.id, { fov: v as number })}>{lbl}</button>
             ))}
           </div>
           <label className="prop-field">
-            <span>{t('prop.label', 'Bezeichnung')}</span>
+            <span>{t('prop.label', 'Label')}</span>
             <input type="text" value={c.label || ''} onChange={(e) => onUpdateCamera(c.id, { label: e.target.value })} />
           </label>
-          <div className="prop-derived">{t('prop.fovNote', 'Kleinerer Bildwinkel = mehr „Tele" (engerer Ausschnitt), größerer = Weitwinkel.')}</div>
+          <div className="prop-derived">{t('prop.fovNote', 'A smaller field of view means more „tele" (tighter framing), a larger one means wide-angle.')}</div>
         </div>
-        <button className="delete-btn" onClick={() => onDelete(c.id)}>{t('prop.deleteCamera', 'Kamera löschen')}</button>
+        <button className="delete-btn" onClick={() => onDelete(c.id)}>{t('prop.deleteCamera', 'Delete camera')}</button>
       </div>
     );
   }
@@ -801,47 +801,47 @@ const PropertyPanel: React.FC<Props> = ({
     };
     return (
       <div className="property-panel">
-        <h3>{t('prop.wall', 'Wand')}</h3>
+        <h3>{t('prop.wall', 'Wall')}</h3>
         <div className="prop-section">
-          <div className="prop-derived lux-readout">{t('prop.length', 'Länge')}: {len.toFixed(2)} m</div>
-          {numField(t('prop.height', 'Höhe (m)'), w.height, (v) => onUpdateWall(w.id, { height: v }), 0.1, 0.1, 20)}
+          <div className="prop-derived lux-readout">{t('prop.length', 'Length')}: {len.toFixed(2)} m</div>
+          {numField(t('prop.height', 'Height (m)'), w.height, (v) => onUpdateWall(w.id, { height: v }), 0.1, 0.1, 20)}
           <label className="prop-field">
-            <span>{t('prop.curve', 'Krümmung')}</span>
+            <span>{t('prop.curve', 'Curvature')}</span>
             <input type="range" min={-1} max={1} step={0.05} value={curveFrac}
               onChange={(e) => setCurve(Number(e.target.value))} />
           </label>
-          <div className="prop-derived">{t('prop.curveNote', 'Oder den gelben Griff auf der Wand ziehen, um sie zu biegen.')}</div>
+          <div className="prop-derived">{t('prop.curveNote', 'Or drag the yellow handle on the wall to bend it.')}</div>
           <label className="prop-field">
-            <span>{t('prop.reflectance', 'Reflexion')} ({Math.round(w.reflectance * 100)}%)</span>
+            <span>{t('prop.reflectance', 'Reflectance')} ({Math.round(w.reflectance * 100)}%)</span>
             <input type="range" min={0} max={1} step={0.05} value={w.reflectance}
               onChange={(e) => onUpdateWall(w.id, { reflectance: Number(e.target.value) })} />
           </label>
           <div className="reflectance-presets">
             {[
-              [t('prop.reflBlack', 'Schwarz'), 0.05],
-              [t('prop.reflConcrete', 'Beton'), 0.35],
-              [t('prop.reflLight', 'Hell'), 0.6],
-              [t('prop.reflWhite', 'Weiß'), 0.85],
+              [t('prop.reflBlack', 'Black'), 0.05],
+              [t('prop.reflConcrete', 'Concrete'), 0.35],
+              [t('prop.reflLight', 'Light'), 0.6],
+              [t('prop.reflWhite', 'White'), 0.85],
             ].map(([lbl, v]) => (
               <button key={lbl as string} className="refl-btn" onClick={() => onUpdateWall(w.id, { reflectance: v as number })}>{lbl}</button>
             ))}
           </div>
           <label className="prop-field">
-            <span>{t('prop.surface', 'Oberfläche')}</span>
+            <span>{t('prop.surface', 'Surface')}</span>
             <select value={w.material ?? DEFAULT_WALL_MATERIAL}
               onChange={(e) => { const id = e.target.value as WallPresetId; onUpdateWall(w.id, { material: id, color: wallPreset(id).defaultColor }); }}>
               {WALL_PRESETS.map((wp) => <option key={wp.id} value={wp.id}>{translate(language, `wallPreset.${wp.id}`, wp.label)}</option>)}
             </select>
           </label>
           <label className="prop-field">
-            <span>{t('prop.colour', 'Farbe')}</span>
+            <span>{t('prop.colour', 'Colour')}</span>
             <input type="color" value={w.color} onChange={(e) => onUpdateWall(w.id, { color: e.target.value })} />
           </label>
           <label className="prop-field">
-            <span>{t('prop.label', 'Bezeichnung')}</span>
+            <span>{t('prop.label', 'Label')}</span>
             <input type="text" value={w.label || ''} onChange={(e) => onUpdateWall(w.id, { label: e.target.value })} />
           </label>
-          <div className="prop-derived">{t('prop.wallNote', 'Oberfläche & Farbe gelten im Render-Modus. Reflektiert Licht diffus in den Raum (Ein-Bounce) – fließt in die Heatmap ein.')}</div>
+          <div className="prop-derived">{t('prop.wallNote', 'Surface & colour apply in render mode. Reflects light diffusely into the room (single bounce) – and feeds into the heat-map.')}</div>
         </div>
         {(() => {
           const wins = w.windows ?? [];
@@ -859,27 +859,27 @@ const PropertyPanel: React.FC<Props> = ({
           };
           return (
             <div className="prop-section">
-              <div className="prop-section-title">{t('prop.windows', 'Fenster & Glasfront')}</div>
+              <div className="prop-section-title">{t('prop.windows', 'Windows & glass front')}</div>
               {wins.length === 0 && (
-                <div className="prop-derived">{t('prop.noWindows', 'Keine Fenster. Fenster sind echte Öffnungen – Licht (und die Sonne) fällt durch sie in den Raum.')}</div>
+                <div className="prop-derived">{t('prop.noWindows', 'No windows. Windows are real openings – light (and the sun) falls through them into the room.')}</div>
               )}
               {wins.map((win, i) => (
                 <div key={win.id} className="window-edit">
                   <div className="window-edit-head">
-                    <span>{t('prop.window', 'Fenster')} {i + 1}</span>
-                    <button className="window-del" onClick={() => removeWin(win.id)} title={t('prop.removeWindow', 'Fenster entfernen')}>✕</button>
+                    <span>{t('prop.window', 'Window')} {i + 1}</span>
+                    <button className="window-del" onClick={() => removeWin(win.id)} title={t('prop.removeWindow', 'Remove window')}>✕</button>
                   </div>
                   {numField(t('prop.winStart', 'Start (m)'), win.start, (v) => updateWin(win.id, { start: v }), 0.1, 0)}
-                  {numField(t('prop.width', 'Breite (m)'), win.width, (v) => updateWin(win.id, { width: v }), 0.1, 0.1)}
-                  {numField(t('prop.sill', 'Brüstung (m)'), win.sill, (v) => updateWin(win.id, { sill: v }), 0.1, 0, w.height)}
-                  {numField(t('prop.winTop', 'Oberkante (m)'), win.top, (v) => updateWin(win.id, { top: v }), 0.1, 0, w.height)}
+                  {numField(t('prop.width', 'Width (m)'), win.width, (v) => updateWin(win.id, { width: v }), 0.1, 0.1)}
+                  {numField(t('prop.sill', 'Sill (m)'), win.sill, (v) => updateWin(win.id, { sill: v }), 0.1, 0, w.height)}
+                  {numField(t('prop.winTop', 'Head (m)'), win.top, (v) => updateWin(win.id, { top: v }), 0.1, 0, w.height)}
                   <label className="prop-field">
-                    <span>{t('prop.transmittance', 'Lichtdurchlass')} ({Math.round(win.transmittance * 100)}%)</span>
+                    <span>{t('prop.transmittance', 'Transmittance')} ({Math.round(win.transmittance * 100)}%)</span>
                     <input type="range" min={0} max={1} step={0.05} value={win.transmittance}
                       onChange={(e) => updateWin(win.id, { transmittance: Number(e.target.value) })} />
                   </label>
                   <label className="prop-field">
-                    <span>{t('prop.glassTint', 'Glasfarbe')}</span>
+                    <span>{t('prop.glassTint', 'Glass tint')}</span>
                     <input type="color" value={win.tint} onChange={(e) => updateWin(win.id, { tint: e.target.value })} />
                   </label>
                 </div>
@@ -891,7 +891,7 @@ const PropertyPanel: React.FC<Props> = ({
             </div>
           );
         })()}
-        <button className="delete-btn" onClick={() => onDelete(w.id)}>Wand löschen</button>
+        <button className="delete-btn" onClick={() => onDelete(w.id)}>{t('prop.wallDelete', 'Delete wall')}</button>
       </div>
     );
   }
@@ -900,32 +900,32 @@ const PropertyPanel: React.FC<Props> = ({
     const c = selCeiling;
     return (
       <div className="property-panel">
-        <h3>{t('prop.ceiling', 'Decke')}</h3>
+        <h3>{t('prop.ceiling', 'Ceiling')}</h3>
         <div className="prop-section">
-          <div className="prop-derived lux-readout">{c.points.length} {t('prop.vertices', 'Eckpunkte')}</div>
-          {numField(t('prop.height', 'Höhe (m)'), c.height, (v) => onUpdateCeiling(c.id, { height: v }), 0.1, 0.5, 30)}
+          <div className="prop-derived lux-readout">{c.points.length} {t('prop.vertices', 'vertices')}</div>
+          {numField(t('prop.height', 'Height (m)'), c.height, (v) => onUpdateCeiling(c.id, { height: v }), 0.1, 0.5, 30)}
           <label className="prop-field">
-            <span>{t('prop.reflectance', 'Reflexion')} ({Math.round(c.reflectance * 100)}%)</span>
+            <span>{t('prop.reflectance', 'Reflectance')} ({Math.round(c.reflectance * 100)}%)</span>
             <input type="range" min={0} max={1} step={0.05} value={c.reflectance}
               onChange={(e) => onUpdateCeiling(c.id, { reflectance: Number(e.target.value) })} />
           </label>
           <div className="reflectance-presets">
             {[
-              [t('prop.reflDark', 'Dunkel'), 0.1],
-              [t('prop.reflConcrete', 'Beton'), 0.4],
-              [t('prop.reflLight', 'Hell'), 0.7],
-              [t('prop.reflWhite', 'Weiß'), 0.85],
+              [t('prop.reflDark', 'Dark'), 0.1],
+              [t('prop.reflConcrete', 'Concrete'), 0.4],
+              [t('prop.reflLight', 'Light'), 0.7],
+              [t('prop.reflWhite', 'White'), 0.85],
             ].map(([lbl, v]) => (
               <button key={lbl as string} className="refl-btn" onClick={() => onUpdateCeiling(c.id, { reflectance: v as number })}>{lbl}</button>
             ))}
           </div>
           <label className="prop-field">
-            <span>{t('prop.colour', 'Farbe')}</span>
+            <span>{t('prop.colour', 'Colour')}</span>
             <input type="color" value={c.color} onChange={(e) => onUpdateCeiling(c.id, { color: e.target.value })} />
           </label>
-          <div className="prop-derived">{t('prop.ceilingNote', 'Reflektiert nach unten in den Raum. Tipp: „Decke" in der Toolbar erzeugt sie neu aus den Wänden.')}</div>
+          <div className="prop-derived">{t('prop.ceilingNote', 'Reflects downwards into the room. Tip: „Ceiling" in the toolbar rebuilds it from the walls.')}</div>
         </div>
-        <button className="delete-btn" onClick={() => onDelete(c.id)}>{t('prop.deleteCeiling', 'Decke löschen')}</button>
+        <button className="delete-btn" onClick={() => onDelete(c.id)}>{t('prop.deleteCeiling', 'Delete ceiling')}</button>
       </div>
     );
   }
@@ -937,17 +937,17 @@ const PropertyPanel: React.FC<Props> = ({
     const h = isRect ? Math.abs(sh.points[1].y - sh.points[0].y) : 0;
     return (
       <div className="property-panel">
-        <h3>{isRect ? t('prop.shapeRectTitle', 'Fläche (Rechteck)') : sh.type === 'measure' ? t('prop.shapeMeasure', 'Maßlinie') : t('prop.shapeLine', 'Linie')}</h3>
+        <h3>{isRect ? t('prop.shapeRectTitle', 'Area (rectangle)') : sh.type === 'measure' ? t('prop.shapeMeasure', 'Dimension line') : t('prop.shapeLine', 'Line')}</h3>
         <div className="prop-section">
           {isRect
-            ? <div className="prop-derived lux-readout">{t('prop.shapeSize', 'Größe')}: {w.toFixed(1)} × {h.toFixed(1)} m · {(w * h).toFixed(1)} m²</div>
+            ? <div className="prop-derived lux-readout">{t('prop.shapeSize', 'Size')}: {w.toFixed(1)} × {h.toFixed(1)} m · {(w * h).toFixed(1)} m²</div>
             : <div className="prop-derived">{sh.label}</div>}
-          <p className="prop-hint">{t('prop.shapeHint', 'Kante ziehen verschiebt die Fläche.')}</p>
+          <p className="prop-hint">{t('prop.shapeHint', 'Dragging an edge moves the area.')}</p>
         </div>
         {isRect && (
-          <button className="auto-btn wide" onClick={onAreaLight}>🔆 {t('prop.lightArea', 'Diese Fläche ausleuchten')}</button>
+          <button className="auto-btn wide" onClick={onAreaLight}>🔆 {t('prop.lightArea', 'Light up this area')}</button>
         )}
-        <button className="delete-btn" onClick={() => onDelete(sh.id)}>{t('prop.delete', 'Löschen')}</button>
+        <button className="delete-btn" onClick={() => onDelete(sh.id)}>{t('prop.delete', 'Delete')}</button>
       </div>
     );
   }
@@ -956,10 +956,10 @@ const PropertyPanel: React.FC<Props> = ({
   if (multiCount > 1) {
     return (
       <div className="property-panel">
-        <h3>{multiCount} {t('prop.multiSelected', 'Elemente ausgewählt')}</h3>
+        <h3>{multiCount} {t('prop.multiSelected', 'elements selected')}</h3>
         {multiFixtures.length > 0 && (
           <div className="prop-section">
-            <span className="prop-section-title">{multiFixtures.length} {t('prop.fixtureCount', 'Leuchte(n)')}</span>
+            <span className="prop-section-title">{multiFixtures.length} {t('prop.fixtureCount', 'fixture(s)')}</span>
             <ul className="multi-sel-list">
               {multiFixtures.map((f) => (
                 <li key={f.id}>{f.fixture.name}</li>
@@ -968,20 +968,20 @@ const PropertyPanel: React.FC<Props> = ({
           </div>
         )}
         <div className="prop-section">
-          <span className="prop-section-title">{t('prop.actions', 'Aktionen')}</span>
+          <span className="prop-section-title">{t('prop.actions', 'Actions')}</span>
           <p className="prop-hint">
-            {t('prop.multiMove', 'Verschieben: Ziehe eine der markierten Leuchten.')}<br />
-            {t('prop.multiRotate', 'Drehen: Nutze die Toolbar-Buttons zum Rotieren um eine Person.')}
+            {t('prop.multiMove', 'Move: drag one of the selected fixtures.')}<br />
+            {t('prop.multiRotate', 'Rotate: use the toolbar buttons to rotate around a person.')}
           </p>
           {multiFixtures.length > 0 && (
             <div className="reflectance-presets">
-              <button className="refl-btn" onClick={() => { for (const mf of multiFixtures) onUpdateFixture(mf.id, { hidden: true }); }}>🚫 {t('prop.hideShort', 'Ausblenden')}</button>
-              <button className="refl-btn" onClick={() => { for (const mf of multiFixtures) onUpdateFixture(mf.id, { hidden: undefined }); }}>👁 {t('prop.show', 'Einblenden')}</button>
+              <button className="refl-btn" onClick={() => { for (const mf of multiFixtures) onUpdateFixture(mf.id, { hidden: true }); }}>🚫 {t('prop.hideShort', 'Hide')}</button>
+              <button className="refl-btn" onClick={() => { for (const mf of multiFixtures) onUpdateFixture(mf.id, { hidden: undefined }); }}>👁 {t('prop.show', 'Show')}</button>
             </div>
           )}
         </div>
         <button className="delete-btn" onClick={() => { for (const sid of selectedIds) onDelete(sid); }}>
-          {t('prop.deleteAll', 'Alle')} {multiCount} {t('prop.delete', 'löschen')}
+          {format(t('prop.deleteAllN', 'Delete all {n}'), { n: multiCount })}
         </button>
       </div>
     );
@@ -990,26 +990,26 @@ const PropertyPanel: React.FC<Props> = ({
   // No selection
   return (
     <div className="property-panel">
-      <h3>{t('prop.title', 'Eigenschaften')}</h3>
+      <h3>{t('prop.title', 'Properties')}</h3>
       <p className="prop-hint">
-        {t('prop.emptyHint', 'Wähle eine Leuchte, Person oder ein Bühnen-Element aus – oder leg direkt los:')}
+        {t('prop.emptyHint', 'Select a fixture, a person or a stage element – or just get started:')}
       </p>
       <div className="prop-section">
-        <span className="prop-section-title">{t('prop.quickstart', 'Schnellstart')}</span>
+        <span className="prop-section-title">{t('prop.quickstart', 'Quick start')}</span>
         <ol className="quickstart-list">
-          <li><span>📐</span> <strong>{t('prop.qs1Title', 'Grundriss')}</strong> {t('prop.qs1Body', 'importieren – JPG, PNG oder PDF')}</li>
-          <li><span>📏</span> <strong>{t('prop.qs2Title', 'Maßstab kalibrieren')}</strong> {t('prop.qs2Body', '– Strecke ziehen, echte Länge eingeben')}</li>
-          <li><span>💡</span> {t('prop.qs3', 'Leuchten aus der Bibliothek auf den Plan ziehen')}</li>
+          <li><span>📐</span> <strong>{t('prop.qs1Title', 'Floor plan')}</strong> {t('prop.qs1Body', 'import – JPG, PNG or PDF')}</li>
+          <li><span>📏</span> <strong>{t('prop.qs2Title', 'Calibrate scale')}</strong> {t('prop.qs2Body', '– drag a distance, enter its real length')}</li>
+          <li><span>💡</span> {t('prop.qs3', 'Drag fixtures from the library onto the plan')}</li>
         </ol>
       </div>
       <div className="prop-section">
-        <span className="prop-section-title">{t('prop.keyboard', 'Tastatur')}</span>
+        <span className="prop-section-title">{t('prop.keyboard', 'Keyboard')}</span>
         <div className="shortcut-grid">
-          <kbd>{t('prop.kbdSpace', 'Leertaste')}</kbd><span>{t('prop.kbdPan', 'Ansicht verschieben')}</span>
-          <kbd>{t('prop.kbdWheel', 'Mausrad')}</kbd><span>{t('prop.kbdZoom', 'Zoomen')}</span>
-          <kbd>{t('prop.kbdUndoKey', 'Strg/⌘ Z')}</kbd><span>{t('prop.kbdUndo', 'Rückgängig')}</span>
-          <kbd>{t('prop.kbdDel', 'Entf')}</kbd><span>{t('prop.delete', 'Löschen')}</span>
-          <kbd>Esc</kbd><span>{t('prop.kbdCancel', 'Abbrechen')}</span>
+          <kbd>{t('prop.kbdSpace', 'Space')}</kbd><span>{t('prop.kbdPan', 'Pan the view')}</span>
+          <kbd>{t('prop.kbdWheel', 'Mouse wheel')}</kbd><span>{t('prop.kbdZoom', 'Zoom')}</span>
+          <kbd>{t('prop.kbdUndoKey', 'Ctrl/⌘ Z')}</kbd><span>{t('prop.kbdUndo', 'Undo')}</span>
+          <kbd>{t('prop.kbdDel', 'Del')}</kbd><span>{t('prop.delete', 'Delete')}</span>
+          <kbd>Esc</kbd><span>{t('prop.kbdCancel', 'Cancel')}</span>
         </div>
       </div>
       {cursorLux !== null && (

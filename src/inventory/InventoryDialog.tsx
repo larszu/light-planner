@@ -110,7 +110,7 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
   const doImport = async (file: File) => {
     const snap = parseInventory(await file.text());
     if (!snap) {
-      setMsg(t('inventory.importErr', 'Keine gültige Lager-Datei (avplan-inventory).'));
+      setMsg(t('inventory.importErr', 'Not a valid inventory file (avplan-inventory).'));
       return;
     }
     // Vorbelegung ist die harmlose der beiden Antworten: `merge` nimmt nichts
@@ -131,9 +131,9 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
       useInventoryStore.getState().storageFull
         ? t(
             'inventory.importFull',
-            '{n} Objekte gelesen, aber NICHT gespeichert: der lokale Speicher ist voll. Erst Platz schaffen, dann erneut importieren.',
+            '{n} objects read but NOT saved: local storage is full. Free some space, then import again.',
           ).replace('{n}', String(n))
-        : t('inventory.importDone', '{n} Objekte importiert.').replace('{n}', String(n)),
+        : t('inventory.importDone', '{n} items imported.').replace('{n}', String(n)),
     );
   };
 
@@ -141,12 +141,12 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
     const code = scan.trim();
     if (!code) return;
     const m = resolveInventoryCode(code, { items, nodes, units });
-    if (!m) setMsg(t('inventory.scanNone', 'Kein Treffer.'));
+    if (!m) setMsg(t('inventory.scanNone', 'No match.'));
     else if (m.kind === 'item') {
-      setMsg(`${t('inventory.item', 'Artikel')}: ${m.item.model}`);
+      setMsg(`${t('inventory.item', 'Item')}: ${m.item.model}`);
       setForm({ ...m.item });
-    } else if (m.kind === 'node') setMsg(`${t('inventory.location', 'Lagerort')}: ${m.node.name}`);
-    else setMsg(`${t('inventory.unit', 'Einheit')}: ${unitLabel(m.unit)}`);
+    } else if (m.kind === 'node') setMsg(`${t('inventory.location', 'Location')}: ${m.node.name}`);
+    else setMsg(`${t('inventory.unit', 'Unit')}: ${unitLabel(m.unit)}`);
     setScan('');
   };
 
@@ -154,8 +154,8 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(760px, 94vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 16 }}>{t('inventory.title', 'Lager / Bestand')}</h2>
-          <button onClick={onClose} aria-label={t('about.close', 'Schließen')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
+          <h2 style={{ margin: 0, fontSize: 16 }}>{t('inventory.title', 'Inventory')}</h2>
+          <button onClick={onClose} aria-label={t('about.close', 'Close')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>
             <Icon name="close" size={18} />
           </button>
         </div>
@@ -164,22 +164,22 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
           <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
             <span style={{ position: 'absolute', left: 6, top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}><Icon name="search" size={13} /></span>
             <input value={scan} onChange={(e) => setScan(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doScan()}
-              placeholder={t('inventory.scanPh', 'Code scannen / eingeben…')} style={{ ...inp, paddingLeft: 26 }} />
+              placeholder={t('inventory.scanPh', 'Scan / enter code…')} style={{ ...inp, paddingLeft: 26 }} />
           </div>
-          <button onClick={doScan}>{t('inventory.scan', 'Auflösen')}</button>
-          <button onClick={doExport} title={t('inventory.exportHint', 'App-übergreifend exportieren')}><Icon name="export" size={13} /> {t('inventory.export', 'Export')}</button>
+          <button onClick={doScan}>{t('inventory.scan', 'Resolve')}</button>
+          <button onClick={doExport} title={t('inventory.exportHint', 'Export across apps')}><Icon name="export" size={13} /> {t('inventory.export', 'Export')}</button>
           <button onClick={() => fileRef.current?.click()}><Icon name="import" size={13} /> {t('inventory.import', 'Import')}</button>
-          <button className="primary" onClick={() => setForm({ model: '', quantity: 1 })}><Icon name="plus" size={13} /> {t('inventory.add', 'Artikel')}</button>
+          <button className="primary" onClick={() => setForm({ model: '', quantity: 1 })}><Icon name="plus" size={13} /> {t('inventory.add', 'Item')}</button>
         </div>
         {msg && <div style={{ ...cell, borderTop: 'none', background: 'var(--lp-input-bg,#1a1a1a)', borderRadius: 4, marginBottom: 8 }}>{msg}</div>}
 
         {pending && vorschau && summe && (
           <div style={{ border: '1px solid var(--lp-border, #333)', borderRadius: 6, padding: 10, marginBottom: 10 }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>{t('inventory.previewTitle', 'Was dieser Import ändert')}</div>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>{t('inventory.previewTitle', 'What this import changes')}</div>
 
             {/* Der Modus steht ÜBER der Tabelle: das Umschalten rechnet sie neu,
                 und genau dieser Vergleich ist die Entscheidung. */}
-            <div role="radiogroup" aria-label={t('inventory.previewTitle', 'Was dieser Import ändert')} style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            <div role="radiogroup" aria-label={t('inventory.previewTitle', 'What this import changes')} style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
               {(['merge', 'replace'] as ImportMode[]).map((m) => (
                 <button
                   key={m}
@@ -189,14 +189,14 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
                   onClick={() => setPending({ ...pending, mode: m })}
                 >
                   {m === 'merge'
-                    ? t('inventory.previewMerge', 'Zusammenführen')
-                    : t('inventory.previewReplace', 'Ersetzen')}
+                    ? t('inventory.previewMerge', 'Merge')
+                    : t('inventory.previewReplace', 'Replace')}
                 </button>
               ))}
               <span style={{ opacity: 0.7, alignSelf: 'center', fontSize: 12 }}>
                 {pending.mode === 'merge'
-                  ? t('inventory.previewMergeHint', 'Fortschreiben — es fällt nichts weg.')
-                  : t('inventory.previewReplaceHint', 'Der bisherige Bestand wird verworfen.')}
+                  ? t('inventory.previewMergeHint', 'Carried forward — nothing is dropped.')
+                  : t('inventory.previewReplaceHint', 'The existing inventory is discarded.')}
               </span>
             </div>
 
@@ -204,13 +204,13 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
               <thead>
                 <tr style={{ textAlign: 'left', opacity: 0.75 }}>
                   <th style={{ padding: '4px 8px' }} />
-                  <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('inventory.previewNew', 'neu')}</th>
-                  <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('inventory.previewChanged', 'geändert')}</th>
-                  <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('inventory.previewSame', 'unverändert')}</th>
+                  <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('inventory.previewNew', 'new')}</th>
+                  <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('inventory.previewChanged', 'changed')}</th>
+                  <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('inventory.previewSame', 'unchanged')}</th>
                   <th style={{ padding: '4px 8px', textAlign: 'right' }}>
                     {pending.mode === 'replace'
-                      ? t('inventory.previewRemoved', 'entfällt')
-                      : t('inventory.previewUntouched', 'bleibt')}
+                      ? t('inventory.previewRemoved', 'dropped')
+                      : t('inventory.previewUntouched', 'kept')}
                   </th>
                 </tr>
               </thead>
@@ -233,19 +233,19 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
                 ausgeschrieben statt nur in einer Spalte zu stehen. */}
             {summe.entfernt > 0 && (
               <div style={{ marginTop: 8, color: 'var(--lp-danger, #f87171)' }}>
-                {t('inventory.previewRemoves', '{n} vorhandene Datensätze fallen weg. Das lässt sich nicht rückgängig machen.').replace('{n}', String(summe.entfernt))}
+                {t('inventory.previewRemoves', '{n} existing records will be dropped. This cannot be undone.').replace('{n}', String(summe.entfernt))}
               </div>
             )}
             {vorschauIstLeer(vorschau) && (
               <div style={{ marginTop: 8, opacity: 0.8 }}>
-                {t('inventory.previewNothing', 'Diese Datei ändert nichts am Bestand.')}
+                {t('inventory.previewNothing', 'This file changes nothing in the inventory.')}
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
-              <button onClick={() => setPending(null)}>{t('inventory.previewCancel', 'Abbrechen')}</button>
+              <button onClick={() => setPending(null)}>{t('inventory.previewCancel', 'Cancel')}</button>
               <button className="primary" onClick={doImportConfirm}>
-                {t('inventory.previewApply', 'Importieren')}
+                {t('inventory.previewApply', 'Import')}
               </button>
             </div>
           </div>
@@ -253,24 +253,24 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
 
         {form && (
           <div style={{ border: '1px solid var(--lp-accent,#5b9)', borderRadius: 6, padding: 12, marginBottom: 10 }}>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>{form.id ? t('inventory.edit', 'Artikel bearbeiten') : t('inventory.new', 'Neuer Artikel')}</div>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>{form.id ? t('inventory.edit', 'Edit item') : t('inventory.new', 'New item')}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              <label>{t('inventory.model', 'Modell')} *<input autoFocus value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} style={inp} /></label>
-              <label>{t('inventory.manufacturer', 'Hersteller')}<input value={form.manufacturer ?? ''} onChange={(e) => setForm({ ...form, manufacturer: e.target.value })} style={inp} /></label>
-              <label>{t('inventory.quantity', 'Menge')}<input type="number" min={0} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} style={inp} /></label>
+              <label>{t('inventory.model', 'Model')} *<input autoFocus value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} style={inp} /></label>
+              <label>{t('inventory.manufacturer', 'Manufacturer')}<input value={form.manufacturer ?? ''} onChange={(e) => setForm({ ...form, manufacturer: e.target.value })} style={inp} /></label>
+              <label>{t('inventory.quantity', 'Quantity')}<input type="number" min={0} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} style={inp} /></label>
               <label>{t('inventory.code', 'Code')}<input value={form.code ?? ''} onChange={(e) => setForm({ ...form, code: e.target.value })} style={inp} /></label>
-              <label>{t('inventory.ownership', 'Eigentum')}
+              <label>{t('inventory.ownership', 'Ownership')}
                 <select value={form.ownership ?? ''} onChange={(e) => setForm({ ...form, ownership: (e.target.value || undefined) as InventoryItem['ownership'] })} style={inp}>
                   <option value="">—</option>
-                  <option value="owned">{t('inventory.owned', 'Eigentum')}</option>
-                  <option value="rented">{t('inventory.rented', 'gemietet')}</option>
-                  <option value="subhire">{t('inventory.subhire', 'Sub-Miete')}</option>
+                  <option value="owned">{t('inventory.owned', 'Owned')}</option>
+                  <option value="rented">{t('inventory.rented', 'Rented')}</option>
+                  <option value="subhire">{t('inventory.subhire', 'Sub-hire')}</option>
                 </select>
               </label>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-              <button onClick={() => setForm(null)}>{t('common.cancel', 'Abbrechen')}</button>
-              <button className="primary" disabled={form.model.trim() === ''} onClick={save}>{t('common.save', 'Speichern')}</button>
+              <button onClick={() => setForm(null)}>{t('common.cancel', 'Cancel')}</button>
+              <button className="primary" disabled={form.model.trim() === ''} onClick={save}>{t('common.save', 'Save')}</button>
             </div>
           </div>
         )}
@@ -278,16 +278,16 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
         <div style={{ overflow: 'auto', flex: 1 }}>
           {sorted.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', opacity: 0.6 }}>
-              {t('inventory.empty', 'Noch keine Lager-Artikel. Lege welche an oder importiere ein Lager aus Cable/MultiCam Planner.')}
+              {t('inventory.empty', 'No inventory items yet. Add some, or import an inventory from Cable/MultiCam Planner.')}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
               <thead style={{ opacity: 0.7 }}>
                 <tr>
-                  <th style={{ padding: '4px 8px' }}>{t('inventory.model', 'Modell')}</th>
-                  <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('inventory.quantity', 'Menge')}</th>
+                  <th style={{ padding: '4px 8px' }}>{t('inventory.model', 'Model')}</th>
+                  <th style={{ padding: '4px 8px', textAlign: 'right' }}>{t('inventory.quantity', 'Quantity')}</th>
                   <th style={{ padding: '4px 8px' }}>{t('inventory.code', 'Code')}</th>
-                  <th style={{ padding: '4px 8px' }}>{t('inventory.ownership', 'Eigentum')}</th>
+                  <th style={{ padding: '4px 8px' }}>{t('inventory.ownership', 'Ownership')}</th>
                   <th />
                 </tr>
               </thead>
@@ -299,8 +299,8 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
                     <td style={{ ...cell, opacity: 0.8 }}>{it.code ?? '—'}</td>
                     <td style={{ ...cell, opacity: 0.8 }}>{it.ownership ?? '—'}</td>
                     <td style={{ ...cell, textAlign: 'right' }}>
-                      <button onClick={() => setForm({ ...it })} style={{ marginRight: 4 }}>{t('common.edit', 'Bearbeiten')}</button>
-                      <button onClick={() => removeItem(it.id)} aria-label={t('common.delete', 'Löschen')}><Icon name="trash" size={13} /></button>
+                      <button onClick={() => setForm({ ...it })} style={{ marginRight: 4 }}>{t('common.edit', 'Edit')}</button>
+                      <button onClick={() => removeItem(it.id)} aria-label={t('common.delete', 'Delete')}><Icon name="trash" size={13} /></button>
                     </td>
                   </tr>
                 ))}
@@ -309,7 +309,7 @@ const InventoryDialog: React.FC<Props> = ({ onClose }) => {
           )}
           {(nodes.length > 0 || units.length > 0) && (
             <div style={{ fontSize: 12, opacity: 0.5, marginTop: 8 }}>
-              + {nodes.length} {t('inventory.locations', 'Lagerorte/Cases')} · {units.length} {t('inventory.units', 'Einheiten')} ({t('inventory.fromImport', 'aus Import, verlustfrei erhalten')})
+              + {nodes.length} {t('inventory.locations', 'Locations/cases')} · {units.length} {t('inventory.units', 'Units')} ({t('inventory.fromImport', 'from import, preserved losslessly')})
             </div>
           )}
         </div>

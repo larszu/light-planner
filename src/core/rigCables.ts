@@ -74,12 +74,21 @@ export interface RunEnd {
  */
 export const NOT_SET = '–';
 
-/** Der Satz, der die Laengen einordnet. Steht im Modul, nicht im Dialog. */
+/**
+ * Der Satz, der die Laengen einordnet. Steht im Modul, nicht im Dialog.
+ *
+ * ENGLISCH, weil es der QUELLTEXT ist (E-28) — er wird im Dialog als Fallback
+ * an `t('sch.cbl.basis', …)` gereicht. Dass er eine Konstante ist und kein
+ * Literal, hat ihn beim Sprachwechsel fast uebersehen lassen: das
+ * Tausch-Werkzeug sieht nur Zeichenketten-Literale. Gefunden hat ihn
+ * `i18n:check` ueber die andere Seite — der Schluessel war erreichbar und
+ * hatte keine deutsche Fassung.
+ */
 export const LENGTH_BASIS_NOTE =
-  'Die Längen sind die geraden Strecken zwischen den Aufhängepunkten — eine '
-  + 'Untergrenze. Durchhang, der Weg um die Traverse und die Schleife am Haken '
-  + 'kommen dazu. Wege von der Quelle zur ersten Leuchte stehen leer: der Plan '
-  + 'stellt weder Verteiler noch Nodes auf, und eine Zahl wäre hier erfunden.';
+  'Lengths are the straight lines between hanging points — a lower bound. '
+  + 'Sag, the way around the truss and the loop at the hook come on top. Runs '
+  + 'from the source to the first fixture are left blank: the plan places '
+  + 'neither distros nor nodes, and a number here would be invented.';
 
 export interface CableRun {
   id: string;

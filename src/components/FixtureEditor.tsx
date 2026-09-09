@@ -139,11 +139,11 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal fixture-editor-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{initial ? t('fx.editTitle', 'Leuchte bearbeiten') : t('fx.newTitle', 'Eigene Leuchte anlegen')}</h3>
+        <h3>{initial ? t('fx.editTitle', 'Edit fixture') : t('fx.newTitle', 'Add a custom fixture')}</h3>
 
         <div className="ai-assist">
           <button type="button" className={`ai-toggle ${aiOpen ? 'open' : ''}`} onClick={() => setAiOpen((o) => !o)}>
-            ✨ {t('fx.aiToggle', 'KI-Assistent – Daten aus Datenblatt ziehen')} {aiOpen ? '▾' : '▸'}
+            ✨ {t('fx.aiToggle', 'AI assistant – pull data from a datasheet')} {aiOpen ? '▾' : '▸'}
           </button>
           {aiOpen && (
             <div className="ai-body">
@@ -152,7 +152,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
                 rows={5}
                 value={aiText}
                 onChange={(e) => setAiText(e.target.value)}
-                placeholder={t('fx.aiPlaceholder', 'Datenblatt-Text hier einfügen – oder einfach das Modell nennen, z. B. Elation KL Profile FC …')}
+                placeholder={t('fx.aiPlaceholder', 'Paste datasheet text here – or simply name the model, e.g. Elation KL Profile FC …')}
               />
               <div className="ai-controls">
                 <input
@@ -160,24 +160,24 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
                   type="password"
                   value={aiKey}
                   onChange={(e) => setAiKey(e.target.value)}
-                  placeholder={t('fx.aiKey', 'Anthropic API-Schlüssel (sk-ant-…)')}
+                  placeholder={t('fx.aiKey', 'Anthropic API key (sk-ant-…)')}
                 />
                 <select value={aiModel} onChange={(e) => setAiModel(e.target.value)}>
                   {AI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
                 <button type="button" className="primary" disabled={aiLoading} onClick={handleExtract}>
-                  {aiLoading ? t('fx.aiExtracting', 'Extrahiere…') : t('fx.aiExtract', 'Daten extrahieren')}
+                  {aiLoading ? t('fx.aiExtracting', 'Extracting…') : t('fx.aiExtract', 'Extract data')}
                 </button>
               </div>
               <div className="ai-note">
-                {t('fx.aiKeyNote', 'Der Schlüssel wird nur für diese Sitzung im Arbeitsspeicher gehalten und nicht gespeichert. Er geht direkt an api.anthropic.com. Bitte alle übernommenen Werte unten prüfen.')}
+                {t('fx.aiKeyNote', 'The key is kept in memory for this session only and is not stored. It goes straight to api.anthropic.com. Please check every value it fills in below.')}
               </div>
               {aiError && <div className="ai-error">⚠ {aiError}</div>}
               {aiVerification && (
                 <div className="ai-verify">
-                  <div className="ai-verify-head">✓ {t('fx.aiVerify', 'Übernommen – bitte prüfen')} ({aiVerification.length} {t('fx.aiFields', 'Felder')}):</div>
+                  <div className="ai-verify-head">✓ {t('fx.aiVerify', 'Filled in – please check')} ({aiVerification.length} {t('fx.aiFields', 'fields')}):</div>
                   <table className="ai-verify-table">
-                    <thead><tr><th>{t('fx.colField', 'Feld')}</th><th>{t('fx.colValue', 'Wert')}</th><th>{t('fx.colSource', 'Quelle / Begründung')}</th></tr></thead>
+                    <thead><tr><th>{t('fx.colField', 'Field')}</th><th>{t('fx.colValue', 'Value')}</th><th>{t('fx.colSource', 'Source / reasoning')}</th></tr></thead>
                     <tbody>
                       {aiVerification.map((v, i) => (
                         <tr key={i} className={/gesch/i.test(v.source) ? 'ai-est' : ''}>
@@ -193,13 +193,13 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
         </div>
 
         <div className="editor-grid">
-          <label>{t('fx.name', 'Name*')}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('fx.namePh', 'z.B. PAR 64 CP62')} /></label>
-          <label>{t('fx.manufacturer', 'Hersteller')}<input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={t('fx.manufacturerPh', 'z.B. Generic')} /></label>
+          <label>{t('fx.name', 'Name*')}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('fx.namePh', 'e.g. PAR 64 CP62')} /></label>
+          <label>{t('fx.manufacturer', 'Manufacturer')}<input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={t('fx.manufacturerPh', 'e.g. Generic')} /></label>
 
-          <label>{t('fx.category', 'Kategorie')}
+          <label>{t('fx.category', 'Category')}
             <select value={category} onChange={(e) => setCategory(e.target.value as FixtureCategory)}>
-              <option value="profile">{t('fx.cat.profile', 'Profilscheinwerfer')}</option>
-              <option value="fresnel">{t('fx.cat.fresnel', 'Stufenlinse')}</option>
+              <option value="profile">{t('fx.cat.profile', 'Profile spot')}</option>
+              <option value="fresnel">{t('fx.cat.fresnel', 'Fresnel')}</option>
               <option value="par">PAR</option>
               <option value="wash">LED Wash</option>
               <option value="spot">LED Spot</option>
@@ -208,100 +208,100 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
               <option value="moving-spot">Moving Head Spot</option>
               <option value="moving-beam">Moving Head Beam</option>
               <option value="blinder">Blinder</option>
-              <option value="cyc">{t('fx.cat.cyc', 'Horizontleuchte')}</option>
-              <option value="flood">{t('fx.cat.flood', 'Fluter')}</option>
-              <option value="followspot">{t('fx.cat.followspot', 'Verfolger')}</option>
-              <option value="led-panel">{t('fx.cat.ledPanel', 'LED-Flächenleuchte')}</option>
-              <option value="custom">{t('fx.cat.custom', 'Eigene')}</option>
+              <option value="cyc">{t('fx.cat.cyc', 'Cyc light')}</option>
+              <option value="flood">{t('fx.cat.flood', 'Flood')}</option>
+              <option value="followspot">{t('fx.cat.followspot', 'Followspot')}</option>
+              <option value="led-panel">{t('fx.cat.ledPanel', 'LED panel')}</option>
+              <option value="custom">{t('fx.cat.custom', 'Custom')}</option>
             </select>
           </label>
 
-          <label>{t('fx.mount', 'Befestigung')}
+          <label>{t('fx.mount', 'Mount')}
             <select value={mountType} onChange={(e) => setMountType(e.target.value as MountType)}>
               <option value="bowens">Bowens S-Mount</option>
               <option value="prolock-bowens">ProLock Bowens</option>
               <option value="junior">Junior Pin (1-1/8")</option>
               <option value="baby">Baby Pin (5/8")</option>
-              <option value="clamp">{t('fx.mount.clamp', 'C-Clamp / Bügelklemme')}</option>
-              <option value="yoke">{t('fx.mount.yoke', 'Integriertes Joch')}</option>
-              <option value="none">{t('fx.mount.none', 'Kein Ansatz')}</option>
+              <option value="clamp">{t('fx.mount.clamp', 'C-clamp')}</option>
+              <option value="yoke">{t('fx.mount.yoke', 'Integrated yoke')}</option>
+              <option value="none">{t('fx.mount.none', 'No mount')}</option>
             </select>
           </label>
 
-          <label>{t('fx.wattage', 'Leistung (W)')}<input type="number" value={wattage} onChange={(e) => setWattage(Number(e.target.value))} min={1} /></label>
-          <label>{t('fx.lumens', 'Lichtstrom (lm)')}<input type="number" value={lumens} onChange={(e) => setLumens(Number(e.target.value))} min={1} /></label>
+          <label>{t('fx.wattage', 'Power (W)')}<input type="number" value={wattage} onChange={(e) => setWattage(Number(e.target.value))} min={1} /></label>
+          <label>{t('fx.lumens', 'Luminous flux (lm)')}<input type="number" value={lumens} onChange={(e) => setLumens(Number(e.target.value))} min={1} /></label>
 
-          <label title={t('fx.beamHint', 'Heller Kern: Winkel, bei dem die Intensität auf 50 % des Maximums fällt (FWHM).')}>{t('fx.beam', 'Beam-Winkel 50 % (°)')}<input type="number" value={beamAngle} step={0.5} onChange={(e) => setBeamAngle(Number(e.target.value))} min={1} max={180} /></label>
-          <label title={t('fx.fieldHint', 'Nutzbarer Rand: bei 10 % des Maximums. Immer größer als der Beam-Winkel.')}>{t('fx.field', 'Field-Winkel 10 % (°)')}<input type="number" value={fieldAngle} step={0.5} onChange={(e) => setFieldAngle(Number(e.target.value))} min={1} max={180} /></label>
-          <label title={t('fx.cutoffHint', 'Wo das Licht praktisch endet (2,5 %). Optional – 0 = nicht angegeben.')}>{t('fx.cutoff', 'Cutoff 2,5 % (°)')}<input type="number" value={cutoffAngle} step={0.5} onChange={(e) => setCutoffAngle(Number(e.target.value))} min={0} max={180} /></label>
-          <div className="editor-note">{t('fx.angleNote', 'Beam (50 %) < Field (10 %) < Cutoff (2,5 %). Der Zoom (unten) ist der einstellbare Beam-Winkel-Bereich – etwas anderes als Beam/Field.')}</div>
+          <label title={t('fx.beamHint', 'Bright core: the angle at which intensity falls to 50 % of the maximum (FWHM).')}>{t('fx.beam', 'Beam angle 50 % (°)')}<input type="number" value={beamAngle} step={0.5} onChange={(e) => setBeamAngle(Number(e.target.value))} min={1} max={180} /></label>
+          <label title={t('fx.fieldHint', 'Usable edge: at 10 % of the maximum. Always wider than the beam angle.')}>{t('fx.field', 'Field angle 10 % (°)')}<input type="number" value={fieldAngle} step={0.5} onChange={(e) => setFieldAngle(Number(e.target.value))} min={1} max={180} /></label>
+          <label title={t('fx.cutoffHint', 'Where the light effectively ends (2.5 %). Optional – 0 = not given.')}>{t('fx.cutoff', 'Cutoff 2.5 % (°)')}<input type="number" value={cutoffAngle} step={0.5} onChange={(e) => setCutoffAngle(Number(e.target.value))} min={0} max={180} /></label>
+          <div className="editor-note">{t('fx.angleNote', 'Beam (50 %) < field (10 %) < cutoff (2.5 %). The zoom (below) is the adjustable beam-angle range – a different thing from beam/field.')}</div>
 
-          <label>{t('fx.beamShape', 'Strahlform')}
+          <label>{t('fx.beamShape', 'Beam shape')}
             <select value={beamShape} onChange={(e) => setBeamShape(e.target.value as BeamShape)}>
-              <option value="circular">{t('fx.shapeCircular', 'Kreisförmig')}</option>
-              <option value="elliptical">{t('fx.shapeElliptical', 'Elliptisch')}</option>
+              <option value="circular">{t('fx.shapeCircular', 'Circular')}</option>
+              <option value="elliptical">{t('fx.shapeElliptical', 'Elliptical')}</option>
               <option value="linear">{t('fx.shapeLinear', 'Linear')}</option>
-              <option value="rectangular">{t('fx.shapeRect', 'Rechteckig')}</option>
+              <option value="rectangular">{t('fx.shapeRect', 'Rectangular')}</option>
             </select>
           </label>
 
           {beamShape !== 'circular' && (
-            <label>{t('fx.beamRatio', 'Beam W:H-Verhältnis')}<input type="number" value={beamRatioWH} step={0.1} onChange={(e) => setBeamRatioWH(Number(e.target.value))} min={0.1} max={10} /></label>
+            <label>{t('fx.beamRatio', 'Beam W:H ratio')}<input type="number" value={beamRatioWH} step={0.1} onChange={(e) => setBeamRatioWH(Number(e.target.value))} min={0.1} max={10} /></label>
           )}
 
-          <label>{t('fx.lensType', 'Linsentyp')}
+          <label>{t('fx.lensType', 'Lens type')}
             <select value={lensType} onChange={(e) => setLensType(e.target.value as LensType)}>
-              <option value="fixed">{t('fx.lensFixed', 'Fest')}</option>
+              <option value="fixed">{t('fx.lensFixed', 'Fixed')}</option>
               <option value="zoom">Zoom</option>
-              <option value="interchangeable">{t('fx.lensInter', 'Wechselbar')}</option>
+              <option value="interchangeable">{t('fx.lensInter', 'Interchangeable')}</option>
               <option value="fresnel">Fresnel</option>
               <option value="pc">Plano-Convex (PC)</option>
-              <option value="reflector">{t('fx.lensReflector', 'Reflektor')}</option>
+              <option value="reflector">{t('fx.lensReflector', 'Reflector')}</option>
             </select>
           </label>
 
           <label className="checkbox-field">
-            <input type="checkbox" checked={hasColorTempRange} onChange={(e) => setHasColorTempRange(e.target.checked)} /> {t('fx.cctRange', 'Farbtemperatur-Bereich (Bi-Color)')}
+            <input type="checkbox" checked={hasColorTempRange} onChange={(e) => setHasColorTempRange(e.target.checked)} /> {t('fx.cctRange', 'Colour-temperature range (bi-colour)')}
           </label>
           {hasColorTempRange ? (
             <>
-              <label>{t('fx.cctMin', 'CCT Min (K)')}<input type="number" value={colorTempMin} onChange={(e) => setColorTempMin(Number(e.target.value))} min={1800} max={10000} /></label>
-              <label>{t('fx.cctMax', 'CCT Max (K)')}<input type="number" value={colorTempMax} onChange={(e) => setColorTempMax(Number(e.target.value))} min={1800} max={10000} /></label>
+              <label>{t('fx.cctMin', 'CCT min (K)')}<input type="number" value={colorTempMin} onChange={(e) => setColorTempMin(Number(e.target.value))} min={1800} max={10000} /></label>
+              <label>{t('fx.cctMax', 'CCT max (K)')}<input type="number" value={colorTempMax} onChange={(e) => setColorTempMax(Number(e.target.value))} min={1800} max={10000} /></label>
             </>
           ) : (
-            <label>{t('fx.cct', 'Farbtemperatur (K, 0=RGBW)')}<input type="number" value={colorTemp} onChange={(e) => setColorTemp(Number(e.target.value))} min={0} /></label>
+            <label>{t('fx.cct', 'Colour temperature (K, 0=RGBW)')}<input type="number" value={colorTemp} onChange={(e) => setColorTemp(Number(e.target.value))} min={0} /></label>
           )}
 
-          <label>{t('fx.weight', 'Gewicht (kg)')}<input type="number" value={weight} step={0.1} onChange={(e) => setWeight(Number(e.target.value))} min={0} /></label>
+          <label>{t('fx.weight', 'Weight (kg)')}<input type="number" value={weight} step={0.1} onChange={(e) => setWeight(Number(e.target.value))} min={0} /></label>
           <label>CRI<input type="number" value={cri} onChange={(e) => setCri(Number(e.target.value))} min={0} max={100} /></label>
           <label>TLCI<input type="number" value={tlci} onChange={(e) => setTlci(Number(e.target.value))} min={0} max={100} /></label>
-          <label>{t('fx.ipRating', 'IP-Schutzart')}<input value={ipRating} onChange={(e) => setIpRating(e.target.value)} placeholder={t('fx.ipRatingPh', 'z.B. 65')} /></label>
-          <label>{t('fx.dmxChannels', 'DMX-Kanäle')}<input type="number" value={dmxChannels} onChange={(e) => setDmxChannels(Number(e.target.value))} min={0} /></label>
+          <label>{t('fx.ipRating', 'IP rating')}<input value={ipRating} onChange={(e) => setIpRating(e.target.value)} placeholder={t('fx.ipRatingPh', 'e.g. 65')} /></label>
+          <label>{t('fx.dmxChannels', 'DMX channels')}<input type="number" value={dmxChannels} onChange={(e) => setDmxChannels(Number(e.target.value))} min={0} /></label>
 
           <label className="checkbox-field">
             <input type="checkbox" checked={hasZoom} onChange={(e) => setHasZoom(e.target.checked)} /> Zoom
           </label>
           {hasZoom && (
             <>
-              <label>{t('fx.zoomMin', 'Zoom Min (°)')}<input type="number" value={zoomMin} step={0.5} onChange={(e) => setZoomMin(Number(e.target.value))} min={1} /></label>
-              <label>{t('fx.zoomMax', 'Zoom Max (°)')}<input type="number" value={zoomMax} step={0.5} onChange={(e) => setZoomMax(Number(e.target.value))} min={1} /></label>
+              <label>{t('fx.zoomMin', 'Zoom min (°)')}<input type="number" value={zoomMin} step={0.5} onChange={(e) => setZoomMin(Number(e.target.value))} min={1} /></label>
+              <label>{t('fx.zoomMax', 'Zoom max (°)')}<input type="number" value={zoomMax} step={0.5} onChange={(e) => setZoomMax(Number(e.target.value))} min={1} /></label>
             </>
           )}
 
           <label className="checkbox-field">
-            <input type="checkbox" checked={hasPhotometric} onChange={(e) => setHasPhotometric(e.target.checked)} /> {t('fx.photoRef', 'Photometrische Referenz')}
+            <input type="checkbox" checked={hasPhotometric} onChange={(e) => setHasPhotometric(e.target.checked)} /> {t('fx.photoRef', 'Photometric reference')}
           </label>
           {hasPhotometric && (
             <>
-              <label>{t('fx.photoLux', 'Lux (gemessen)')}<input type="number" value={photoLux} onChange={(e) => setPhotoLux(Number(e.target.value))} min={1} /></label>
-              <label>{t('fx.photoDistance', 'Messabstand (m)')}<input type="number" value={photoDistance} step={0.5} onChange={(e) => setPhotoDistance(Number(e.target.value))} min={0.5} /></label>
+              <label>{t('fx.photoLux', 'Lux (measured)')}<input type="number" value={photoLux} onChange={(e) => setPhotoLux(Number(e.target.value))} min={1} /></label>
+              <label>{t('fx.photoDistance', 'Measuring distance (m)')}<input type="number" value={photoDistance} step={0.5} onChange={(e) => setPhotoDistance(Number(e.target.value))} min={0.5} /></label>
             </>
           )}
         </div>
 
         <div className="modal-actions">
-          <button onClick={onCancel}>{t('common.cancel', 'Abbrechen')}</button>
-          <button className="primary" onClick={handleSave} disabled={!name.trim()}>{t('common.save', 'Speichern')}</button>
+          <button onClick={onCancel}>{t('common.cancel', 'Cancel')}</button>
+          <button className="primary" onClick={handleSave} disabled={!name.trim()}>{t('common.save', 'Save')}</button>
         </div>
       </div>
     </div>

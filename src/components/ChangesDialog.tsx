@@ -53,7 +53,7 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
   const activeLabel = t(aktiv.key, aktiv.label);
 
   const protokoll = (
-    log.length === 0 ? <div className="tool-empty">{t('dlg.chg.noLog', 'Noch keine Aktivität in dieser Sitzung.')}</div> : (
+    log.length === 0 ? <div className="tool-empty">{t('dlg.chg.noLog', 'Nothing has happened in this session yet.')}</div> : (
       <ul className="log-list">
         {[...log].reverse().map((e, i) => (
           <li key={i} className="log-item"><span className="log-time">{time(e.time, language)}</span><span className="log-label">{e.label}</span></li>
@@ -66,22 +66,22 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
     <div className="timeline">
       {redoSteps.length > 0 && (
         <>
-          <div className="tl-head">{t('dlg.chg.redoHead', 'Wiederherstellbar (Strg Y)')}</div>
+          <div className="tl-head">{t('dlg.chg.redoHead', 'Redoable (Ctrl Y)')}</div>
           {[...redoSteps].reverse().map((s, i) => (
-            <button key={'r' + i} className="tl-step redo" onClick={() => onJump('redo', s.count)} title={t('dlg.chg.redo', 'Wiederherstellen')}>
+            <button key={'r' + i} className="tl-step redo" onClick={() => onJump('redo', s.count)} title={t('dlg.chg.redo', 'Redo')}>
               <Icon name="redo" size={13} /><span>{s.label}</span>
             </button>
           ))}
         </>
       )}
-      <div className="tl-current"><span className="tl-dot" /> {t('dlg.chg.current', 'Aktueller Stand')}</div>
+      <div className="tl-current"><span className="tl-dot" /> {t('dlg.chg.current', 'Current state')}</div>
       {undoSteps.length === 0 ? (
-        <div className="tool-empty">{t('dlg.chg.noUndo', 'Nichts rückgängig zu machen.')}</div>
+        <div className="tool-empty">{t('dlg.chg.noUndo', 'Nothing to undo.')}</div>
       ) : (
         <>
-          <div className="tl-head">{t('dlg.chg.undoHead', 'Letzte Schritte (Strg Z)')}</div>
+          <div className="tl-head">{t('dlg.chg.undoHead', 'Last steps (Ctrl Z)')}</div>
           {undoSteps.map((s, i) => (
-            <button key={'u' + i} className="tl-step undo" onClick={() => onJump('undo', s.count)} title={t('dlg.chg.undoTo', 'Bis hierhin rückgängig')}>
+            <button key={'u' + i} className="tl-step undo" onClick={() => onJump('undo', s.count)} title={t('dlg.chg.undoTo', 'Undo up to here')}>
               <Icon name="undo" size={13} /><span>{s.label}</span>
             </button>
           ))}
@@ -92,10 +92,10 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
 
   const diffPanel = !latest ? (
     <div className="diff-noversion">
-      <div className="tool-empty">{t('dlg.chg.noVersion', 'Noch keine gespeicherte Version. Sichere den aktuellen Stand, um künftig zu vergleichen.')}</div>
+      <div className="tool-empty">{t('dlg.chg.noVersion', 'No saved version yet. Save the current state to compare against it later.')}</div>
       <div className="ver-save">
-        <input value={label} placeholder={t('dlg.chg.namePh', 'Version benennen…')} onChange={(e) => setLabel(e.target.value)} />
-        <button className="btn-primary" onClick={() => { onSaveVersion(label); setLabel(''); }}><Icon name="save" size={14} /> {t('dlg.chg.save', 'Sichern')}</button>
+        <input value={label} placeholder={t('dlg.chg.namePh', 'Name this version…')} onChange={(e) => setLabel(e.target.value)} />
+        <button className="btn-primary" onClick={() => { onSaveVersion(label); setLabel(''); }}><Icon name="save" size={14} /> {t('dlg.chg.save', 'Save')}</button>
       </div>
     </div>
   ) : (
@@ -104,14 +104,14 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
         {/* Der Plural stand als angehaengtes „en" im JSX. Das geht nur im
             Deutschen auf; Englisch braucht ein anderes Wort, andere Sprachen
             mehr als zwei Formen. Zwei ganze Woerter statt einer Endung. */}
-        <b>{diff!.total}</b> {diff!.total === 1 ? t('dlg.chg.changeOne', 'Änderung') : t('dlg.chg.changeMany', 'Änderungen')} {t('dlg.chg.since', 'seit')} „{latest.label}" ({new Date(latest.savedAt).toLocaleString(locale(language), { dateStyle: 'short', timeStyle: 'short' })})
-        <button className="btn-secondary diff-snap" onClick={() => { onSaveVersion(label || `${t('dlg.chg.stateAt', 'Stand')} ${new Date().toLocaleString(locale(language))}`); setLabel(''); }}><Icon name="save" size={13} /> {t('dlg.chg.saveNow', 'Jetzt sichern')}</button>
+        <b>{diff!.total}</b> {diff!.total === 1 ? t('dlg.chg.changeOne', 'change') : t('dlg.chg.changeMany', 'changes')} {t('dlg.chg.since', 'since')} „{latest.label}" ({new Date(latest.savedAt).toLocaleString(locale(language), { dateStyle: 'short', timeStyle: 'short' })})
+        <button className="btn-secondary diff-snap" onClick={() => { onSaveVersion(label || `${t('dlg.chg.stateAt', 'State')} ${new Date().toLocaleString(locale(language))}`); setLabel(''); }}><Icon name="save" size={13} /> {t('dlg.chg.saveNow', 'Save now')}</button>
       </div>
       {/* B-21: „Keine Änderungen" nur, wenn AUCH die acht nicht
           aufgeschlüsselten Kategorien gleich sind. Sonst ist der Satz keine
           Lücke in der Anzeige, sondern eine Falschaussage. */}
       {diff!.total === 0 && diff!.unnamed.length === 0
-        ? <div className="rig-clean">✓ {t('dlg.chg.noChanges', 'Keine Änderungen seit der letzten Version.')}</div>
+        ? <div className="rig-clean">✓ {t('dlg.chg.noChanges', 'No changes since the last version.')}</div>
         : <DiffView diff={diff!} />}
     </>
   );
@@ -122,8 +122,8 @@ const ChangesDialog: React.FC<Props> = ({ log, undoSteps, redoSteps, currentDoc,
     <div className="modal-overlay" onMouseDown={onClose}>
       <div className="modal tool-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="tool-head">
-          <h3><Icon name={aktiv.icon} size={18} /> {activeLabel} <span className="th-sub">· {projectName || t('dlg.chg.untitled', 'Lichtplan')}</span></h3>
-          <button className="fp-icon-btn fp-close" onClick={onClose} title={t('common.close', 'Schließen')}>✕</button>
+          <h3><Icon name={aktiv.icon} size={18} /> {activeLabel} <span className="th-sub">· {projectName || t('dlg.chg.untitled', 'Lighting plan')}</span></h3>
+          <button className="fp-icon-btn fp-close" onClick={onClose} title={t('common.close', 'Close')}>✕</button>
         </div>
         <div className="tool-body">
           <nav className="tool-nav">
