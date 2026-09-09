@@ -241,6 +241,13 @@ jobs:
       - name: Der Ablauf ist ein Baum, keine Liste
         run: npm run order:check
 
+      # Bedarf 53 -- laut Bedarfsdatenbank "the single most-requested unmet
+      # capability found": aus dem tatsaechlich Passierten die Restzeiten neu
+      # rechnen, die Umbaupausen dabei ERHALTEN, und das Ergebnis zeigen,
+      # BEVOR es uebernommen wird. Plan und Ist bleiben zwei Tatsachen.
+      - name: Den Ablauf aus dem Ist neu takten
+        run: npm run retime:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.
