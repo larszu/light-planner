@@ -55,6 +55,7 @@
     "access:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/order-access-check.ts",
     "actuals:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/actuals-check.ts",
     "slider:check": "node scripts/slider-groesse-check.mjs",
+    "canvas:check": "node scripts/canvas-steuerung-check.mjs",
     "zoom:check": "node scripts/zoom-grenze-check.mjs"
   },
   "dependencies": {

@@ -3,7 +3,7 @@ import React from 'react';
 // One consistent line-icon set (1.7px stroke, currentColor) replacing the
 // emoji icons across the UI. Add a name here and reference it as <Icon name=… />.
 export type IconName =
-  | 'select' | 'pan' | 'rect' | 'line' | 'measure' | 'person' | 'podium' | 'stage'
+  | 'select' | 'pan' | 'marquee' | 'rect' | 'line' | 'measure' | 'person' | 'podium' | 'stage'
   | 'truss' | 'wall' | 'camera' | 'fixture' | 'plan2d' | 'cube3d' | 'photo' | 'grid'
   | 'heatmap' | 'settings' | 'import' | 'schedule' | 'export' | 'save' | 'open'
   | 'undo' | 'redo' | 'search' | 'chevronRight' | 'chevronDown' | 'eye' | 'eyeOff'
@@ -14,6 +14,8 @@ export type IconName =
 const P: Record<IconName, React.ReactNode> = {
   select: <path d="M5 3l6.5 16 2.2-6.3 6.3-2.2Z" />,
   pan: <path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V12m0-1a1.5 1.5 0 0 1 3 0v4a5 5 0 0 1-5 5h-1.5a4 4 0 0 1-3-1.4L6 16a1.6 1.6 0 0 1 2.4-2L9 15" />,
+  // Gestrichelter Rahmen — dieselbe Form, die der Zug auf dem Canvas malt.
+  marquee: <rect x="4" y="5" width="16" height="14" strokeDasharray="3 2.5" />,
   rect: <rect x="4" y="6" width="16" height="12" rx="1.5" />,
   line: <path d="M5 19 19 5" />,
   measure: <path d="M4 14 14 4l6 6L10 20Z M8 8l2 2M11 5l2 2M5 11l2 2" />,

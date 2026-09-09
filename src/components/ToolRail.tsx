@@ -27,7 +27,8 @@ type TFn = (key: string, de: string) => string;
 const groupsFor = (t: TFn): Group[] => [
   [
     { id: 'select', icon: 'select', label: t('tool.select', 'Select'), hint: t('tool.select.hint', 'Select & move — V') },
-    { id: 'pan', icon: 'pan', label: t('tool.pan', 'Pan'), hint: t('tool.pan.hint', 'Pan the view — space/H') },
+    { id: 'pan', icon: 'pan', label: t('tool.pan', 'Pan'), hint: t('tool.pan.hint', 'Drag on empty canvas already pans — this also pans over objects') },
+    { id: 'marquee', icon: 'marquee', label: t('tool.marquee', 'Marquee'), hint: t('tool.marquee.hint', 'Frame-select without Shift — for touch devices') },
   ],
   [
     { id: 'person', icon: 'person', label: t('tool.person', 'Person'), hint: t('tool.person.hint', 'Place a person') },

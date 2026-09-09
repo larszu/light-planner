@@ -96,7 +96,10 @@ const Toolbar: React.FC<Props> = ({
   const { t } = useTranslation();
   const tools: { id: Tool; label: string; icon: string; hint?: string }[] = [
     { id: 'select', label: t('tool.select', 'Select'), icon: '⊹' },
-    { id: 'pan', label: t('tool.pan', 'Pan'), icon: '✋' },
+    { id: 'pan', label: t('tool.pan', 'Pan'), icon: '✋',
+      hint: t('tool.pan.hint', 'Drag on empty canvas already pans — this also pans over objects') },
+    { id: 'marquee', label: t('tool.marquee', 'Marquee'), icon: '⬚',
+      hint: t('tool.marquee.hint', 'Frame-select without Shift — for touch devices') },
     { id: 'rect', label: t('tool.rect', 'Rectangle'), icon: '▭' },
     { id: 'line', label: t('tool.line', 'Line'), icon: '╱' },
     { id: 'measure', label: t('tool.measure', 'Measure'), icon: '📏' },
