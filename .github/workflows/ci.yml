@@ -248,6 +248,14 @@ jobs:
       - name: Den Ablauf aus dem Ist neu takten
         run: npm run retime:check
 
+      # Bedarf 56 -- das Ist mit EINEM Griff. Der Bedarf sagt, er lebe oder
+      # sterbe an der Bedienschnelligkeit; die Regeln, die das tragen, sind
+      # aber Modul-Regeln: ein zweiter Druck ueberschreibt keine Tatsache,
+      # ein Ende ohne Beginn wird gemeldet statt verworfen, und was nicht
+      # gemessen wurde, zaehlt nirgends als null.
+      - name: Das Ist mit einem Griff erfassen
+        run: npm run actuals:check
+
       # Bedarf 54 -- laut Bedarfsdatenbank "the most precisely user-specified
       # request in the whole evidence base". Sehen und Aendern sind zwei
       # Fragen; die eigene Spalte ja, die fremde nein; Zuschauer lesen mit;

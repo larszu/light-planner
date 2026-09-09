@@ -245,9 +245,26 @@ const folge = (items: Eintrag[]): string[] =>
   assert.match(panel, /onMoveScene\(s\.id, 'down'\)/);
   assert.match(panel, /canParent\(scenes, s\.id, vorgaenger\(s\.id\)\)\.ok/,
     'der Einrueck-Knopf bietet an, was nicht geht');
-  // Die Nummer kommt aus der Ableitung und nicht aus dem Index der Schleife.
-  assert.doesNotMatch(panel, /scenes\.map\(\(s\)/,
-    'irgendwo laeuft noch eine Schleife ueber die rohe Szenenliste');
+  // Die Nummer kommt aus der Ableitung und nicht aus dem Index der Schleife:
+  // im GEZEICHNETEN Teil darf keine Schleife ueber die rohe Szenenliste
+  // laufen, sonst stuende neben der abgeleiteten Reihenfolge eine zweite.
+  //
+  // 2026-09-09 GENAUER GEFASST. Hier stand `doesNotMatch(panel, ...)` ueber
+  // die GANZE Datei — und das ist eine andere Frage als die, die der Guard
+  // stellen will. Bedarf 56 brachte dem Panel eine Nachbetrachtung, die ueber
+  // ALLE Szenen rechnet (`auswertung`) und dafuer zweimal `scenes.map`
+  // braucht; gezeichnet wird davon nichts. Der Guard wurde daran rot, obwohl
+  // die Aenderung richtig war.
+  //
+  // Ein Waechter, der an einer richtigen Aenderung rot wird, wird geaendert
+  // statt gelesen — aber nicht abgeschwaecht: er misst jetzt die FRAGE (was
+  // wird gezeichnet) statt eine Zeichenkette in ihrer Naehe. Gemessen wird
+  // ab dem `return (` der Komponente; alles davor ist Rechnung, alles danach
+  // ist Anzeige.
+  const gezeichnet = panel.slice(panel.indexOf('return ('));
+  assert.ok(gezeichnet.length > 500, 'der gezeichnete Teil wurde nicht gefunden');
+  assert.doesNotMatch(gezeichnet, /scenes\.map\(\(s\)/,
+    'im gezeichneten Teil laeuft noch eine Schleife ueber die rohe Szenenliste');
 
   assert.match(ohneKommentare('../src/types.ts'), /parentId\?: string;/,
     'die Szene traegt keinen Elter');
