@@ -248,6 +248,13 @@ jobs:
       - name: Den Ablauf aus dem Ist neu takten
         run: npm run retime:check
 
+      # Bedarf 54 -- laut Bedarfsdatenbank "the most precisely user-specified
+      # request in the whole evidence base". Sehen und Aendern sind zwei
+      # Fragen; die eigene Spalte ja, die fremde nein; Zuschauer lesen mit;
+      # und der Riegel waehrend der Show gilt auch fuer die Regie.
+      - name: Eine Ablaufliste, rollenweise Spalten
+        run: npm run access:check
+
       # INTEGRATION.md war bis 2026-09-04 von keiner Einstiegsseite aus
       # verlinkt -- also ausgerechnet das Dokument, das die Einbettung in den
       # cable-planner beschreibt.
