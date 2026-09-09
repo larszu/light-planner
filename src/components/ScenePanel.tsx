@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from '../i18n';
 import { canParent, runningOrder } from '../core/runningOrder';
+import { auswertung, istDauer, naechsterGriff, type Griff } from '../core/actuals';
 import type { Scene } from '../types';
 
 interface Props {
@@ -25,6 +26,17 @@ interface Props {
   onMoveScene: (id: string, direction: 'up' | 'down') => void;
   /** Eine Szene unter eine andere haengen (oder wieder nach oben holen). */
   onReparentScene: (id: string, parentId: string | null) => void;
+  /**
+   * BEDARF 56 — DER GRIFF. Ein Knopf, ein Argument, keine Rueckfrage.
+   *
+   * Der Bedarf sagt ausdruecklich, dass er „an der Bedienschnelligkeit lebt
+   * oder stirbt, nicht am Datenmodell". Deshalb ist das hier kein Dialog und
+   * kein Formular: was passiert, entscheidet der Zustand der Zeile, und der
+   * Nutzer trifft eine Flaeche.
+   */
+  onCaptureActual: (id: string, griff: Griff) => void;
+  /** Die geplante Dauer eines Eintrags in Minuten; `null` loescht sie. */
+  onSetPlanned: (id: string, minuten: number | null) => void;
 }
 
 // Floating panel for lighting scenes (looks): save the current state, switch
@@ -43,6 +55,8 @@ const ScenePanel: React.FC<Props> = ({
   onShowAll,
   onMoveScene,
   onReparentScene,
+  onCaptureActual,
+  onSetPlanned,
 }) => {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
@@ -62,6 +76,19 @@ const ScenePanel: React.FC<Props> = ({
     const idx = ablauf.rows.findIndex((r) => r.item.id === id);
     return idx > 0 ? ablauf.rows[idx - 1].item.id : null;
   };
+
+  // BEDARF 56 — die Nachbetrachtung. EINE Rechnung, hier wie auf dem Blatt:
+  // `auswertung` traegt die Regel, dass eine nicht gemessene Zeile nirgends
+  // als 0 zaehlt. Sie hier noch einmal aufzustellen hiesse, dieselbe Frage
+  // zweimal zu beantworten — und die zweite Antwort weicht irgendwann ab.
+  const bilanz = auswertung(
+    scenes,
+    Object.fromEntries(scenes.map((s) => [s.id, s.timing ?? {}])),
+    Object.fromEntries(scenes.map((s) => [s.id, s.actual ?? {}])),
+  );
+
+  const minuten = (wert: number) => `${Math.round(wert)}\u00a0min`;
+  const vorzeichen = (wert: number) => `${wert > 0 ? '+' : ''}${Math.round(wert)}`;
 
   const startRename = (s: Scene) => { setEditingId(s.id); setDraft(s.name); };
   const commitRename = () => {
@@ -114,6 +141,74 @@ const ScenePanel: React.FC<Props> = ({
                         {s.name}
                       </button>
                     )}
+                    {/* BEDARF 56 — DER GRIFF, und zwar als eigene Flaeche vor
+                        den sieben kleinen Knoepfen. Zwischen ihnen waere er
+                        der achte gleich aussehende und im Saal nicht zu
+                        treffen; der Bedarf steht und faellt aber genau
+                        damit. Was er tut, sagt seine Beschriftung, und die
+                        folgt dem Zustand der Zeile. */}
+                    {(() => {
+                      const griff: Griff | null = naechsterGriff(s.actual);
+                      const dauer = istDauer(s.actual);
+                      const zeile = bilanz.zeilen.find((z) => z.id === s.id);
+                      if (griff === 'start') {
+                        return (
+                          <button
+                            className="sp-ist sp-ist-start"
+                            onClick={() => onCaptureActual(s.id, 'start')}
+                            title={t('panel.scene.captureStart', 'Beginn jetzt festhalten')}
+                          >▶</button>
+                        );
+                      }
+                      if (griff === 'ende') {
+                        return (
+                          <button
+                            className="sp-ist sp-ist-ende"
+                            onClick={() => onCaptureActual(s.id, 'ende')}
+                            title={t('panel.scene.captureEnd', 'Ende jetzt festhalten')}
+                          >■</button>
+                        );
+                      }
+                      // Kein Griff mehr. Zwei Lagen, und die Beschriftung
+                      // unterscheidet sie: fertig gemessen — oder ein Ende
+                      // ohne Beginn, das eine Luecke bleibt und keine Zahl.
+                      const luecke = dauer === null;
+                      return (
+                        <span
+                          className={`sp-ist sp-ist-fertig${luecke ? ' sp-ist-ohne-start' : ''}`}
+                          title={
+                            luecke
+                              ? t('panel.scene.captureGap', 'Ende ohne Beginn erfasst — die Dauer ist nicht messbar')
+                              : t('panel.scene.captured', 'Ist erfasst')
+                          }
+                        >
+                          {luecke ? '–' : minuten(dauer)}
+                          {zeile?.abweichungMinuten != null && (
+                            <em className={zeile.abweichungMinuten > 0 ? 'plus' : 'minus'}>
+                              {vorzeichen(zeile.abweichungMinuten)}
+                            </em>
+                          )}
+                        </span>
+                      );
+                    })()}
+                    {/* Die geplante Dauer. Ohne sie gaebe es nachher nichts,
+                        wogegen das Ist gehalten werden koennte — und der
+                        Bedarf will die Planung des naechsten Jahres aus dem
+                        Ergebnis speisen, nicht bloss das Ergebnis sammeln.
+                        Leer heisst „nicht geplant" und nicht „null Minuten". */}
+                    <input
+                      className="sp-plan"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={s.timing?.plannedMinutes ?? ''}
+                      placeholder="–"
+                      title={t('panel.scene.planned', 'Geplante Dauer in Minuten')}
+                      onChange={(e) => {
+                        const roh = e.target.value.trim();
+                        onSetPlanned(s.id, roh === '' ? null : Number(roh));
+                      }}
+                    />
                     <div className="sp-item-actions">
                       <button className="sp-mini" onClick={() => onMoveScene(s.id, 'up')} title={t('panel.scene.up', 'Nach oben — mit allem, was darunter hängt')}>↑</button>
                       <button className="sp-mini" onClick={() => onMoveScene(s.id, 'down')} title={t('panel.scene.down', 'Nach unten — mit allem, was darunter hängt')}>↓</button>
@@ -148,6 +243,25 @@ const ScenePanel: React.FC<Props> = ({
           {ablauf.gaps.map((g) => (
             <p key={g.kind} className="sp-empty">{g.message}</p>
           ))}
+
+          {/* BEDARF 56 — die Nachbetrachtung in einer Zeile. Sie nennt, ueber
+              WIE VIELE Eintraege sie rechnet: eine Summe ohne ihre Basis
+              liest sich wie eine Aussage ueber den ganzen Abend, auch wenn
+              nur zwei Punkte erfasst wurden. */}
+          {bilanz.gemessen > 0 && (
+            <p className="sp-bilanz">
+              {t('panel.scene.measured', 'Erfasst')}: {bilanz.gemessen}
+              {bilanz.abweichungBasis > 0 ? (
+                <>
+                  {' · '}
+                  {vorzeichen(bilanz.abweichungSumme)}&nbsp;min{' '}
+                  {t('panel.scene.overPlanOf', 'gegen den Plan, aus')} {bilanz.abweichungBasis}
+                </>
+              ) : (
+                <>{' · '}{t('panel.scene.noPlanYet', 'kein Vergleich — keine Dauer geplant')}</>
+              )}
+            </p>
+          )}
 
           {hiddenCount > 0 && (
             <button className="sp-showall" onClick={onShowAll}>

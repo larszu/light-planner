@@ -1998,6 +1998,41 @@ kbd {
 }
 .sp-showall:hover { background: rgba(255, 170, 60, 0.22); }
 
+/* BEDARF 56 -- der Ein-Griff-Knopf.
+   Er ist mit Absicht groesser als die sieben `sp-mini` daneben: ein Ziel von
+   28x22 Pixeln trifft man im halbdunklen Saal, eines von 14x14 nicht. Der
+   Bedarf sagt ausdruecklich, dass er an der Bedienschnelligkeit haengt --
+   ihn hier auf Mini-Groesse zu bringen sparte vier Pixel und kostete die
+   Funktion. */
+.sp-ist {
+  flex: 0 0 auto; min-width: 28px; min-height: 22px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  border: 1px solid transparent; border-radius: 0;
+  font-size: 12px; line-height: 1; cursor: pointer; padding: 2px 6px;
+}
+.sp-ist-start { background: rgba(80, 200, 120, 0.16); border-color: #3f9d63; color: #8fe0ac; }
+.sp-ist-start:hover { background: rgba(80, 200, 120, 0.3); }
+.sp-ist-ende { background: rgba(255, 110, 90, 0.16); border-color: #c85a48; color: #ffa898; }
+.sp-ist-ende:hover { background: rgba(255, 110, 90, 0.3); }
+/* Erfasst: kein Knopf mehr, sondern die Auskunft. Der Griff ueberschreibt
+   nichts, also wird hier auch keiner angeboten. */
+.sp-ist-fertig { cursor: default; color: var(--text2); font-variant-numeric: tabular-nums; }
+.sp-ist-fertig em { font-style: normal; font-size: 10px; }
+.sp-ist-ohne-start { color: #ffa898; }
+.sp-ist-fertig em.plus { color: #ffa898; }
+.sp-ist-fertig em.minus { color: #8fe0ac; }
+/* Geplante Dauer. Schmal, weil sie eine Zahl ist und kein Formular. */
+.sp-plan {
+  flex: 0 0 auto; width: 40px; border: 1px solid var(--line); border-radius: 0;
+  background: rgba(255, 255, 255, 0.04); color: var(--text2);
+  font-size: 11px; padding: 2px 4px; text-align: right;
+}
+.sp-plan:focus { outline: none; border-color: #d8922e; color: var(--text); }
+.sp-bilanz {
+  margin: 4px 0 0; padding: 4px 6px; font-size: 11px; color: var(--text2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 /* Layers (Ebenen) panel – floating, bottom-left of the canvas */
 .layers-panel {
   position: absolute;

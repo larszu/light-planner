@@ -1,6 +1,8 @@
 // ── Fixture categories following real event-tech conventions ──
 import type { DmxProtocol } from './core/universeIdentity';
 import type { PhaseTemplate } from './core/powerDistribution';
+import type { OrderTiming } from './core/retime';
+import type { SceneActual } from './core/actuals';
 
 export type FixtureCategory =
   | 'profile'        // Profilscheinwerfer / Ellipsoidal (ETC Source Four, Selecon)
@@ -227,6 +229,23 @@ export interface Scene {
    * still.
    */
   parentId?: string;
+  /**
+   * BEDARF 53 — die geplanten Zeiten dieses Eintrags.
+   *
+   * Gerechnet wird damit in `core/retime.ts`; hier steht nur, was erklaert
+   * wurde. Fehlt das Feld, ist keine Dauer geplant — was etwas anderes ist
+   * als „null Minuten geplant".
+   */
+  timing?: OrderTiming;
+  /**
+   * BEDARF 56 — was tatsaechlich passiert ist, mit einem Griff erfasst.
+   *
+   * ISO-Zeitpunkte und nicht Minuten: das Ist ist eine Tatsache ueber einen
+   * Abend, der Plan ist relativ. Die Begruendung im Kopf von
+   * `core/actuals.ts`; sie ist der Grund, warum das Verschieben des
+   * Show-Beginns hier nichts umschreibt.
+   */
+  actual?: SceneActual;
 }
 
 // ── Person on stage ──

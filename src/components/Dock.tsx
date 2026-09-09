@@ -30,6 +30,8 @@ interface Props {
   // Bedarf 132 — verschieben und ein-/ausruecken. Das Dock reicht nur durch.
   onMoveScene: (id: string, direction: 'up' | 'down') => void;
   onReparentScene: (id: string, parentId: string | null) => void;
+  onCaptureActual: (id: string, griff: 'start' | 'ende') => void;
+  onSetPlanned: (id: string, minuten: number | null) => void;
 }
 
 type TabId = 'library' | 'layers' | 'scenes';
@@ -87,6 +89,8 @@ const Dock: React.FC<Props> = (p) => {
             onShowAll={p.onShowAll}
             onMoveScene={p.onMoveScene}
             onReparentScene={p.onReparentScene}
+            onCaptureActual={p.onCaptureActual}
+            onSetPlanned={p.onSetPlanned}
           />
         )}
       </div>

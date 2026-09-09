@@ -52,7 +52,8 @@
     "brand:check": "node --experimental-strip-types scripts/brand-tokens-check.ts",
     "preview:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/inventory-import-preview-check.ts",
     "retime:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/retime-check.ts",
-    "access:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/order-access-check.ts"
+    "access:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/order-access-check.ts",
+    "actuals:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/actuals-check.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^6.0.227",

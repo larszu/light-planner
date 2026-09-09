@@ -45,6 +45,7 @@ import { useProjectStore } from './store/projectStore';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 import { canParent, moveItem } from './core/runningOrder';
+import { erfassen, type Griff } from './core/actuals';
 import { useTranslation } from './i18n';
 
 export type PlanMode = 'none' | 'calibrate' | 'move';
@@ -1462,6 +1463,43 @@ const App: React.FC = () => {
     });
   }, []);
 
+  // ── BEDARF 56: das Ist mit einem Griff ──
+  //
+  // DIE UHR STEHT HIER und nirgends tiefer. `core/actuals.ts` bekommt den
+  // Zeitpunkt herein, damit es pruefbar bleibt und auf zwei Rechnern
+  // dasselbe tut; genommen wird er an genau dieser Stelle, weil sie die
+  // einzige ist, an der es „jetzt" wirklich gibt.
+  //
+  // Was ein zweiter Druck macht, entscheidet `erfassen` und nicht diese
+  // Zeile: es schreibt eine erfasste Tatsache nicht um. `geaendert: false`
+  // heisst deshalb, dass der Zustand unangetastet bleibt — und dann wird
+  // auch kein Undo-Schritt angelegt, der nichts rueckgaengig zu machen
+  // haette.
+  const handleCaptureActual = useCallback((id: string, griff: Griff) => {
+    const jetzt = new Date().toISOString();
+    setScenes((prev) => {
+      const szene = prev.find((s) => s.id === id);
+      if (!szene) return prev;
+      const e = erfassen(szene.actual, griff, jetzt);
+      if (!e.geaendert) return prev;
+      return prev.map((s) => (s.id === id ? { ...s, actual: e.actual } : s));
+    });
+  }, []);
+
+  // Die geplante Dauer. `null` LOESCHT das Feld, statt 0 hineinzuschreiben:
+  // „nicht geplant" und „null Minuten geplant" sind zwei Auskuenfte, und die
+  // Nachbetrachtung rechnet nur mit der zweiten.
+  const handleSetPlanned = useCallback((id: string, minuten: number | null) => {
+    setScenes((prev) => prev.map((s) => {
+      if (s.id !== id) return s;
+      if (minuten === null || !Number.isFinite(minuten) || minuten < 0) {
+        const { plannedMinutes: _weg, ...rest } = s.timing ?? {};
+        return { ...s, timing: Object.keys(rest).length > 0 ? rest : undefined };
+      }
+      return { ...s, timing: { ...(s.timing ?? {}), plannedMinutes: minuten } };
+    }));
+  }, []);
+
   // ── Temporarily mute / un-mute lamps ──
   const handleShowAllFixtures = useCallback(() => {
     if (!fixtures.some((f) => f.hidden)) return;
@@ -1573,6 +1611,8 @@ const App: React.FC = () => {
           onShowAll={handleShowAllFixtures}
           onMoveScene={handleMoveScene}
           onReparentScene={handleReparentScene}
+          onCaptureActual={handleCaptureActual}
+          onSetPlanned={handleSetPlanned}
         />
         <div className="canvas-area">
           {viewMode === '2d' ? (
