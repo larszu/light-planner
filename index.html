@@ -4,7 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" />
+    <!--
+      Kein `frame-ancestors` in dieser Zeile, und das ist Absicht.
+
+      Browser IGNORIEREN `frame-ancestors` ausdruecklich, wenn die Richtlinie
+      ueber ein <meta>-Element kommt (sie melden es in der Konsole). Die
+      Angabe stand hier und schuetzte vor gar nichts — sie sah nur so aus.
+      Das ist die schlechtere Sorte Fehler: eine Zeile, die eine Zusage macht,
+      die sie nicht halten kann.
+
+      Und haette der Browser sie befolgt, waere sie falsch gewesen: die Suite
+      bettet den Light-Planner als iframe ein. `'none'` haette genau das
+      verboten.
+
+      Echter Klickjacking-Schutz braucht den HTTP-Kopf
+      (`Content-Security-Policy: frame-ancestors ...` oder `X-Frame-Options`).
+      Den kann GitHub Pages nicht setzen; auf der Desktop-App setzt ihn der
+      Electron-Prozess. Wer ihn hier wieder als <meta> eintraegt, gewinnt
+      nichts und bricht die Einbettung.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com; worker-src 'self' blob:; font-src 'self'; object-src 'none'; base-uri 'none'" />
     <title>LightPlanner – Lichtberechnung für Events</title>
   </head>
   <body>

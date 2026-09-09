@@ -1639,16 +1639,54 @@ const PlanCanvas: React.FC<Props> = ({
     dragRef.current = null;
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const [sx, sy] = getCanvasPos(e);
-    const v = viewRef.current;
-    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    const newScale = Math.min(400, Math.max(2, v.scale * factor));
-    v.offsetX = sx - ((sx - v.offsetX) / v.scale) * newScale;
-    v.offsetY = sy - ((sy - v.offsetY) / v.scale) * newScale;
-    v.scale = newScale;
-  };
+  // Zoomen soll den Plan vergroessern, nicht die Seite.
+  //
+  // Der Radhandler haengt am Element selbst und NICHT an Reacts `onWheel` —
+  // das ist der ganze Punkt und der Grund fuer den gemeldeten Fehler. React
+  // haengt `wheel` seit Version 17 als PASSIVEN Listener an die Wurzel; in
+  // einem passiven Listener ist `preventDefault()` wirkungslos. Der Aufruf
+  // stand vorher da, sah richtig aus und tat nichts: Strg+Rad ueber dem Plan
+  // — und die Zwei-Finger-Geste, die Browser als Strg+Rad schicken —
+  // vergroesserte die ganze Website statt des Canvas.
+  //
+  // Dazu gehoeren zwei Dinge, die man leicht vergisst:
+  //  * `touch-action: none` am Canvas (im Stilblatt). Ohne das nimmt der
+  //    Browser die Pinch-Geste auf Tablets VORWEG, bevor ueberhaupt ein
+  //    Ereignis hier ankommt — ein nicht-passiver Listener hilft dann nichts.
+  //  * Safaris `gesture*`-Ereignisse. Die gibt es sonst nirgends, und ohne
+  //    sie zoomt Safari auf dem Trackpad weiter die Seite.
+  //
+  // Was hier ausdruecklich NICHT passiert: der Seiten-Zoom des Browsers wird
+  // nicht global abgeschaltet (kein `user-scalable=no`). Er ist ein
+  // Zugaenglichkeits-Werkzeug; er soll nur nicht losgehen, wenn der Zeiger
+  // ueber dem Plan steht.
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = cv.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const v = viewRef.current;
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const newScale = Math.min(400, Math.max(2, v.scale * factor));
+      v.offsetX = sx - ((sx - v.offsetX) / v.scale) * newScale;
+      v.offsetY = sy - ((sy - v.offsetY) / v.scale) * newScale;
+      v.scale = newScale;
+    };
+    const gesteStoppen = (e: Event) => e.preventDefault();
+    cv.addEventListener('wheel', onWheel, { passive: false });
+    cv.addEventListener('gesturestart', gesteStoppen);
+    cv.addEventListener('gesturechange', gesteStoppen);
+    cv.addEventListener('gestureend', gesteStoppen);
+    return () => {
+      cv.removeEventListener('wheel', onWheel);
+      cv.removeEventListener('gesturestart', gesteStoppen);
+      cv.removeEventListener('gesturechange', gesteStoppen);
+      cv.removeEventListener('gestureend', gesteStoppen);
+    };
+  }, []);
 
   const cursor = activeTool === 'pan' || spaceDownRef.current ? 'grab'
     : planMode === 'move' ? 'move'
@@ -1660,7 +1698,7 @@ const PlanCanvas: React.FC<Props> = ({
       <canvas ref={canvasRef} className="plan-canvas"
         onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
         onDoubleClick={handleDoubleClick}
-        onWheel={handleWheel} onDragOver={handleDragOver} onDrop={handleDrop}
+        onDragOver={handleDragOver} onDrop={handleDrop}
         onContextMenu={(e) => e.preventDefault()} style={{ cursor }} />
     </div>
   );

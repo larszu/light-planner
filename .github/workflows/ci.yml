@@ -60,6 +60,21 @@ jobs:
       - name: Quellsprache — Fallbacks sind englisch
         run: npm run lang:check
 
+      # Nutzer-Meldung 2026-09-09: „Passe auch die Ui von allen slidern an
+      # sodass man sie gut bedienen kann." Vorher stand im Stilblatt nur
+      # `accent-color` — also das Aussehen des Browsers, und dessen Regler
+      # ist rund 16 px hoch. WCAG 2.2 SC 2.5.8 (Stufe AA) nennt 24 px.
+      - name: Schieberegler sind zu treffen (24 px, WCAG 2.5.8)
+        run: npm run slider:check
+
+      # Zoomt der Plan oder die Seite? Der Defekt dahinter sah im Quelltext
+      # richtig aus: `preventDefault()` in einem React-`onWheel` ist
+      # wirkungslos, weil React `wheel` passiv anhaengt. Drei Voraussetzungen
+      # gehoeren zusammen (eigener Listener, `touch-action`, Safaris
+      # `gesture*`); dieser Schritt haelt alle drei fest.
+      - name: Zoom bleibt im Canvas (kein passives preventDefault)
+        run: npm run zoom:check
+
       # WARUM DIESER SCHRITT NEU IST, und warum er ausgerechnet hier auffiel.
       #
       # Die CI hat bisher gebaut, aber nie typgeprueft. Vite baut mit esbuild

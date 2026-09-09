@@ -31,6 +31,14 @@ export const de: Record<string, string> = {
   'app.inventory': 'Lager',
   'app.inventoryTitle': 'Lager / Bestand',
   'app.loading3d': '3D-Ansicht wird geladen…',
+  'scene3d.emptyTitle': 'Noch nichts im Plan',
+  'scene3d.emptyHint':
+    'Die 3D-Ansicht und der Render zeigen, was im Plan liegt. Wechsle in den 2D-Plan und zieh eine Leuchte, ein Bühnenelement oder einen Grundriss hinein — es erscheint hier sofort.',
+  'scene3d.failed': 'Die 3D-Ansicht lässt sich hier nicht anzeigen.',
+  'scene3d.contextLost':
+    'Der Browser hat den WebGL-Kontext verloren — meist ein Reset des Grafiktreibers oder zu viele 3D-Ansichten gleichzeitig. Er wird von selbst wiederhergestellt, sobald der Browser einen zurückgibt.',
+  'scene3d.noWebgl':
+    'Dieser Browser hat keinen WebGL-Kontext hergegeben. Der 2D-Plan, die Blätter und der Export sind davon nicht betroffen.',
   'app.movePlan': 'Ziehe den Grundriss, um ihn auszurichten · ESC zum Beenden',
   'app.placePost': 'zu platzieren · ESC zum Abbrechen',
   'app.placePre': 'Klicke auf den Plan um',

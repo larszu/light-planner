@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -14,6 +14,7 @@ import { getBeamColorHex } from '../core/colorTemp';
 import { sampleWall, isCurved, pointInPolygon, wallSegments, normalizedWindows, type NormWindow } from '../core/geometry';
 import { floorPreset, wallPreset, surfaceCanvas, DEFAULT_FLOOR, type SurfacePreset } from '../core/surfaceTextures';
 import type { ResolvedSun } from '../core/sun';
+import { useTranslation } from '../i18n';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
@@ -281,6 +282,10 @@ interface Props {
 
 const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, floor, sun, onSelect, onHoverLux }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
+  // Warum die Ansicht leer ist — falls sie leer ist. Siehe die Begruendung am
+  // Renderer weiter unten.
+  const [fehler, setFehler] = useState<string | null>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
@@ -332,7 +337,28 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     camera.position.set(15, 15, 15);
     camera.lookAt(0, 0, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    // Wenn hier nichts zu sehen ist, soll DASTEHEN, warum.
+    //
+    // Nutzer-Meldung 2026-09-09: „3d und render geht in GitHub pages nicht".
+    // Der gebaute Stand wurde daraufhin in einem echten Browser unter einem
+    // /light-planner/-Unterpfad vermessen — 3D und Render liefen, das Modell
+    // kam mit HTTP 200, keine Fehler in der Konsole. Der Fehler liess sich
+    // also nicht nachstellen, und genau das ist der Punkt: WENN WebGL beim
+    // Nutzer nicht zu haben ist (abgeschaltet, keine GPU, Richtlinie, ein
+    // verlorener Kontext nach einem Treiber-Reset), dann warf diese Zeile
+    // eine Ausnahme in einen useEffect — die Ansicht blieb schwarz und sagte
+    // kein Wort. „Geht nicht" ohne Grund ist nicht diagnostizierbar, weder
+    // fuer den Nutzer noch fuer den naechsten Bericht.
+    //
+    // Es wird hier NICHTS ersetzt oder vorgetaeuscht: ohne WebGL gibt es
+    // keine 3D-Ansicht. Es steht nur der Grund da statt einer leeren Flaeche.
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+      return;
+    }
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -532,11 +558,27 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     renderer.domElement.addEventListener('pointermove', handlePointerMove);
     renderer.domElement.addEventListener('pointerleave', handlePointerLeave);
 
+    // Ein verlorener Kontext (Treiber-Reset, GPU-Wechsel, zu viele Kontexte im
+    // Browser) hinterlaesst ein eingefrorenes schwarzes Bild — das sieht aus
+    // wie „3D geht nicht", ohne dass irgendwo etwas dazu stuende.
+    // `preventDefault()` ist die Bedingung dafuer, dass der Browser den
+    // Kontext ueberhaupt wiederherstellen DARF; ohne den Aufruf bleibt es
+    // schwarz, auch wenn der Grund laengst weg ist.
+    const kontextVerloren = (e: Event) => {
+      e.preventDefault();
+      setFehler('__WEBGL_KONTEXT_VERLOREN__');
+    };
+    const kontextZurueck = () => setFehler(null);
+    renderer.domElement.addEventListener('webglcontextlost', kontextVerloren);
+    renderer.domElement.addEventListener('webglcontextrestored', kontextZurueck);
+
     return () => {
       cancelAnimationFrame(sceneRef.current!.animId);
       renderer.domElement.removeEventListener('click', handleClick);
       renderer.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer.domElement.removeEventListener('pointerleave', handlePointerLeave);
+      renderer.domElement.removeEventListener('webglcontextlost', kontextVerloren);
+      renderer.domElement.removeEventListener('webglcontextrestored', kontextZurueck);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       obs.disconnect();
@@ -1493,7 +1535,68 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     },
   }));
 
-  return <div ref={containerRef} className="scene3d-container" />;
+  // Nichts im Plan heisst: nichts zu sehen — und das soll DASTEHEN.
+  //
+  // Nutzer-Meldung 2026-09-09: „3d und render geht in GitHub pages nicht".
+  // Nachgestellt und abfotografiert: auf einem frisch geoeffneten Plan (und
+  // genau der steht auf der Pages-Seite, denn die Daten liegen im
+  // `localStorage` des Besuchers) zeigt die 3D-Ansicht ein fast schwarzes
+  // Raster und der Render-Modus eine formatfuellende graue Bodentextur. Beides
+  // ist technisch korrekt — die Kamera schaut auf einen leeren Boden — und
+  // beides sieht aus wie ein Defekt. Wer das sieht, meldet „geht nicht", und
+  // er hat recht: die Ansicht beantwortet die Frage nicht, die er hat.
+  //
+  // Der Hinweis ist ABSICHTLICH durchlaessig (`pointer-events: none` im
+  // Stilblatt): die Ansicht bleibt drehbar, waehrend er dasteht. Er
+  // verschwindet in dem Moment, in dem das erste Objekt im Plan liegt.
+  const planLeer =
+    fixtures.length === 0 &&
+    persons.length === 0 &&
+    stageElements.length === 0 &&
+    trusses.length === 0 &&
+    walls.length === 0 &&
+    ceilings.length === 0 &&
+    floorPlan === null;
+
+  return (
+    <div className="scene3d-container">
+      <div ref={containerRef} className="scene3d-surface" />
+      {fehler === null && planLeer && (
+        <div className="scene3d-empty">
+          {/* Eine Karte mit eigener Flaeche, kein blosser Text: der Hinweis
+              steht mal auf dem fast schwarzen Raster der 3D-Ansicht und mal
+              auf dem hellen Boden des Render-Modus. Ein Schatten waere das
+              naheliegende Mittel und ist im Haus verboten (ADR-007). */}
+          <div className="scene3d-empty-card">
+            <b>{t('scene3d.emptyTitle', 'Nothing in the plan yet')}</b>
+            <span>
+              {t(
+                'scene3d.emptyHint',
+                'The 3D view and the render show what is in the plan. Switch to the 2D plan and drag a fixture, a stage element or a floor plan onto it — it appears here immediately.',
+              )}
+            </span>
+          </div>
+        </div>
+      )}
+      {fehler !== null && (
+        <div className="scene3d-failure" role="alert">
+          <b>{t('scene3d.failed', 'The 3D view cannot be shown here.')}</b>
+          <span>
+            {fehler === '__WEBGL_KONTEXT_VERLOREN__'
+              ? t(
+                  'scene3d.contextLost',
+                  'The browser lost the WebGL context — usually a graphics driver reset or too many 3D views open at once. It is restored automatically as soon as the browser hands one back.',
+                )
+              : t(
+                  'scene3d.noWebgl',
+                  'This browser did not provide a WebGL context. The 2D plan, the sheets and the export are unaffected.',
+                )}
+          </span>
+          {fehler !== '__WEBGL_KONTEXT_VERLOREN__' && <code>{fehler}</code>}
+        </div>
+      )}
+    </div>
+  );
 });
 
 export default Scene3D;
