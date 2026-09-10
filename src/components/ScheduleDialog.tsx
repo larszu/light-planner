@@ -47,7 +47,7 @@ import { gelLibrary } from '../core/gelLibrary';
 import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
 import Icon from './Icon';
 import type { IconName } from './Icon';
-import { useTranslation } from '../i18n';
+import { useTranslation, format } from '../i18n';
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -1085,9 +1085,9 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const checkPanel = (
     <>
       <div className="rig-pills">
-        <span className={`rig-pill ${ic.errors ? 'err' : 'off'}`}>{ic.errors} Fehler</span>
-        <span className={`rig-pill ${ic.warnings ? 'warn' : 'off'}`}>{ic.warnings} Warnungen</span>
-        <span className="rig-pill info">{ic.infos} Hinweise</span>
+        <span className={`rig-pill ${ic.errors ? 'err' : 'off'}`}>{format(t('rig.pill.errors', '{n} errors'), { n: ic.errors })}</span>
+        <span className={`rig-pill ${ic.warnings ? 'warn' : 'off'}`}>{format(t('rig.pill.warnings', '{n} warnings'), { n: ic.warnings })}</span>
+        <span className="rig-pill info">{format(t('rig.pill.infos', '{n} notes'), { n: ic.infos })}</span>
         {/* BEDARF 142 — das Urteil, und zwar mit „nicht beurteilbar" darin.
             Ein Plan, dessen Last-Zahlen auf fehlenden Angaben beruhen, ist
             nicht bereit: er ist unbeantwortet. */}

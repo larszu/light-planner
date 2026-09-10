@@ -885,8 +885,8 @@ const PropertyPanel: React.FC<Props> = ({
                 </div>
               ))}
               <div className="window-actions">
-                <button onClick={() => addWin(false)}>+ Fenster</button>
-                <button onClick={() => addWin(true)}>Glasfront</button>
+                <button onClick={() => addWin(false)}>{t('prop.addWindow', '+ Window')}</button>
+                <button onClick={() => addWin(true)}>{t('prop.addGlassFront', 'Glass front')}</button>
               </div>
             </div>
           );
