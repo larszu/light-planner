@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import type { FixtureGroup, PlacedFixture, Truss, Wall, Ceiling, WorkNote, WorkNoteTarget } from '../types';
-import { computePower, fixtureCounts, footprint, trussLoads, circuitBreakdown, colorCounts, nearestTrussId } from '../core/patch';
+import { computePower, fixtureCounts, footprint, footprintOrNull, trussLoads, circuitBreakdown, colorCounts, nearestTrussId } from '../core/patch';
 import { documentFingerprint, stampForStand, type DocumentStamp } from '../core/documentStamp';
 import { colorTable, gelCodes, inventoryTable, scheduleOrder, scheduleTable, tableToCsv, type DocumentTable } from '../core/documentTables';
 import {
@@ -523,9 +523,15 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
               {/* Die Zelle zeigt die Zahl SO, wie sie im gewaehlten Protokoll
                   am Geraet steht — in Art-Net also „0:0:2.15" statt „2.15".
                   Wer sie abtippt, tippt damit das, was am Node steht. */}
+              {/* Ohne Adresse steht hier der GRUND. „Dimmer" fuer eine
+                  Leuchte, deren Modus nur nicht gewaehlt ist, waere die
+                  Falschauskunft, die erst am Pult auffaellt: der Zettel sagt
+                  „braucht keine Adresse", und im Rig fehlt das Geraet. */}
               <td>{f.universe != null && f.dmxAddress != null
                 ? `${universeReading(f.universe, dmxProtocol).primary}.${f.dmxAddress}`
-                : (footprint(f) === 0 ? 'Dimmer' : '–')}</td>
+                : footprintOrNull(f) === null
+                  ? t('sch.noMode', 'no mode')
+                  : footprint(f) === 0 ? t('sch.dimmer', 'Dimmer') : '–'}</td>
               <td>{f.fixture.name}</td>
               <td>{f.x},{f.y} · {f.mountingHeight}m</td>
               <td>{gelCodes(f.gelFilterIds) || '–'}</td>

@@ -9,7 +9,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { PlacedFixture } from '../core';
-import { footprint } from '../core/patch';
+import { footprint, footprintOrNull, modeOf, modesOf } from '../core/patch';
 
 // Subset of Cable-Planner's ConnectorType that lighting fixtures use. The host
 // union is a superset, so these string literals are assignable to it.
@@ -80,7 +80,12 @@ export function fixtureToEquipment(pf: PlacedFixture): CpEquipmentItem {
   // Thru-Buchse, die es an einer Dimmerleuchte nicht gibt. Wer den Plan
   // uebernahm, bekam eine DMX-Leitung zum 1-kW-Stufenlinsenscheinwerfer.
   const channels = footprint(pf);
-  const hatDmx = channels > 0;
+  // Ein Geraet, dessen Modus nur nicht gewaehlt ist, HAT eine DMX-Ansteuerung
+  // — sein Fussabdruck ist bloss unbekannt. Es allein an `channels > 0` zu
+  // haengen, haette ihm im Kabelplan die DMX-Buchsen genommen, und der
+  // Kabelzug haette eine Leitung weniger vorgesehen als das Rig braucht.
+  const modusFehlt = footprintOrNull(pf) === null;
+  const hatDmx = channels > 0 || modusFehlt;
   const patch = pf.universe != null && pf.dmxAddress != null ? `U${pf.universe}.${pf.dmxAddress}` : undefined;
   const inputs: CpPort[] = [];
   if (hatDmx) {
@@ -96,14 +101,27 @@ export function fixtureToEquipment(pf: PlacedFixture): CpEquipmentItem {
   const outputs: CpPort[] = hatDmx
     ? [{ id: `${pf.id}:dmx-thru`, name: 'DMX Thru', type: 'DMX', connectorType: 'DMX 5-pol (XLR)', side: 'right' }]
     : [];
+  // Der Modus faehrt mit. Der Kabel-Planer fuehrt seit 2026-09-10 dasselbe
+  // Modell (`dmxProfil`/`dmxModusId`, Paket `@avplan/dmx-core`) — reicht der
+  // Export nur die Kanalzahl herueber, kommt drueben eine Zahl an, deren
+  // Modus niemand mehr kennt, und die dortige Adressvergabe rechnet mit
+  // einem Fussabdruck, dessen Herkunft verloren ist.
+  const modus = modeOf(pf);
   const categoryProps: Record<string, string | number | boolean> = {
     'Lichtstrom (lm)': f.lumens,
     'Beam (°)': f.beamAngle,
     'Field (°)': f.fieldAngle,
-    'DMX-Footprint': channels,
+    'DMX-Footprint': modusFehlt ? 'unbekannt' : channels,
     'Dimmer (%)': pf.dimming,
     'Höhe (m)': pf.mountingHeight,
   };
+  if (modus) {
+    categoryProps['DMX-Modus'] = modus.name;
+    categoryProps['DMX-Modus-Herkunft'] = modus.origin;
+    if (modus.evidence) categoryProps['DMX-Modus-Beleg'] = modus.evidence;
+  } else if (modusFehlt) {
+    categoryProps['DMX-Modus'] = `nicht gewählt (${modesOf(f).length} zur Auswahl)`;
+  }
   if (pf.universe != null) categoryProps['DMX-Universe'] = pf.universe;
   if (pf.dmxAddress != null) categoryProps['DMX-Adresse'] = pf.dmxAddress;
   if (pf.channel != null) categoryProps['Kanal'] = pf.channel;

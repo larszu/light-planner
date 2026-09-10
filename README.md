@@ -79,6 +79,7 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 
 ### 📋 Patch & paperwork
 - Auto-number the rig and auto-patch DMX (universe / address, footprint-aware, with clash detection)
+- **Operating modes decide the footprint**: a moving head occupies a different number of channels per mode, so the mode is part of the fixture and the patch follows it. A device whose mode has not been chosen gets *no* address and says so — an unknown footprint is not a footprint of zero, and a single channel count out of place shifts every address after it. Each channel count carries where it came from (device, console patch, GDTF, by hand, estimate); a count carried over from the old single-number field counts as an estimate until someone confirms it
 - Equipment list, instrument schedule and an electrical-load summary (kW, A per phase, 16 A circuits) — export to CSV
 - Trusses / hanging positions you can draw and label
 - **Return from the console**: load the desk's patch export (CSV/TSV) and hold it against the plan — re-addressed, renamed, retyped, only-on-the-desk, only-in-the-plan. One-way on purpose: nothing is written back, because the plan carries the intent and the desk the state after load-in

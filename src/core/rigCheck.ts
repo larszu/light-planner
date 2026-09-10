@@ -3,7 +3,10 @@
 // overloaded trusses and an electrical-load sanity check. Pure data in, a flat
 // list of issues out (sorted worst-first) for a report panel.
 import type { PlacedFixture, Truss } from '../types';
-import { findPatchConflicts, footprint, computePower, trussLoads, DEFAULT_TRUSS_CAPACITY, UNIVERSE_SIZE } from './patch';
+import {
+  findPatchConflicts, footprint, footprintOrNull, modeOf, computePower, trussLoads,
+  DEFAULT_TRUSS_CAPACITY, UNIVERSE_SIZE,
+} from './patch';
 import {
   CIRCUIT_AMPS, DEFAULT_TEMPLATE, PHASE_LABEL, distributionFor, type PhaseTemplate,
 } from './powerDistribution';
@@ -77,6 +80,46 @@ export function rigCheck(
   if (dupChannels.length > 0) {
     const ids = dupChannels.flatMap(([, i]) => i);
     issues.push({ severity: 'warning', message: `${dupChannels.length} doppelte Kanalnummer(n) (${dupChannels.map(([c]) => c).join(', ')})`, ids });
+  }
+
+  // 2b) Geräte mit mehreren Modi, von denen keiner feststeht.
+  //
+  // WARUM DAS EIN FEHLER IST UND KEINE WARNUNG. Der Fußabdruck ist damit
+  // UNBEKANNT, und unbekannt ist nicht null: `autoPatch` vergibt keine
+  // Adresse (richtig — es weiß ja nicht, wie viele Kanäle zu reservieren
+  // wären), aber ohne diese Zeile fiele die Leuchte auch durch die
+  // „ungepatcht"-Prüfung unten, denn die fragt `footprint(f) > 0`. Eine
+  // Leuchte, die im Plan steht, keine Adresse hat und dafür auch nicht
+  // beanstandet wird, fehlt am Pult — und zwar wortlos.
+  const ohneModus = fixtures.filter((f) => footprintOrNull(f) === null);
+  if (ohneModus.length > 0) {
+    issues.push({
+      severity: 'error',
+      message: `${ohneModus.length} Leuchte(n) ohne gewählten DMX-Modus – ihr Fußabdruck ist unbekannt, sie bekommen keine Adresse`,
+      ids: ohneModus.map((f) => f.id),
+    });
+  }
+
+  // 2c) Modi, deren Kanalzahl geschätzt ist.
+  //
+  // Eine Kanalzahl ist eine Behauptung über ein fremdes Gerät. Ist sie
+  // geschätzt, verschiebt sie im Zweifel JEDE Folgeadresse im Rig — deshalb
+  // steht sie hier und nicht in einer Fußnote. `basis: 'assumed'` sagt dem
+  // Vorflug-Bericht, dass er über den Patch kein Urteil fällen kann.
+  //
+  // Die 47 Katalog-Leuchten tragen ihre Kanalzahl noch als blanke Zahl in
+  // `dmxChannels`; `modesOf()` macht daraus einen Modus `estimated`. Diese
+  // Meldung ist also anfangs die Regel und nicht die Ausnahme — sie
+  // verschwindet Gerät für Gerät, sobald jemand den Modus am Gerät abliest
+  // oder aus dem Pult-Patch übernimmt (Task #111).
+  const geschaetzt = fixtures.filter((f) => modeOf(f)?.origin === 'estimated');
+  if (geschaetzt.length > 0) {
+    issues.push({
+      severity: 'warning',
+      message: `${geschaetzt.length} Leuchte(n) mit geschätzter Kanalzahl – der Patch stimmt nur, wenn die Schätzung stimmt`,
+      ids: geschaetzt.map((f) => f.id),
+      basis: 'assumed',
+    });
   }
 
   // 3a) Profile, die nicht in ein Universe passen. Vor der allgemeinen

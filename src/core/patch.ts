@@ -4,17 +4,98 @@
 // professional plots: number the rig in reading order, assign DMX addresses
 // respecting each fixture's footprint, and total up the electrical load.
 
-import type { PlacedFixture, Truss } from '../types';
+import type { DmxMode, Fixture, PlacedFixture, Truss } from '../types';
 import { gelLibrary } from './gelLibrary';
 
 /** Kanäle je DMX-Universe. Mehr passt nicht hinein — das ist keine Konvention,
  *  sondern die Größe des Datenpakets. */
 export const UNIVERSE_SIZE = 512;
 
+// ── Betriebsmodi ────────────────────────────────────────────────────────────
+//
+// BEFUND (gemessen 2026-09-10). `footprint()` las bis hierher EINE Zahl je
+// Gerätetyp — `fixture.dmxChannels`. Ein Moving Head hat aber je Betriebsart
+// einen anderen Fußabdruck; der Robin MegaPointe steht im Katalog mit 30
+// Kanälen, was für höchstens einen seiner Modi stimmt. Wer am Pult einen
+// anderen fährt, bekommt eine Adressliste, in der ab dem ZWEITEN Gerät jede
+// Adresse um die Differenz der beiden Modi daneben liegt.
+//
+// Diese drei Funktionen sind die ganze Umstellung. Alles Weitere in dieser
+// Datei rechnet unverändert weiter — nur eben mit der Zahl des Modus, den das
+// Gerät wirklich fährt.
+
+/**
+ * Die Modi eines Gerätetyps, so wie sie zu lesen sind.
+ *
+ * Sind keine erklärt, gilt die alte Angabe `dmxChannels` als EIN Modus — und
+ * zwar als `estimated`, mit Beleg. Das ist die ehrliche Lesart: über die
+ * Herkunft dieser Zahl steht in den 47 Katalogeinträgen nichts, und eine Zahl
+ * ohne Quelle ist von einer abgelesenen nicht zu unterscheiden. Sie hier
+ * stillschweigend als gemessen durchzureichen wäre der bequeme Weg und genau
+ * die Defektform, gegen die `specSource` und `Task #111` stehen.
+ *
+ * Ein `dmxChannels: 0` (konventionelle Leuchte am Dimmer) ergibt KEINEN Modus:
+ * das Gerät hat keinen Fußabdruck, es hat gar keine DMX-Ansteuerung.
+ */
+export function modesOf(f: Fixture): DmxMode[] {
+  if (f.dmxModes && f.dmxModes.length > 0) return f.dmxModes;
+  if (f.dmxChannels && f.dmxChannels > 0) {
+    return [{
+      id: LEGACY_MODE_ID,
+      name: 'Unspecified',
+      channels: f.dmxChannels,
+      origin: 'estimated',
+      evidence: 'Fixture.dmxChannels — Herkunft nicht festgehalten (Stand 2026-09-10)',
+    }];
+  }
+  return [];
+}
+
+/** Id des aus `dmxChannels` erzeugten Ersatz-Modus. */
+export const LEGACY_MODE_ID = 'legacy-dmxChannels';
+
+/** Der gefahrene Modus, oder `undefined`, wenn keiner feststeht. */
+export function modeOf(f: PlacedFixture): DmxMode | undefined {
+  const modes = modesOf(f.fixture);
+  if (modes.length === 0) return undefined;
+  // Genau ein Modus: der ist es. Ohne diese Zeile müsste jede der 47
+  // Katalog-Leuchten erst von Hand „ihren" einzigen Modus zugewiesen
+  // bekommen, bevor irgendetwas patchbar wäre.
+  if (modes.length === 1) return modes[0];
+  return modes.find((m) => m.id === f.dmxModeId);
+}
+
+/**
+ * Der Fußabdruck, wenn er BEKANNT ist — sonst `null`.
+ *
+ * Drei Zustände, und das ist der Kern:
+ *   `0`     konventionelle Leuchte am Dimmer. Kein DMX, mit Absicht.
+ *   `n > 0` so viele Kanäle im gefahrenen Modus.
+ *   `null`  das Gerät hat mehrere Modi und es steht keiner fest.
+ *
+ * `null` zu `0` zu machen wäre die teure Vereinfachung: `autoPatch` überspringt
+ * beides, aber `rigCheck` verlangt für eine 0 keine Adresse — die Leuchte
+ * stünde also unpatchbar und unbeanstandet im Plan, und am Pult fehlt sie.
+ */
+export function footprintOrNull(f: PlacedFixture): number | null {
+  const modes = modesOf(f.fixture);
+  if (modes.length === 0) return 0;
+  const m = modeOf(f);
+  return m ? Math.max(1, Math.round(m.channels)) : null;
+}
+
+/** `true`, wenn das Gerät Modi hat, aber keiner feststeht. */
+export const modeMissing = (f: PlacedFixture): boolean => footprintOrNull(f) === null;
+
 // DMX footprint of a fixture; 0 / undefined means a conventional unit that
 // lives on a dimmer (gets a channel number but no DMX address).
+//
+// ACHTUNG: Diese Funktion beantwortet „unbekannt" mit 0 und ist damit für
+// jede ANZEIGE die falsche — dort gehört `footprintOrNull()` hin, sonst
+// steht an einer Leuchte ohne gewählten Modus „Dimmer". Zum RECHNEN ist sie
+// richtig: wer keinen Modus hat, belegt auch keine Kanäle.
 export function footprint(f: PlacedFixture): number {
-  return f.fixture.dmxChannels && f.fixture.dmxChannels > 0 ? f.fixture.dmxChannels : 0;
+  return footprintOrNull(f) ?? 0;
 }
 
 // Reading order: top-to-bottom in ~1 m rows, then left-to-right.

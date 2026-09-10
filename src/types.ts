@@ -71,6 +71,39 @@ export interface Attachment {
   weightAdditional: number; // kg added
 }
 
+// ── DMX: Betriebsmodus und Fussabdruck ───────────────────────────────
+//
+// Der teure Fehler bei DMX ist nicht der falsche Wert an EINER Stelle, es ist
+// der Versatz: eine Kanalzahl daneben, und ab dem naechsten Geraet stimmt
+// keine Adresse mehr. Deshalb steht der Modus im Modell und nicht im Kopf des
+// Planers.
+
+/**
+ * Woher die Kanalzahl eines Modus stammt.
+ *
+ * Eine Kanalzahl ist eine BEHAUPTUNG ueber ein fremdes Geraet. Steht sie ohne
+ * Quelle da, ist sie von einer abgelesenen nicht zu unterscheiden — dieselbe
+ * Defektform, gegen die `specSource` weiter unten steht.
+ *
+ * `device` meint: am echten Geraet abgelesen (Display/Menue). `console` meint:
+ * aus einem eingelesenen Pult-Patch uebernommen — das Pult weiss, womit es
+ * tatsaechlich faehrt, und ist damit die staerkste Quelle im Haus.
+ */
+export type DmxModeOrigin = 'manual' | 'gdtf' | 'console' | 'device' | 'estimated';
+
+/** Ein Betriebsmodus eines Geraets: wie er heisst und was er belegt. */
+export interface DmxMode {
+  /** Stabil je Geraetetyp. Der Plan speichert diese Id, nicht den Namen. */
+  id: string;
+  /** Wie der Modus am Geraet heisst, z. B. `Mode 1` oder `Standard 16bit`. */
+  name: string;
+  /** Fussabdruck IN DIESEM MODUS, in Kanaelen. Muss >= 1 sein. */
+  channels: number;
+  origin: DmxModeOrigin;
+  /** Freitext zur Quelle: Seitenzahl, Dateiname, Pult-Export, Datum. */
+  evidence?: string;
+}
+
 export interface Fixture {
   id: string;
   name: string;
@@ -98,7 +131,41 @@ export interface Fixture {
   mountType: MountType;
   ipRating?: string;
   powerConnector?: string;
+  /**
+   * Fussabdruck OHNE Modusbegriff — die alte Angabe, EINE Zahl je Geraet.
+   *
+   * Sie bleibt, weil jeder gespeicherte Plan und jeder der Katalogeintraege
+   * sie traegt; gelesen wird sie ueber `modesOf()`, das daraus einen Modus
+   * mit `origin: 'estimated'` macht. Neue Angaben gehoeren nach `dmxModes`.
+   */
   dmxChannels?: number;
+  /**
+   * Die Betriebsmodi dieses Geraetetyps.
+   *
+   * ─── WARUM EINE ZAHL NICHT REICHT (gemessen 2026-09-10) ─────────────────
+   *
+   * Ein Moving Head hat nicht EINEN Fussabdruck, sondern je Betriebsart
+   * einen. Der Robin MegaPointe stand hier mit `dmxChannels: 30` — eine Zahl,
+   * die fuer genau einen seiner Modi stimmen kann und fuer die anderen nicht.
+   * Wer im Pult Modus A faehrt und im Plan mit der Zahl aus Modus B rechnet,
+   * bekommt eine Adressliste, in der ab dem ZWEITEN Geraet jede Adresse
+   * falsch ist, und zwar um genau den Unterschied der beiden Modi. Das faellt
+   * nicht beim Patchen auf, sondern wenn das dritte Geraet auf einen Befehl
+   * reagiert, der dem zweiten galt.
+   *
+   * Leer/fehlend heisst: ueber die Modi dieses Geraets ist nichts erklaert.
+   * Dann gilt `dmxChannels` als EIN Modus unbekannter Herkunft — sichtbar
+   * als solcher, nicht stillschweigend als gemessen.
+   *
+   * ─── VOKABULAR ──────────────────────────────────────────────────────────
+   *
+   * Deckungsgleich mit `@avplan/dmx-core` (`DmxModus`), das der Kabel-Planer
+   * benutzt — dort deutsch benannt, hier englisch wie der Rest dieser Datei:
+   *   `channels` = `kanaele` · `origin` = `herkunft` · `evidence` = `beleg`.
+   * Die Wertemengen sind identisch, damit ein Plan, der zwischen den beiden
+   * Apps hin und her geht, keinen Modus verliert.
+   */
+  dmxModes?: DmxMode[];
   // ── Attachments ──
   compatibleAttachments?: Attachment[];
   /**
@@ -183,6 +250,18 @@ export interface PlacedFixture {
   // ── Patch / paperwork (instrument schedule, channel hookup) ──
   channel?: number;            // control / dimmer channel number
   unitNumber?: string;         // unit (instrument) number on its position
+  /**
+   * Welcher Modus dieser Leuchte gefahren wird — Id aus `fixture.dmxModes`.
+   *
+   * Er sitzt an der PLATZIERTEN Leuchte und nicht am Katalogeintrag, weil
+   * zwei Geraete desselben Typs im selben Rig verschieden laufen duerfen:
+   * die vier Mover im Gegenlicht im erweiterten Modus, die zwei auf dem
+   * Boden im kleinen. Ein Modus am Typ waere fuer beide derselbe.
+   *
+   * Fehlt er, waehrend das Geraet Modi hat, ist der Fussabdruck UNBEKANNT —
+   * nicht 0. Siehe `footprintOrNull()` in `core/patch.ts`.
+   */
+  dmxModeId?: string;
   universe?: number;           // DMX universe (1-based)
   dmxAddress?: number;         // DMX start address within the universe (1–512)
   purpose?: string;            // focus / purpose note ("Frontlicht Bühne")

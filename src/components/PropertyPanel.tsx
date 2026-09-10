@@ -1,15 +1,31 @@
 import React from 'react';
-import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape, CameraView, WallWindow } from '../types';
+import type { PlacedFixture, Person, StageElement, Fixture, Truss, Wall, Ceiling, Shape, CameraView, WallWindow, DmxMode, DmxModeOrigin } from '../types';
 import { wallMidHandle, curveControlForMid, wallLength } from '../core/geometry';
 import { luxFromFixture, effectiveFieldAngleDeg, explainLux } from '../core/lightCalc';
 import type { FixtureCategory, BeamShape, LensType, MountType, WallPresetId } from '../types';
 import { WALL_PRESETS, DEFAULT_WALL_MATERIAL, wallPreset } from '../core/surfaceTextures';
-import { DEFAULT_TRUSS_CAPACITY, footprint } from '../core/patch';
+import { DEFAULT_TRUSS_CAPACITY, footprint, footprintOrNull, modeOf, modesOf, LEGACY_MODE_ID } from '../core/patch';
 import { gelLibrary } from '../core/gelLibrary';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
 import { isEstimate, isStaleSource } from '../types';
 import { useTranslation, translate, format } from '../i18n';
+
+/**
+ * Die Herkunftsangaben eines DMX-Modus, in der Reihenfolge der Anzeige.
+ *
+ * Deckungsgleich mit `@avplan/dmx-core` (`ModusHerkunft`), damit ein Plan
+ * zwischen Licht- und Kabel-Planer keinen Beleg verliert.
+ */
+const ORIGIN_ORDER: DmxModeOrigin[] = ['manual', 'gdtf', 'console', 'device', 'estimated'];
+
+const ORIGIN_LABEL = (t: (k: string, f: string) => string): Record<DmxModeOrigin, string> => ({
+  manual: t('prop.originManual', 'Manual'),
+  gdtf: t('prop.originGdtf', 'GDTF file'),
+  console: t('prop.originConsole', 'Console patch'),
+  device: t('prop.originDevice', 'Read off the device'),
+  estimated: t('prop.originEstimated', 'Estimate'),
+});
 
 interface Props {
   fixtures: PlacedFixture[];
@@ -457,8 +473,40 @@ const PropertyPanel: React.FC<Props> = ({
             <input type="number" min={1} max={512} value={f.dmxAddress ?? ''}
               onChange={(e) => onUpdateFixture(f.id, { dmxAddress: e.target.value === '' ? undefined : Number(e.target.value) })} />
           </label>
+          {/* ── Betriebsmodus ─────────────────────────────────────────────
+              Er steht VOR der Adresse, weil er sie bestimmt: ein Moving Head
+              belegt je Betriebsart verschieden viele Kanaele. Wer die Adresse
+              zuerst setzt, hat zwischendurch einen Plan, der eine Zahl
+              behauptet, die er nicht kennt. */}
+          {modesOf(f.fixture).length > 1 && (
+            <label className="prop-field">
+              <span>{t('prop.dmxMode', 'DMX mode')}</span>
+              <select
+                value={f.dmxModeId ?? ''}
+                onChange={(e) => onUpdateFixture(f.id, { dmxModeId: e.target.value || undefined })}
+              >
+                <option value="">{t('prop.dmxModeNone', '— not chosen —')}</option>
+                {modesOf(f.fixture).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {format(t('prop.dmxModeOption', '{name} ({ch} ch)'), { name: m.name, ch: m.channels })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="prop-derived">
-            {t('prop.footprint', 'Footprint')}: {footprint(f) > 0 ? `${footprint(f)} DMX-Ch` : t('prop.dimmer1ch', 'Dimmer (1 ch)')}
+            {t('prop.footprint', 'Footprint')}: {(() => {
+              const fp = footprintOrNull(f);
+              // Drei Zustaende, und die Anzeige unterscheidet sie. „Dimmer"
+              // fuer ein Geraet, dessen Modus nur nicht gewaehlt ist, waere
+              // die Falschauskunft, die im Saal auffaellt und nicht hier.
+              if (fp === null) return t('prop.footprintUnknown', 'unknown — no mode chosen');
+              if (fp === 0) return t('prop.dimmer1ch', 'Dimmer (1 ch)');
+              const m = modeOf(f);
+              return m && m.origin === 'estimated'
+                ? format(t('prop.footprintEstimated', '{ch} DMX ch (estimated)'), { ch: fp })
+                : format(t('prop.footprintCh', '{ch} DMX ch'), { ch: fp });
+            })()}
           </div>
           <label className="prop-field">
             <span>{t('prop.purpose', 'Purpose')}</span>
@@ -554,6 +602,71 @@ const PropertyPanel: React.FC<Props> = ({
                 {sNum('CRI', f.fixture.cri, (v) => setSpec({ cri: v || undefined }), 1)}
                 {sNum('TLCI', f.fixture.tlci, (v) => setSpec({ tlci: v || undefined }), 1)}
                 {sNum(t('prop.dmxChannels', 'DMX channels'), f.fixture.dmxChannels, (v) => setSpec({ dmxChannels: v || undefined }), 1)}
+                {/* ── Betriebsmodi ────────────────────────────────────────
+                    Die Zeile darueber ist die ALTE Angabe: eine Zahl je
+                    Geraet, ohne Modusbegriff. Sie bleibt lesbar, weil jeder
+                    gespeicherte Plan sie traegt — aber ein Moving Head hat je
+                    Betriebsart einen anderen Fussabdruck, und der wird hier
+                    eingetragen. Zu JEDER Kanalzahl gehoert, woher sie kommt:
+                    eine Zahl ohne Quelle ist von einer abgelesenen nicht zu
+                    unterscheiden, und sie verschiebt im Zweifel jede
+                    Folgeadresse im Rig. */}
+                {(() => {
+                  const modes = modesOf(f.fixture);
+                  const geerbt = modes.length === 1 && modes[0]!.id === LEGACY_MODE_ID;
+                  const setModes = (next: DmxMode[]) => setSpec({ dmxModes: next });
+                  const change = (id: string, part: Partial<DmxMode>) =>
+                    setModes(modes.map((m) => (m.id === id ? { ...m, ...part } : m)));
+                  return (
+                    <div className="prop-modes">
+                      <div className="prop-field-sub">
+                        {t('prop.dmxModes', 'DMX modes (footprint per operating mode):')}
+                      </div>
+                      {geerbt && (
+                        <div className="prop-derived">
+                          {t('prop.dmxModesLegacy', 'One mode carried over from the channel count above; where it came from was never recorded, so it counts as an estimate until someone reads it off the device or the console patch.')}
+                        </div>
+                      )}
+                      {modes.map((m) => (
+                        <div key={m.id} className="prop-mode-row">
+                          <input
+                            type="text" value={m.name}
+                            title={t('prop.dmxModeName', 'Mode name as it appears on the device')}
+                            onChange={(e) => change(m.id, { name: e.target.value })}
+                          />
+                          <input
+                            type="number" min={1} max={512} value={m.channels}
+                            title={t('prop.dmxModeChannels', 'Channels in this mode')}
+                            onChange={(e) => change(m.id, { channels: Math.max(1, Math.round(Number(e.target.value) || 1)) })}
+                          />
+                          <select
+                            value={m.origin}
+                            title={t('prop.dmxModeOrigin', 'Where this channel count comes from')}
+                            onChange={(e) => change(m.id, { origin: e.target.value as DmxModeOrigin })}
+                          >
+                            {ORIGIN_ORDER.map((o) => (
+                              <option key={o} value={o}>{ORIGIN_LABEL(t)[o]}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button" className="prop-mode-del"
+                            title={t('prop.dmxModeRemove', 'Remove mode')}
+                            onClick={() => setModes(modes.filter((x) => x.id !== m.id))}
+                          >x</button>
+                        </div>
+                      ))}
+                      <button
+                        type="button" className="prop-mode-add"
+                        onClick={() => setModes([...modes, {
+                          id: `m${modes.length + 1}-${f.fixture.id}`,
+                          name: format(t('prop.dmxModeDefault', 'Mode {n}'), { n: modes.length + 1 }),
+                          channels: 1,
+                          origin: 'manual',
+                        }])}
+                      >{t('prop.dmxModeAdd', '+ Mode')}</button>
+                    </div>
+                  );
+                })()}
                 <label className="prop-field"><span>{t('prop.ipRating', 'IP rating')}</span>
                   <input type="text" value={f.fixture.ipRating ?? ''} onChange={(e) => setSpec({ ipRating: e.target.value || undefined })} /></label>
                 <div className="prop-field-sub">{t('prop.photoRef', 'Photometric reference (drives the lux calculation):')}</div>
