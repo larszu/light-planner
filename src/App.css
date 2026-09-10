@@ -1364,6 +1364,62 @@ input[type="range"]:disabled {
   color: var(--text2);
 }
 
+/* ── DMX-Betriebsmodi ──────────────────────────────────────────────────
+   Je Zeile Name, Kanalzahl, Herkunft und Beleg. Die Herkunft steht NEBEN der
+   Zahl und nicht in einem Untermenue: wer sie dort verstecken muesste, um
+   Platz zu sparen, hat sie faktisch weggelassen. Die Zeile bricht um, statt
+   auf schmalen Panels aus dem Rand zu laufen. */
+.prop-modes,
+.fx-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+}
+.fx-modes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.fx-modes-hint {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--text2);
+}
+.prop-mode-row,
+.fx-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.prop-mode-row input[type='text'],
+.fx-mode-row input:not([type='number']) {
+  flex: 1 1 90px;
+  min-width: 70px;
+}
+.prop-mode-row input[type='number'],
+.fx-mode-row input[type='number'] {
+  width: 60px;
+  flex: 0 0 auto;
+}
+.prop-mode-row select,
+.fx-mode-row select {
+  flex: 0 1 auto;
+  min-width: 90px;
+}
+.prop-mode-del,
+.prop-mode-add,
+.fx-mode-row button,
+.fx-modes-head button {
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
 .lux-readout {
   text-align: center;
 }

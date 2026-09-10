@@ -46,6 +46,7 @@
 
 import type { PlacedFixture } from '../types';
 import type { FieldChange } from './diff';
+import { modeOf } from './patch';
 
 const UNIVERSE_SIZE = 512;
 
@@ -61,11 +62,26 @@ export interface ConsoleRow {
   label?: string;
   /** Gerätetyp, so wie das Pult ihn schreibt. */
   type?: string;
+  /**
+   * Der Betriebsmodus, so wie das Pult ihn schreibt („Mode 2", „Extended").
+   *
+   * WARUM DIESE SPALTE ZAEHLT. Der Modus bestimmt den Fussabdruck: derselbe
+   * Moving Head belegt je Betriebsart verschieden viele Kanaele. Faehrt das
+   * Pult einen anderen als der Plan annimmt, stimmt ab dem NAECHSTEN Geraet
+   * keine Adresse mehr, und zwar um genau die Differenz der beiden Modi. Am
+   * Pult sieht das aus wie ein defektes Geraet.
+   *
+   * Das Pult ist fuer diese Angabe die staerkste Quelle im Haus — es weiss,
+   * womit es tatsaechlich faehrt. Uebernommen wird sie trotzdem nicht
+   * automatisch: dieses Modul schreibt nichts in den Plan (siehe Kopf), es
+   * stellt den Unterschied auf das Blatt.
+   */
+  mode?: string;
   /** Zeilennummer in der Datei — damit eine Meldung auffindbar ist. */
   line: number;
 }
 
-export type PatchColumn = 'channel' | 'address' | 'label' | 'type';
+export type PatchColumn = 'channel' | 'address' | 'label' | 'type' | 'mode';
 
 export interface ColumnMapping {
   column: PatchColumn;
@@ -105,6 +121,9 @@ const HEADER_SYNONYMS: Readonly<Record<PatchColumn, readonly string[]>> = {
   address: ['address', 'addr', 'adresse', 'dmx', 'dmxaddress', 'patch', 'startaddress'],
   label: ['label', 'name', 'bezeichnung', 'beschriftung', 'text'],
   type: ['type', 'fixturetype', 'fixture', 'typ', 'geraetetyp', 'gerätetyp', 'instrumenttype', 'instrument'],
+  // „personality" ist der Begriff bei ETC/Hog, „profile" bei einigen
+  // Ausgaben, „footprint" NICHT: das ist die Kanalzahl und nicht der Modus.
+  mode: ['mode', 'modus', 'betriebsart', 'dmxmode', 'fixturemode', 'personality', 'profile'],
 };
 
 /** Kleinschreibung, nur Buchstaben und Ziffern. */
@@ -250,6 +269,7 @@ export function parseConsolePatch(text: string): ConsolePatchParse {
   const iAddress = spalte(mapping, 'address');
   const iLabel = spalte(mapping, 'label');
   const iType = spalte(mapping, 'type');
+  const iMode = spalte(mapping, 'mode');
 
   const rows: ConsoleRow[] = [];
   for (let i = kopfIndex + 1; i < zeilen.length; i += 1) {
@@ -276,6 +296,7 @@ export function parseConsolePatch(text: string): ConsolePatchParse {
     }
     if (iLabel !== undefined) { const s = (felder[iLabel] ?? '').trim(); if (s) row.label = s; }
     if (iType !== undefined) { const s = (felder[iType] ?? '').trim(); if (s) row.type = s; }
+    if (iMode !== undefined) { const s = (felder[iMode] ?? '').trim(); if (s) row.mode = s; }
 
     rows.push(row);
   }
@@ -358,6 +379,7 @@ export function patchReturn(
   const hatTyp = parse.mapping.some((m) => m.column === 'type');
   const hatLabel = parse.mapping.some((m) => m.column === 'label');
   const hatAdresse = parse.mapping.some((m) => m.column === 'address');
+  const hatModus = parse.mapping.some((m) => m.column === 'mode');
 
   const entries: PatchReturnEntry[] = [];
   const counts: Record<ReturnKind, number> = {
@@ -458,6 +480,17 @@ export function patchReturn(
       if (normText(r.type) !== normText(f.fixture.name)
         && normText(r.type) !== normText(`${f.fixture.manufacturer} ${f.fixture.name}`)) {
         differences.push({ field: 'Typ', from: f.fixture.name, to: r.type });
+      }
+    }
+    if (hatModus && r.mode) {
+      // Der Plan kennt den Modus nur, wenn einer gewaehlt ist. Ist keiner
+      // gewaehlt, steht das als Unterschied da und nicht als Uebereinstimmung
+      // — sonst faellt genau der Fall durch, in dem der Plan gar nichts
+      // weiss und das Pult sehr wohl.
+      const m = modeOf(f);
+      const von = m ? m.name : NOT_COMPARED;
+      if (!m || normText(r.mode) !== normText(m.name)) {
+        differences.push({ field: 'Modus', from: von, to: r.mode });
       }
     }
     if (hatLabel && r.label) {

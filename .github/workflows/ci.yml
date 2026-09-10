@@ -271,6 +271,12 @@ jobs:
       # Handvoll Leuchten, das nicht einmal in package.json stand.
       - name: Der Auto-Patch erreicht die Universe-Grenze
         run: npm run autopatch:check
+      # Der Betriebsmodus entscheidet den Fussabdruck: derselbe Moving Head
+      # belegt je Betriebsart verschieden viele Kanaele. Bis 2026-09-10 las
+      # der Planer EINE Zahl je Geraetetyp — eine Kanalzahl daneben, und ab
+      # dem naechsten Geraet stimmt jede Adresse nicht mehr.
+      - name: Der DMX-Modus entscheidet den Fussabdruck
+        run: npm run dmx:check
 
       # Bedarf 132: die Szenen waren eine flache Liste. Wer den dritten Song
       # nach vorn zieht, musste seine Teil-Stimmungen einzeln hinterherziehen

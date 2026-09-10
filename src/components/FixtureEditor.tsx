@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Fixture, FixtureCategory, BeamShape, LensType, MountType } from '../types';
+import type { Fixture, FixtureCategory, BeamShape, LensType, MountType, DmxMode, DmxModeOrigin } from '../types';
 import { extractFixtureSpecs, AI_MODELS, type ExtractedFields, type VerificationItem } from '../utils/aiExtract';
 import { useHost } from '../integration/hostContext';
 import { useTranslation } from '../i18n';
@@ -32,6 +32,12 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
   const [cri, setCri] = useState(initial?.cri ?? 90);
   const [ipRating, setIpRating] = useState(initial?.ipRating ?? '');
   const [dmxChannels, setDmxChannels] = useState(initial?.dmxChannels ?? 1);
+  // Die Betriebsmodi. Leer heisst: ueber die Modi dieses Geraets ist nichts
+  // erklaert — dann gilt die Kanalzahl darueber als EIN Modus geschaetzter
+  // Herkunft (`modesOf()` in `core/patch.ts`). Ein Moving Head gehoert hier
+  // hinein, denn seine Kanalzahl ist keine Eigenschaft des Geraets, sondern
+  // eine seiner Betriebsart.
+  const [dmxModes, setDmxModes] = useState<DmxMode[]>(initial?.dmxModes ?? []);
   // New fields
   const [mountType, setMountType] = useState<MountType>(initial?.mountType ?? 'clamp');
   const [hasColorTempRange, setHasColorTempRange] = useState(!!initial?.colorTempRange);
@@ -122,6 +128,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
       tlci: tlci || undefined,
       ipRating: ipRating || undefined,
       dmxChannels: dmxChannels || undefined,
+      dmxModes: dmxModes.length > 0 ? dmxModes : undefined,
       photometric: hasPhotometric ? { lux: photoLux, distance: photoDistance, beamAngle, colorTemp: colorTemp || 5600 } : undefined,
       // Den Beleg mitnehmen. Er stand bis hierher in `aiVerification`, wurde
       // im Dialog angezeigt („bitte pruefen") — und beim Speichern verworfen.
@@ -277,6 +284,64 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
           <label>TLCI<input type="number" value={tlci} onChange={(e) => setTlci(Number(e.target.value))} min={0} max={100} /></label>
           <label>{t('fx.ipRating', 'IP rating')}<input value={ipRating} onChange={(e) => setIpRating(e.target.value)} placeholder={t('fx.ipRatingPh', 'e.g. 65')} /></label>
           <label>{t('fx.dmxChannels', 'DMX channels')}<input type="number" value={dmxChannels} onChange={(e) => setDmxChannels(Number(e.target.value))} min={0} /></label>
+
+          {/* ── Betriebsmodi ───────────────────────────────────────────────
+              Die Zahl darueber ist der Fussabdruck OHNE Modusbegriff. Fuer
+              alles, was mehr als eine Betriebsart hat — jeder Moving Head,
+              jede Pixel-Leuchte — steht sie hier drin, je Modus eine Zeile.
+              Zu jeder Kanalzahl gehoert, WOHER sie kommt: eine Zahl ohne
+              Quelle ist von einer abgelesenen nicht zu unterscheiden, und
+              eine falsche verschiebt jede Folgeadresse im Rig. */}
+          <div className="fx-modes">
+            <div className="fx-modes-head">
+              <span>{t('fx.dmxModes', 'DMX modes')}</span>
+              <button
+                type="button"
+                onClick={() => setDmxModes([...dmxModes, {
+                  id: `m${dmxModes.length + 1}`,
+                  name: `Mode ${dmxModes.length + 1}`,
+                  channels: dmxChannels || 1,
+                  origin: 'manual',
+                }])}
+              >{t('fx.dmxModeAdd', '+ Mode')}</button>
+            </div>
+            {dmxModes.length === 0 && (
+              <p className="fx-modes-hint">
+                {t('fx.dmxModesEmpty', 'No mode stated: the channel count above then counts as a single mode of unrecorded origin. Enter one line per operating mode for anything that has more than one.')}
+              </p>
+            )}
+            {dmxModes.map((m, i) => (
+              <div key={m.id} className="fx-mode-row">
+                <input
+                  value={m.name}
+                  onChange={(e) => setDmxModes(dmxModes.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                  placeholder={t('fx.dmxModeNamePh', 'Mode 1')}
+                />
+                <input
+                  type="number" min={1} max={512} value={m.channels}
+                  title={t('fx.dmxModeChannels', 'Channels in this mode')}
+                  onChange={(e) => setDmxModes(dmxModes.map((x, j) => (j === i ? { ...x, channels: Math.max(1, Math.round(Number(e.target.value) || 1)) } : x)))}
+                />
+                <select
+                  value={m.origin}
+                  title={t('fx.dmxModeOrigin', 'Where this channel count comes from')}
+                  onChange={(e) => setDmxModes(dmxModes.map((x, j) => (j === i ? { ...x, origin: e.target.value as DmxModeOrigin } : x)))}
+                >
+                  <option value="manual">{t('fx.originManual', 'Manual')}</option>
+                  <option value="gdtf">{t('fx.originGdtf', 'GDTF file')}</option>
+                  <option value="console">{t('fx.originConsole', 'Console patch')}</option>
+                  <option value="device">{t('fx.originDevice', 'Read off the device')}</option>
+                  <option value="estimated">{t('fx.originEstimated', 'Estimate')}</option>
+                </select>
+                <input
+                  value={m.evidence ?? ''}
+                  placeholder={t('fx.dmxModeEvidencePh', 'Source: page, file, export')}
+                  onChange={(e) => setDmxModes(dmxModes.map((x, j) => (j === i ? { ...x, evidence: e.target.value || undefined } : x)))}
+                />
+                <button type="button" onClick={() => setDmxModes(dmxModes.filter((_, j) => j !== i))}>x</button>
+              </div>
+            ))}
+          </div>
 
           <label className="checkbox-field">
             <input type="checkbox" checked={hasZoom} onChange={(e) => setHasZoom(e.target.checked)} /> Zoom
