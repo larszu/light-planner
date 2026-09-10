@@ -101,7 +101,26 @@ for (const datei of alleDateien(SRC)) {
       literale += 1;
       if (!KENNUNGEN.has(text.trim())) {
         const ohnePlatzhalter = text.replace(/\{[^}]*\}/g, ' ');
-        for (const wort of ohnePlatzhalter.match(/[A-Za-zÄÖÜäöüß]+/g) ?? []) {
+        // CamelCase AUSEINANDER, bevor ein Wort geprueft wird.
+        //
+        // Der Scan sucht deutsche Umlaut-Ersatzformen, und die stehen in
+        // WOERTERN. Ein Bezeichner wie `venueFailed` ist keines, sondern zwei
+        // — und weil er als Ganzes nicht auf der Ausnahmeliste stand, meldete
+        // der Lauf ein „ue", das aus dem englischen `venue` kam. Die Liste
+        // trug dagegen schon `exportvenue`, `exportvenuehint`, `importvenue`
+        // und `importvenuehint`: vier Eintraege fuer EIN Wort, und beim
+        // naechsten i18n-Schluessel waere es der fuenfte. Das ist die Sorte
+        // Liste, die immer einen Eintrag zu kurz ist — genau die Bauform, die
+        // dieser Check im Kopf ausdruecklich ablehnt.
+        //
+        // Geteilt wird nur am Uebergang klein→gross: `venueFailed` faellt in
+        // `venue` und `Failed`, `Grundriss` bleibt heil, und ein deutsches
+        // Wort mit Ersatzform bleibt eines (`Geraeteliste` hat keinen
+        // Grossbuchstaben im Innern).
+        const woerter = (ohnePlatzhalter.match(/[A-Za-zÄÖÜäöüß]+/g) ?? []).flatMap((w) =>
+          w.split(/(?<=[a-zäöüß])(?=[A-ZÄÖÜ])/),
+        );
+        for (const wort of woerter) {
           if (!/ae|oe|ue|Ae|Oe|Ue|AE|OE|UE/.test(wort)) continue;
           if (HARMLOS.has(wort.toLowerCase()) || istHex(wort)) continue;
           const zeile = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;

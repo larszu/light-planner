@@ -135,14 +135,14 @@ const Toolbar: React.FC<Props> = ({
         <button
           className={`tool-btn ${viewMode === '2d' ? 'active' : ''}`}
           onClick={() => onViewModeChange('2d')}
-          title="2D-Draufsicht"
+          title={t('tb.view2d', '2D top view')}
         >
           <span className="tool-label">2D</span>
         </button>
         <button
           className={`tool-btn ${viewMode === '3d' ? 'active' : ''}`}
           onClick={() => onViewModeChange('3d')}
-          title="3D-Ansicht"
+          title={t('tb.view3d', '3D view')}
         >
           <span className="tool-label">3D</span>
         </button>
@@ -153,7 +153,7 @@ const Toolbar: React.FC<Props> = ({
       <div className="toolbar-group">
         <label className="tool-btn upload-btn" title={t('tb.importPlan', 'Import a floor plan (JPG, PNG or PDF) — then calibrate the scale')}>
           <span className="tool-icon">📐</span>
-          <span className="tool-label">Grundriss</span>
+          <span className="tool-label">{t('tb.floorPlanShort', 'Floor plan')}</span>
           <input
             type="file"
             accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png"
@@ -168,10 +168,10 @@ const Toolbar: React.FC<Props> = ({
         <button
           className={`tool-btn ${snapEnabled ? 'active' : ''}`}
           onClick={onToggleSnap}
-          title="Am Raster einrasten (0,5 m) ein/aus"
+          title={t('tb.snap', 'Snap to the grid (0.5 m) on/off')}
         >
           <span className="tool-icon">⊞</span>
-          <span className="tool-label">Raster</span>
+          <span className="tool-label">{t('tb.gridShort', 'Grid')}</span>
         </button>
       </div>
 
@@ -181,14 +181,14 @@ const Toolbar: React.FC<Props> = ({
         <button
           className={`tool-btn ${showHeatMap ? 'active' : ''}`}
           onClick={onToggleHeatMap}
-          title="Heatmap ein/aus"
+          title={t('tb.heatmap', 'Heatmap on/off')}
         >
           <span className="tool-icon">🌡</span>
           <span className="tool-label">Heatmap</span>
         </button>
         {showHeatMap && (
-          <label className="heat-scale-label" title="Max Lux für Farbskala">
-            <span>Max:</span>
+          <label className="heat-scale-label" title={t('tb.heatmapMax', 'Max lux for the colour scale')}>
+            <span>{t('tb.heatmapMaxShort', 'Max:')}</span>
             <input
               type="number"
               min={10}
@@ -201,8 +201,8 @@ const Toolbar: React.FC<Props> = ({
           </label>
         )}
         {showHeatMap && (
-          <label className="heat-scale-label" title="Beleuchtungsziel (0 = aus)">
-            <span>Ziel:</span>
+          <label className="heat-scale-label" title={t('tb.heatmapTarget', 'Lighting target (0 = off)')}>
+            <span>{t('tb.heatmapTargetShort', 'Target:')}</span>
             <input
               type="number"
               min={0}
@@ -227,10 +227,10 @@ const Toolbar: React.FC<Props> = ({
               title={t('tb.photoMode', 'Photo mode (render style): show the whole 3D scene photorealistically — real fixtures, shadows, bloom, volumetric beams and realistic people. (This is NOT a camera tool.)')}
             >
               <span className="tool-icon">📷</span>
-              <span className="tool-label">Foto</span>
+              <span className="tool-label">{t('tb.photoShort', 'Photo')}</span>
             </button>
             {photoMode && (
-              <label className="heat-scale-label" title="Belichtung (wie Kamera-Blende/ISO)">
+              <label className="heat-scale-label" title={t('tb.exposure', 'Exposure (like camera aperture/ISO)')}>
                 <span>☀</span>
                 <input
                   type="range"
@@ -261,10 +261,10 @@ const Toolbar: React.FC<Props> = ({
               <button
                 className={`tool-btn ${showBeams ? 'active' : ''}`}
                 onClick={onToggleBeams}
-                title="Lichtkegel global ein-/ausschalten (volumetrische Strahlen im Dunst)"
+                title={t('tb.beams', 'Toggle all beam cones (volumetric rays in haze)')}
               >
                 <span className="tool-icon">🔦</span>
-                <span className="tool-label">Kegel</span>
+                <span className="tool-label">{t('tb.beamsShort', 'Beams')}</span>
               </button>
             )}
           </div>
@@ -279,10 +279,10 @@ const Toolbar: React.FC<Props> = ({
           className="tool-btn auto-btn"
           onClick={onAutoThreePoint}
           disabled={!hasPersons}
-          title="3-Punkt-Beleuchtung (Standard)"
+          title={t('tb.threePointDefault', 'Three-point lighting (default)')}
         >
           <span className="tool-icon">💡</span>
-          <span className="tool-label">3-Punkt</span>
+          <span className="tool-label">{t('tb.threePointShort', '3-point')}</span>
         </button>
         <button
           className="tool-btn auto-btn"
@@ -291,7 +291,7 @@ const Toolbar: React.FC<Props> = ({
           title={t('tb.threePoint', 'Three-point lighting with fixture choice')}
         >
           <span className="tool-icon">⚙</span>
-          <span className="tool-label">Konfig.</span>
+          <span className="tool-label">{t('tb.threePointConfigShort', 'Config.')}</span>
         </button>
         <button
           className="tool-btn auto-btn"
@@ -300,7 +300,7 @@ const Toolbar: React.FC<Props> = ({
           title={t('tb.washArea', 'Light an area — pick sides (N/E/S/W) and target lux. The area is the selected rectangle, riser or group of people.')}
         >
           <span className="tool-icon">🔆</span>
-          <span className="tool-label">Verteilen</span>
+          <span className="tool-label">{t('tb.washAreaShort', 'Wash')}</span>
         </button>
         <button
           className="tool-btn"
@@ -309,7 +309,7 @@ const Toolbar: React.FC<Props> = ({
           title={t('tb.autoCeiling', 'Create a ceiling over all walls automatically (it reflects light)')}
         >
           <span className="tool-icon">⬓</span>
-          <span className="tool-label">Decke</span>
+          <span className="tool-label">{t('tb.ceilingShort', 'Ceiling')}</span>
         </button>
       </div>
 
@@ -317,11 +317,11 @@ const Toolbar: React.FC<Props> = ({
 
       {/* Align (multi-select) on X / Y / Z + distribute */}
       <div className="toolbar-group">
-        <button className="tool-btn" onClick={onAlignX} disabled={!multiSelected} title="Auf gleiche X-Position ausrichten (senkrechte Linie)">
+        <button className="tool-btn" onClick={onAlignX} disabled={!multiSelected} title={t('tb.alignX', 'Align to the same X position (vertical line)')}>
           <span className="tool-icon">⫴</span>
           <span className="tool-label">X-Align</span>
         </button>
-        <button className="tool-btn" onClick={onAlignY} disabled={!multiSelected} title="Auf gleiche Y-Position ausrichten (waagerechte Linie)">
+        <button className="tool-btn" onClick={onAlignY} disabled={!multiSelected} title={t('tb.alignY', 'Align to the same Y position (horizontal line)')}>
           <span className="tool-icon">⫶</span>
           <span className="tool-label">Y-Align</span>
         </button>
@@ -344,11 +344,11 @@ const Toolbar: React.FC<Props> = ({
         <>
           <div className="toolbar-separator" />
           <div className="toolbar-group">
-            <button className="tool-btn" onClick={onGroupSelection} title="Auswahl gruppieren">
+            <button className="tool-btn" onClick={onGroupSelection} title={t('tb.group', 'Group the selection')}>
               <span className="tool-icon">🔗</span>
-              <span className="tool-label">Gruppe</span>
+              <span className="tool-label">{t('tb.groupShort', 'Group')}</span>
             </button>
-            <button className="tool-btn" onClick={onUngroupSelection} title="Gruppierung aufheben">
+            <button className="tool-btn" onClick={onUngroupSelection} title={t('tb.ungroup', 'Ungroup')}>
               <span className="tool-icon">✂</span>
               <span className="tool-label">{t('tb.detach', 'Detach')}</span>
             </button>
@@ -356,11 +356,11 @@ const Toolbar: React.FC<Props> = ({
               <span className="tool-icon">↺</span>
               <span className="tool-label">−45°</span>
             </button>
-            <button className="tool-btn" onClick={() => onRotateSelection(45)} title="45° im Uhrzeigersinn um Person drehen">
+            <button className="tool-btn" onClick={() => onRotateSelection(45)} title={t('tb.rotateCw', 'Rotate 45° clockwise around the person')}>
               <span className="tool-icon">↻</span>
               <span className="tool-label">+45°</span>
             </button>
-            <button className="tool-btn" onClick={() => onRotateSelection(180)} title="180° um Person drehen">
+            <button className="tool-btn" onClick={() => onRotateSelection(180)} title={t('tb.rotate180', 'Rotate 180° around the person')}>
               <span className="tool-icon">⟳</span>
               <span className="tool-label">180°</span>
             </button>
@@ -375,15 +375,15 @@ const Toolbar: React.FC<Props> = ({
           <span className="tool-icon">📋</span>
           <span className="tool-label">{t('tb.scheduleShort', 'Schedule')}</span>
         </button>
-        <button className="tool-btn" onClick={onSaveProject} title="Projekt speichern">
+        <button className="tool-btn" onClick={onSaveProject} title={t('tb.saveProject', 'Save project')}>
           <span className="tool-icon">💾</span>
-          <span className="tool-label">Speichern</span>
+          <span className="tool-label">{t('tb.saveShort', 'Save')}</span>
         </button>
-        <button className="tool-btn" onClick={onLoadProject} title="Projekt laden">
+        <button className="tool-btn" onClick={onLoadProject} title={t('tb.loadProject', 'Load project')}>
           <span className="tool-icon">📂</span>
-          <span className="tool-label">Laden</span>
+          <span className="tool-label">{t('tb.loadShort', 'Load')}</span>
         </button>
-        <button className="tool-btn" onClick={onExport} title="Plan als Bild exportieren">
+        <button className="tool-btn" onClick={onExport} title={t('tb.exportImage', 'Export the plan as an image')}>
           <span className="tool-icon">🖼</span>
           <span className="tool-label">Export</span>
         </button>

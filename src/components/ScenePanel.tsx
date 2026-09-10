@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useTranslation } from '../i18n';
+import { useTranslation, format } from '../i18n';
 import { canParent, runningOrder } from '../core/runningOrder';
 import { auswertung, istDauer, naechsterGriff, type Griff } from '../core/actuals';
 import type { Scene } from '../types';
@@ -265,7 +265,7 @@ const ScenePanel: React.FC<Props> = ({
 
           {hiddenCount > 0 && (
             <button className="sp-showall" onClick={onShowAll}>
-              👁 {hiddenCount} ausgeblendet – alle einblenden
+              👁 {format(t('panel.scene.showAllHidden', '{n} hidden - show all'), { n: hiddenCount })}
             </button>
           )}
         </div>

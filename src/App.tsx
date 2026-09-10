@@ -46,7 +46,7 @@ import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 import { canParent, moveItem } from './core/runningOrder';
 import { erfassen, type Griff } from './core/actuals';
-import { useTranslation } from './i18n';
+import { useTranslation, format } from './i18n';
 
 export type PlanMode = 'none' | 'calibrate' | 'move';
 
@@ -944,7 +944,7 @@ const App: React.FC = () => {
     try {
       avplan = parseAvPlan(res.text);
     } catch (e) {
-      window.alert(`.avplan-Import fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
+      window.alert(format(t('import.avplanFailed', 'Importing the .avplan file failed: {reason}'), { reason: e instanceof Error ? e.message : String(e) }));
       return;
     }
     const r = fromVenueExchange({
@@ -999,7 +999,7 @@ const App: React.FC = () => {
     try {
       ex = parseVenueExchange(res.text);
     } catch (e) {
-      window.alert(`Venue-Import fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
+      window.alert(format(t('import.venueFailed', 'Importing the venue file failed: {reason}'), { reason: e instanceof Error ? e.message : String(e) }));
       return;
     }
     // ADR-005, Regel 2 — auch hier ist die Projektion kanonisch fuer Existenz

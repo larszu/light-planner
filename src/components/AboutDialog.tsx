@@ -1,6 +1,6 @@
 import React from 'react';
 import { APP_NAME, APP_VERSION } from '../version';
-import { useTranslation } from '../i18n';
+import { useTranslation, format } from '../i18n';
 
 interface Props { onClose: () => void }
 
@@ -14,12 +14,17 @@ const AboutDialog: React.FC<Props> = ({ onClose }) => {
       <h2 className="about-name">{APP_NAME}</h2>
       <div className="about-version">{t('about.version', 'Version')} {APP_VERSION}</div>
       <p className="about-desc">
-        Planung von Veranstaltungs- und Bühnenbeleuchtung – Grundriss-Import,
-        Maßstab, Leuchten mit echten photometrischen Daten, Heatmap, 3D-Vorschau
-        mit Foto-Ansicht, Szenen, Ebenen, DMX-Patch &amp; Export.
+        {t(
+          'about.description',
+          'Planning for event and stage lighting - floor-plan import, scale, fixtures with real photometric data, heatmap, 3D preview with photo view, scenes, layers, DMX patch and export.',
+        )}
       </p>
       <div className="about-tech">React · TypeScript · Three.js · Vite</div>
-      <div className="about-copy">© {new Date().getFullYear()} · Alle Berechnungen bleiben nachvollziehbar.</div>
+      <div className="about-copy">
+        {format(t('about.copyright', '© {year} · Every calculation stays traceable.'), {
+          year: new Date().getFullYear(),
+        })}
+      </div>
       <div className="modal-actions">
         <button className="primary" onClick={onClose}>{t('about.close', 'Close')}</button>
       </div>
