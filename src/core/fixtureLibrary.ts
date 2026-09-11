@@ -281,6 +281,24 @@ export const fixtureLibrary: Fixture[] = [
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [12, 49],
     colorTemp: 0, weight: 10.1, mountType: 'yoke', dmxChannels: 21,
   },
+  {
+    id: 'martin-mac-aura-pxl', name: 'MAC Aura PXL', manufacturer: 'Martin / Harman', category: 'moving-wash',
+    wattage: 560, lumens: 10500, beamAngle: 6, fieldAngle: 59,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [6, 59],
+    colorTemp: 0, colorTempRange: [2000, 10000], weight: 15.6, mountType: 'yoke', dmxChannels: 32,
+  },
+  {
+    id: 'glp-impression-x4', name: 'impression X4', manufacturer: 'GLP', category: 'moving-wash',
+    wattage: 350, lumens: 5085, beamAngle: 7, fieldAngle: 50,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 50],
+    colorTemp: 0, weight: 7.9, mountType: 'yoke',
+  },
+  {
+    id: 'robe-robin-spiider', name: 'Robin Spiider', manufacturer: 'Robe', category: 'moving-wash',
+    wattage: 600, lumens: 11000, beamAngle: 4, fieldAngle: 50,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [4, 50],
+    colorTemp: 0, colorTempRange: [2700, 8000], weight: 13.3, mountType: 'yoke', dmxChannels: 49,
+  },
 
   // ═══════════════════════════════════════════════════════════
   // MOVING HEAD SPOT
