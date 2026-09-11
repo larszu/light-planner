@@ -22,6 +22,17 @@
   --line-2: rgba(246, 245, 240, 0.35);
   /* Aktionsflaeche der Marke: Off-White, darauf Navy — 13:1 statt 4:1. */
   --accent: #F6F5F0;
+  /* Die Schrift AUF der Aktionsflaeche. Sie fehlte, und das war teuer:
+   * seit ADR-007 Stufe 5 ist `--accent` Off-White, aber SIEBEN Zustaende
+   * schrieben weiterhin `color: #fff` darauf — Weiss auf Off-White, also
+   * unlesbar, und zwar in jedem Thema. `#fff` war gegen den FRUEHEREN,
+   * gesaettigten Akzent richtig und ist beim Farbwechsel stehengeblieben.
+   * Kein Themenfehler, sondern einer, den die Themenarbeit gefunden hat:
+   * `.nudge-btn:hover` · `.gp-btn.active` · `.dist-toggle button.on` ·
+   * `.sp-save-btn` · `.about-version` · `.tb-modeswitch button.on` ·
+   * `.dock-badge` — darunter die Zahl am Reiter, die sagt, wieviel dort
+   * offen ist. */
+  --accent-text: #132040;
   --accent-soft: rgba(246, 245, 240, 0.13);
   --accent2: #8C9CB3;       /* Stahlblau — die Marke hat keinen zweiten Akzent */
   --warm: #C8892B;
@@ -36,8 +47,97 @@
    * nie Text, nie zweimal in einem Sichtfeld. Fehlerrot ist --danger und
    * ein anderer Ton. */
   --signal: #D6402E;
+  /* Schrift auf den Statusfarben. Die bedeuten etwas und drehen sich nicht
+   * mit dem Thema — also dreht sich auch ihre Schrift nicht. */
+  --text-on-status: #FFFFFF;
+  /* Flaechen, die keine Farbe sind, sondern ein Zustand oder ein Grund. */
+  --overlay: var(--overlay);      /* schwebende Werkzeuggruppe ueber dem Plan */
+  --disabled: #555555;
+  /* Statusfarben in der aufgehellten Fassung, die auf dunklem Grund lesbar
+   * ist. Auf hellem Grund waere sie es nicht — deshalb ein Token und kein
+   * Hexwert im Regelblock. Die BEDEUTUNG bleibt dieselbe, nur die Helligkeit
+   * dreht sich. */
+  --warn-text: #ffcc88;
+  --warn-text-soft: #c9a06a;
+  --good-text: #6ab04c;
   /* Keine Rundungen (Guide S. 10). Der Name bleibt fuer die Aufrufer. */
   --radius: 0;
+}
+
+/* ─── DAS HELL-THEMA (B-70) ────────────────────────────────────────────────
+ *
+ * Nur die WERTE der Variablen werden getauscht, keine Regel und keine
+ * Klasse. Das haelt, weil die Oberflaeche seit ADR-007 Stufe 5 an den
+ * Variablen haengt — `scripts/rohe-farben-check.mjs` misst, dass es so
+ * bleibt.
+ *
+ * DREI ZUSTAENDE, NICHT ZWEI. „System" ist keine Umschreibung fuer
+ * „dunkel": wer nichts waehlt, folgt dem Betriebssystem; wer waehlt,
+ * gewinnt gegen es. Deshalb `[data-theme]` am Wurzelelement UND eine
+ * Medienabfrage, und die Medienabfrage ist gegen eine ausdrueckliche Wahl
+ * abgesichert.
+ *
+ * WAS NICHT MITSPRINGT, und warum das kein Rest ist:
+ *
+ *   Der 2D-Plan und die 3D-Szene. Ein Lichtplan zeigt eine BELEUCHTETE
+ *   Buehne — Farben, Kegel, Schatten. Sie hell zu machen hiesse, anderes
+ *   Licht zu behaupten, und genau darueber gibt dieses Werkzeug Auskunft.
+ *   Der Plan ist der Inhalt, nicht die Verpackung.
+ *
+ *   Die Gel-Farben, die Statusfarben und das Signalrot. Sie bedeuten etwas,
+ *   und ihre Bedeutung haengt nicht am Thema.
+ *
+ *   Das Etikettenblatt (`.label-sheet`). Papier ist weiss, auch nachts.
+ */
+:root[data-theme='light'] {
+  --warn-text: #8A5B12;
+  --warn-text-soft: #7A5520;
+  --good-text: #2C6B2F;
+  --bg: #F6F5F0;
+  --bg-2: #EDEDE7;
+  --panel: #FFFFFF;
+  --panel-alt: #FBFBF8;
+  --border: rgba(19, 32, 64, 0.16);
+  --line-2: rgba(19, 32, 64, 0.38);
+  /* Auf Hell ist Navy die Flaeche und Off-White die Schrift darauf — sonst
+   * verschwaende der einzige Knopf, den der Nutzer sucht. */
+  --accent: #132040;
+  --accent-text: #F6F5F0;
+  --accent-soft: rgba(19, 32, 64, 0.10);
+  --accent2: #4E6180;
+  --text: #1B2B45;
+  --text2: #4E6180;
+  --text3: #7C8AA1;
+  --overlay: #ffffffcc;
+  --disabled: #AAB0BB;
+  color-scheme: light;
+}
+
+/* Ohne ausdrueckliche Wahl entscheidet das Betriebssystem. Gegen
+ * `data-theme='dark'` abgesichert: wer ausdruecklich dunkel gewaehlt hat,
+ * bekommt dunkel, auch auf einem hell eingestellten Rechner. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --warn-text: #8A5B12;
+    --warn-text-soft: #7A5520;
+    --good-text: #2C6B2F;
+    --bg: #F6F5F0;
+    --bg-2: #EDEDE7;
+    --panel: #FFFFFF;
+    --panel-alt: #FBFBF8;
+    --border: rgba(19, 32, 64, 0.16);
+    --line-2: rgba(19, 32, 64, 0.38);
+    --accent: #132040;
+    --accent-text: #F6F5F0;
+    --accent-soft: rgba(19, 32, 64, 0.10);
+    --accent2: #4E6180;
+    --text: #1B2B45;
+    --text2: #4E6180;
+    --text3: #7C8AA1;
+    --overlay: #ffffffcc;
+    --disabled: #AAB0BB;
+    color-scheme: light;
+  }
 }
 
 body {
@@ -149,7 +249,7 @@ body {
 
 .menu-item:hover {
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
 }
 
 .menu-check {
@@ -159,7 +259,7 @@ body {
 }
 
 .menu-item:hover .menu-check {
-  color: #111;
+  color: var(--accent-text);
 }
 
 .menu-label {
@@ -173,7 +273,7 @@ body {
 }
 
 .menu-item:hover .menu-shortcut {
-  color: #111;
+  color: var(--accent-text);
 }
 
 .menu-sep {
@@ -234,7 +334,7 @@ body {
 
 .tool-btn.active {
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 
@@ -597,7 +697,7 @@ body {
 
 .fp-calibrate-btn.active {
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
 }
 
 .fp-move-btn {
@@ -619,7 +719,7 @@ body {
 
 .fp-move-btn.active {
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 
@@ -787,7 +887,7 @@ body {
 .compass-btn.on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #111;
+  color: var(--accent-text);
 }
 .compass-btn.c-n { grid-area: 1 / 2 / 2 / 3; }
 .compass-btn.c-w { grid-area: 2 / 1 / 3 / 2; }
@@ -1016,7 +1116,7 @@ body {
 .tool-nav button span { flex: 1; }
 .tool-nav button:hover { background: var(--panel); color: var(--text); }
 .tool-nav button.on { background: var(--accent-soft); color: var(--accent); }
-.tool-nav .nav-badge { min-width: 19px; height: 19px; padding: 0 5px; border-radius: 0; color: #fff;
+.tool-nav .nav-badge { min-width: 19px; height: 19px; padding: 0 5px; border-radius: 0; color: var(--text-on-status);
   font-size: 10.5px; font-weight: 700; display: grid; place-items: center; }
 .tool-nav .nav-badge.err { background: var(--danger); }
 .tool-nav .nav-badge.warn { background: var(--warn); }
@@ -1070,7 +1170,7 @@ body {
   border-radius: 0; background: var(--panel-alt); }
 .focus-row.done { background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.35); }
 .focus-tick { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 0; border: 1.5px solid var(--text3);
-  background: transparent; color: #fff; display: grid; place-items: center; cursor: pointer; }
+  background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; }
 .focus-tick.on { background: var(--success); border-color: var(--success); }
 .focus-ch { flex: 0 0 auto; min-width: 26px; font-size: 16px; font-weight: 800; color: var(--text);
   font-variant-numeric: tabular-nums; text-align: center; }
@@ -1518,7 +1618,7 @@ input[type="range"]:disabled {
   border: none;
   border-radius: 0;
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -1559,7 +1659,7 @@ input[type="range"]:disabled {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: var(--disabled);
 }
 
 /* ── 3D View ───────────────────────────────────────────── */
@@ -1728,7 +1828,7 @@ input[type="range"]:disabled {
   cursor: pointer;
   padding: 0;
 }
-.beam-help-toggle:hover { background: var(--accent); color: #111; }
+.beam-help-toggle:hover { background: var(--accent); color: var(--accent-text); }
 
 /* Beam angle legend */
 .beam-angles {
@@ -1856,7 +1956,7 @@ input[type="range"]:disabled {
 }
 .nudge-btn:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
 }
 
 .prop-derived {
@@ -1907,7 +2007,7 @@ input[type="range"]:disabled {
   height: 18px;
   border-radius: 0;
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
   font-size: 10px;
   font-weight: 700;
   display: flex;
@@ -2059,7 +2159,7 @@ input[type="range"]:disabled {
 .gp-btn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
   font-weight: 600;
 }
 .gel-placement-note { margin-top: 2px; }
@@ -2076,7 +2176,7 @@ input[type="range"]:disabled {
   cursor: pointer;
 }
 .dist-toggle button:hover { border-color: var(--accent); color: var(--text); }
-.dist-toggle button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.dist-toggle button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
 .area-physics {
   margin-top: 6px;
   font-size: 10px;
@@ -2102,12 +2202,12 @@ input[type="range"]:disabled {
 .hide-toggle.is-hidden {
   background: rgba(255, 170, 60, 0.18);
   border-color: #d8922e;
-  color: #ffcc88;
+  color: var(--warn-text);
   font-weight: 600;
 }
 .hide-note {
   font-size: 10.5px;
-  color: #c9a06a;
+  color: var(--warn-text-soft);
   background: rgba(255, 170, 60, 0.08);
   border-left: 2px solid #d8922e;
   padding: 4px 6px;
@@ -2156,7 +2256,7 @@ input[type="range"]:disabled {
   border: 1px solid var(--accent);
   border-radius: 0;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
@@ -2337,7 +2437,7 @@ input[type="range"]:disabled {
   padding: 2px 10px;
   border-radius: 0;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-text);
   font-size: 12px;
   font-weight: 600;
 }
@@ -2430,7 +2530,7 @@ input[type="range"]:disabled {
   border: none;
   border-radius: 0;
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -2529,7 +2629,7 @@ input[type="range"]:disabled {
   border: none;
   border-radius: 0;
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -2596,7 +2696,7 @@ input[type="range"]:disabled {
 /* ── Attachment & New UI Elements ──────────────────────── */
 .prop-attachment-badge {
   background: var(--accent);
-  color: #111;
+  color: var(--accent-text);
   font-size: 10px;
   font-weight: 600;
   padding: 2px 10px;
@@ -2652,9 +2752,9 @@ input[type="range"]:disabled {
   text-transform: uppercase;
 }
 
-.gel-type-cto { background: #ff8c00; color: #111; }
+.gel-type-cto { background: #ff8c00; color: var(--accent-text); }
 .gel-type-ctb { background: #4488ff; color: #fff; }
-.gel-type-frost { background: #bbccdd; color: #111; }
+.gel-type-frost { background: #bbccdd; color: var(--accent-text); }
 
 .gel-remove {
   margin-left: auto;
@@ -2858,7 +2958,7 @@ input[type="range"]:disabled {
 .tb-modeswitch button { appearance: none; border: 0; background: transparent; color: var(--text2); font: inherit; font-weight: 600;
   font-size: 13px; padding: 6px 16px; border-radius: 0; cursor: pointer; display: flex; align-items: center; gap: 7px; }
 .tb-modeswitch button:hover { color: var(--text); }
-.tb-modeswitch button.on { background: var(--accent); color: #fff; box-shadow: none; }
+.tb-modeswitch button.on { background: var(--accent); color: var(--accent-text); box-shadow: none; }
 
 /* dropdown / popover */
 .tb-dropdown { position: absolute; top: 100%; min-width: 250px; background: var(--panel); border: 1px solid var(--line-2);
@@ -2911,7 +3011,7 @@ input[type="range"]:disabled {
   background: transparent; color: var(--text2); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 0; position: relative; }
 .dock-tab:hover { color: var(--text); }
 .dock-tab.on { color: var(--text); background: var(--panel-alt); box-shadow: none; }
-.dock-badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; border-radius: 0; padding: 0 6px; }
+.dock-badge { background: var(--accent); color: var(--accent-text); font-size: 10px; font-weight: 700; border-radius: 0; padding: 0 6px; }
 .dock-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
 /* panels reused inside the dock — strip their standalone chrome */
 .dock-body .sidebar { width: 100%; min-width: 0; border: 0; background: transparent; flex: 1; }
@@ -2936,7 +3036,7 @@ input[type="range"]:disabled {
 
 /* ── Canvas contextual actions ── */
 .canvas-actions { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 15; }
-.ca-group { display: flex; align-items: center; gap: 3px; background: #10161ecc; backdrop-filter: blur(10px);
+.ca-group { display: flex; align-items: center; gap: 3px; background: var(--overlay); backdrop-filter: blur(10px);
   border: 1px solid var(--line-2); border-radius: 0; padding: 5px 8px; box-shadow: none; }
 .ca-label { color: var(--text3); font-size: 10px; letter-spacing: .8px; text-transform: uppercase; font-weight: 700; margin-right: 4px; }
 .ca-btn { height: 30px; min-width: 30px; padding: 0 6px; border: 0; border-radius: 0; background: transparent; color: var(--text2);
@@ -2955,7 +3055,7 @@ input[type="range"]:disabled {
 .spec-src {
   margin-left: 0.3em;
   font-size: 0.85em;
-  color: #6ab04c;
+  color: var(--good-text);
   cursor: help;
 }
 .spec-src-est { color: #d9a441; }

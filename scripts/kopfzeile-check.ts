@@ -122,14 +122,38 @@ assert.ok(
 assert.match(einstellungen, /setLanguage\(/, 'Der Einstellungen-Dialog schaltet die Sprache nicht');
 assert.ok(!/setLanguage/.test(modell), 'Der Sprachschalter ist zurueck im Menue-Modell');
 
-// ── 6. Was der Dialog NICHT hat, steht begruendet darin ──────────────────
+// ── 6. Der Dialog fuehrt den GANZEN Grundstock der Suite ─────────────────
 //
-// Der gemeinsame Grundstock der Suite ist Sprache, Thema und Ueber. Das Thema
-// fehlt hier mit Messung (ein einziges dunkles Stilblatt, dazu der 2D-Canvas
-// und die 3D-Szene). Faellt diese Zeile, weil jemand die Umstellung gebaut
-// hat: dann gehoert der Umschalter hinein, und sie wird GEAENDERT statt
-// geloescht.
-assert.ok(einstellungen.includes('B-70'), 'Der Grund fuer das fehlende Thema fehlt im Dialog');
+// Sprache, Thema, Ueber. Bis zum 2026-09-11 verlangte diese Stelle
+// ausdruecklich, dass das Thema FEHLT — mit Messung (ein einziges dunkles
+// Stilblatt, dazu der 2D-Canvas und die 3D-Szene) und mit dem Satz:
+// „Faellt diese Zeile, weil jemand die Umstellung gebaut hat: dann gehoert
+// der Umschalter hinein, und sie wird GEAENDERT statt geloescht."
+//
+// Genau das ist passiert (B-70), und genau so ist es gemacht.
+assert.ok(einstellungen.includes("t('settings.theme'"), 'Der Dialog fuehrt kein Thema');
+
+// DREI ZUSTAENDE, nicht zwei. „System" ist keine Umschreibung fuer „dunkel":
+// wer nichts gewaehlt hat, folgt dem Betriebssystem. Ein Schalter mit zwei
+// Stellungen muesste beim ersten Oeffnen eine Wahl erfinden.
+for (const zustand of ['settings.theme.system', 'settings.theme.dark', 'settings.theme.light']) {
+  assert.ok(einstellungen.includes(`t('${zustand}'`), `Der Thema-Schalter kennt ${zustand} nicht`);
+}
+
+// Und er schaltet WIRKLICH: ein Knopf, der nur einen lokalen Zustand setzt,
+// faerbt sich selbst um und sonst nichts.
+assert.ok(einstellungen.includes('setzeThema('), 'Der Thema-Schalter ruft setzeThema nicht auf');
+
+// Das Stilblatt fuehrt beide Saetze Werte — und die Medienabfrage ist gegen
+// eine ausdrueckliche Wahl abgesichert. Ohne das `:not([data-theme='dark'])`
+// bekaeme, wer dunkel GEWAEHLT hat, auf einem hell eingestellten Rechner
+// trotzdem hell: der Schalter saehe dann aus, als taete er nichts.
+const appCss = readFileSync(new URL('../src/App.css', import.meta.url), 'utf8');
+assert.ok(appCss.includes(":root[data-theme='light']"), 'Es gibt keinen hellen Satz Werte');
+assert.ok(
+  appCss.includes(":root:not([data-theme='dark'])"),
+  'Die Medienabfrage ist nicht gegen eine ausdrueckliche Wahl abgesichert',
+);
 
 // ── 7. Die tote Zweitleiste ist weg ──────────────────────────────────────
 assert.ok(
