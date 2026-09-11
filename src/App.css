@@ -51,7 +51,16 @@
    * mit dem Thema — also dreht sich auch ihre Schrift nicht. */
   --text-on-status: #FFFFFF;
   /* Flaechen, die keine Farbe sind, sondern ein Zustand oder ein Grund. */
-  --overlay: var(--overlay);      /* schwebende Werkzeuggruppe ueber dem Plan */
+  /* Die schwebende Werkzeuggruppe ueber dem Plan. Der Wert stand vor B-70
+   * als `#10161ecc` direkt in `.ca-group` — beim Herausziehen hat der
+   * Umstellungs-Lauf die eben geschriebene DEFINITION gleich mit ersetzt,
+   * und heraus kam `--overlay: var(--overlay)`. Das ist nicht bloss
+   * unschoen: eine Eigenschaft, die sich selbst nennt, ist laut Spezifikation
+   * zyklisch und damit ungueltig — `background: var(--overlay)` faellt dann
+   * auf „keine Farbe" zurueck, und die Gruppe stand ohne Hinterlegung
+   * transparent ueber dem Plan. Im Dunkel-Thema, also dort, wo jeder
+   * arbeitet. `farben:check` misst diese Form jetzt. */
+  --overlay: #10161ecc;
   --disabled: #555555;
   /* Statusfarben in der aufgehellten Fassung, die auf dunklem Grund lesbar
    * ist. Auf hellem Grund waere sie es nicht — deshalb ein Token und kein

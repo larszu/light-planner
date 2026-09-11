@@ -31,6 +31,20 @@
 //   `.label-sheet` & Druck   Papier ist weiss, auch nachts.
 //   `.ba-cut`, `.beam-*`     Strahlen-Darstellung: Inhalt, nicht Verpackung.
 //
+// ZWEITENS, seit dem 2026-09-11: eine Eigenschaft, die SICH SELBST nennt.
+// `--overlay: var(--overlay)` ist laut Spezifikation zyklisch und damit
+// ungueltig; jedes `var(--overlay)` faellt danach auf „keine Farbe" zurueck.
+// Genau das ist beim Umbau entstanden — der Lauf, der die Hexwerte aus den
+// Regeln in die Token zog, hat die eben geschriebene Definition gleich mit
+// ersetzt. Der Befund traf das Dunkel-Thema, also das, in dem gearbeitet
+// wird, und war trotzdem unsichtbar: eine transparente Flaeche sieht nicht
+// nach Defekt aus, sondern nach Absicht.
+//
+// Diese Form gehoert hierher und nicht in einen eigenen Lauf: sie entsteht
+// bei derselben Arbeit, an derselben Stelle, und wird von der :root-Ausnahme
+// dieses Waechters ausdruecklich gedeckt — er hatte also die Tuer offen, an
+// der sie hereinkam.
+//
 // Was der Lauf NICHT kann: er liest Zeichen. Ob die Farbe hinter einer
 // Variablen im Hell-Thema lesbar ist, sieht er nicht — Kontrast misst er
 // nicht. Genau daran ist er auch vorbeigelaufen, als sieben Zustaende
@@ -86,6 +100,27 @@ for (let i = 0; i < zeilen.length; i += 1) {
   funde.push(`App.css:${i + 1}  ${zeilen[i].trim()}   (in \`${sel || '?'}\`)`);
 }
 
+/**
+ * Eigenschaften, die sich selbst als Wert nennen.
+ *
+ * Als eigene Funktion, damit die Gegenprobe sie mit einem erfundenen
+ * Stilblatt aufrufen kann statt mit dem echten — ein Waechter, der nur am
+ * gesunden Zustand gemessen wird, ist nicht gemessen.
+ */
+export function selbstbezuege(quelle: string): string[] {
+  const treffer: string[] = [];
+  quelle.split('\n').forEach((zeile, i) => {
+    const m = /^\s*--([a-z0-9-]+)\s*:\s*(.*)$/i.exec(zeile);
+    if (!m) return;
+    if (new RegExp(`var\\(\\s*--${m[1]}\\s*[,)]`, 'i').test(m[2])) {
+      treffer.push(`App.css:${i + 1}  ${zeile.trim()}`);
+    }
+  });
+  return treffer;
+}
+
+const zyklen = selbstbezuege(css);
+
 // ─── Gegenproben ───────────────────────────────────────────────────────────
 
 // 0. Es wurde ueberhaupt gelesen. Ohne diese Zeile waere ein leerer Pfad
@@ -113,11 +148,41 @@ assert.ok(!ROH.test('  border-color: #333;'), 'das Muster misst mehr, als der Ko
 //    die jemand braucht.
 assert.ok(inErlaubt >= 3, `nur ${inErlaubt} erlaubte Stellen erkannt — die Ausnahmen greifen nicht`);
 
+// 2b. Die Zyklus-Messung faengt wirklich, wonach sie sucht — an einem
+//     erfundenen Stilblatt, nicht am echten. Der Fall, der sie ausgeloest
+//     hat, steht als erste Probe drin.
+{
+  assert.deepEqual(
+    selbstbezuege(':root {\n  --overlay: var(--overlay);\n}').length,
+    1,
+    'die Zyklus-Messung sieht den Fall nicht, der sie ausgeloest hat',
+  );
+  assert.equal(
+    selbstbezuege('  --a: var(--a, #fff);').length,
+    1,
+    'ein Selbstbezug mit Rueckfallwert ist genauso zyklisch und muss auffallen',
+  );
+  assert.equal(selbstbezuege('  --a: var(--b);').length, 0, 'die Messung schlaegt auf eine FREMDE Variable an');
+  assert.equal(selbstbezuege('  --accent: #132040;').length, 0, 'die Messung schlaegt auf einen Hexwert an');
+  // Der Praefix-Fall: `--a` darf nicht in `--accent` hineinlesen.
+  assert.equal(selbstbezuege('  --a: var(--accent);').length, 0, 'die Messung vergleicht Namen nur als Praefix');
+}
+
 // 3. Der Selektor-Finder findet den Selektor und nicht irgendetwas.
 {
   const probe = ['.a {', '  color: #fff;', '}', '.b {', '  background: #000;', '}'];
   assert.equal(selektorVon(probe, 1), '.a');
   assert.equal(selektorVon(probe, 4), '.b');
+}
+
+if (zyklen.length > 0) {
+  console.error(`\n${zyklen.length} Eigenschaft(en) nennen sich selbst als Wert:`);
+  for (const z of zyklen) console.error(`  ${z}`);
+  console.error(
+    '\nDas ist laut Spezifikation zyklisch und damit ungueltig: jedes `var(...)` ' +
+      'darauf faellt auf „keine Farbe" zurueck. Der Wert gehoert ausgeschrieben hin.',
+  );
+  process.exit(1);
 }
 
 if (funde.length > 0) {
@@ -131,5 +196,5 @@ if (funde.length > 0) {
 }
 
 console.log(
-  `farben:check ok — keine rohe Flaeche ausserhalb der Token-Bloecke (${inErlaubt} erlaubte Stellen).`,
+  `farben:check ok — keine rohe Flaeche ausserhalb der Token-Bloecke (${inErlaubt} erlaubte Stellen), kein Selbstbezug.`,
 );
