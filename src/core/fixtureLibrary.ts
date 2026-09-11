@@ -270,6 +270,12 @@ export const fixtureLibrary: Fixture[] = [
     colorTemp: 0, weight: 9.7, mountType: 'yoke', dmxChannels: 18,
   },
   {
+    id: 'robe-robin-ledbeam-150', name: 'Robin LEDBeam 150', manufacturer: 'Robe', category: 'moving-wash',
+    wattage: 220, lumens: 3550, beamAngle: 3.8, fieldAngle: 60,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [3.8, 60],
+    colorTemp: 0, colorTempRange: [2700, 8000], weight: 5.7, mountType: 'yoke', dmxChannels: 22,
+  },
+  {
     id: 'chauvet-rogue-r2-wash', name: 'Rogue R2 Wash', manufacturer: 'Chauvet Professional', category: 'moving-wash',
     wattage: 270, lumens: 8200, beamAngle: 12, fieldAngle: 49,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [12, 49],
@@ -306,6 +312,12 @@ export const fixtureLibrary: Fixture[] = [
     wattage: 470, lumens: 23000, beamAngle: 3, fieldAngle: 45,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [3, 45],
     colorTemp: 6500, weight: 21.5, mountType: 'yoke', dmxChannels: 30,
+  },
+  {
+    id: 'robe-robin-pointe', name: 'Robin Pointe', manufacturer: 'Robe', category: 'moving-beam',
+    wattage: 470, lumens: 9870, beamAngle: 2.5, fieldAngle: 20,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [2.5, 20],
+    colorTemp: 7000, cri: 75, weight: 15, mountType: 'yoke', dmxChannels: 30,
   },
   {
     id: 'claypaky-mythos2', name: 'Mythos 2', manufacturer: 'Clay Paky', category: 'moving-beam',
