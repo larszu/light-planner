@@ -854,6 +854,15 @@ export const de: Record<string, string> = {
   'settings.language': 'Sprache',
   'settings.languageHint':
     'Englisch ist die Quellsprache, Deutsch eine Übersetzung. Ein fehlender Eintrag fällt auf Englisch zurück.',
+  'settings.theme': 'Thema',
+  'settings.theme.dark': 'Dunkel',
+  'settings.theme.darkHint': 'Immer dunkel.',
+  'settings.theme.light': 'Hell',
+  'settings.theme.lightHint': 'Immer hell.',
+  'settings.theme.system': 'System',
+  'settings.theme.systemHint': 'Folgt dem Betriebssystem.',
+  'settings.themeHint':
+    'Die Plan-Ansicht und die 3D-Szene bleiben, wie sie sind: ein Lichtplan zeigt eine beleuchtete Bühne, und sie heller zu machen hiesse, anderes Licht zu behaupten.',
   'settings.title': 'Einstellungen',
   'sidebar.addCustom': '+ Eigene Leuchte anlegen',
   'sidebar.attachments': 'Vorsätze verfügbar',

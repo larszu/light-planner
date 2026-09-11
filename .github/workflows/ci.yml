@@ -116,6 +116,14 @@ jobs:
       - name: Kopfzeile im Schnitt der Suite (ADR-007 Abschnitt 6)
         run: npm run kopfzeile:check
 
+      # B-70 — das Hell-Thema haelt nur, solange keine Flaeche und keine
+      # Schrift ihren Wert selbst schreibt. Solange die App nur dunkel war,
+      # war ein `background: #1d1d2c` zufaellig richtig; jetzt ist es eine
+      # dunkle Insel auf hellem Grund, und wer im Dunkel-Thema arbeitet —
+      # also fast jeder, der hier etwas baut — sieht sie nie.
+      - name: Keine rohen Flaechenfarben (B-70)
+        run: npm run farben:check
+
       # Nutzer-Rueckmeldung 2026-09-07 am Kabel-Planer: die Anwendung schrieb
       # ihr Deutsch als „Geraet"/„Domaene". Dieselbe Drift stand hier in elf
       # Meldungen. Der Check kennt nicht die falschen Woerter, sondern die,

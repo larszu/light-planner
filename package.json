@@ -58,7 +58,8 @@
     "canvas:check": "node scripts/canvas-steuerung-check.mjs",
     "zoom:check": "node scripts/zoom-grenze-check.mjs",
     "dmx:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/dmx-mode-check.ts",
-    "kopfzeile:check": "node --experimental-strip-types scripts/kopfzeile-check.ts"
+    "kopfzeile:check": "node --experimental-strip-types scripts/kopfzeile-check.ts",
+    "farben:check": "node --experimental-strip-types scripts/rohe-farben-check.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^6.0.227",
