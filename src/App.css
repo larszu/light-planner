@@ -51,7 +51,16 @@
    * mit dem Thema — also dreht sich auch ihre Schrift nicht. */
   --text-on-status: #FFFFFF;
   /* Flaechen, die keine Farbe sind, sondern ein Zustand oder ein Grund. */
-  --overlay: var(--overlay);      /* schwebende Werkzeuggruppe ueber dem Plan */
+  /* Die schwebende Werkzeuggruppe ueber dem Plan. Der Wert stand vor B-70
+   * als `#10161ecc` direkt in `.ca-group` — beim Herausziehen hat der
+   * Umstellungs-Lauf die eben geschriebene DEFINITION gleich mit ersetzt,
+   * und heraus kam `--overlay: var(--overlay)`. Das ist nicht bloss
+   * unschoen: eine Eigenschaft, die sich selbst nennt, ist laut Spezifikation
+   * zyklisch und damit ungueltig — `background: var(--overlay)` faellt dann
+   * auf „keine Farbe" zurueck, und die Gruppe stand ohne Hinterlegung
+   * transparent ueber dem Plan. Im Dunkel-Thema, also dort, wo jeder
+   * arbeitet. `farben:check` misst diese Form jetzt. */
+  --overlay: #10161ecc;
   --disabled: #555555;
   /* Statusfarben in der aufgehellten Fassung, die auf dunklem Grund lesbar
    * ist. Auf hellem Grund waere sie es nicht — deshalb ein Token und kein
@@ -60,6 +69,21 @@
   --warn-text: #ffcc88;
   --warn-text-soft: #c9a06a;
   --good-text: #6ab04c;
+  /* Schrift auf einer GETOENTEN Statusflaeche (die Ist-Chips im Ablauf, der
+   * „alle zeigen"-Knopf). Nicht dasselbe wie `--text-on-status`: dort liegt
+   * die Schrift auf der vollen Farbe, hier auf einem 16-%-Schleier ueber dem
+   * Grund — der Schleier dreht sich mit dem Thema, die Schrift also auch. */
+  --text-tint-good: #8fe0ac;
+  --text-tint-stop: #ffa898;
+  /* Weitere Schriftrollen, die im Dunkeln aufgehellt sind und es im Hellen
+   * nicht bleiben duerfen. */
+  --text-danger: #ff6b6b;
+  --text-est: #d9a441;
+  --text-stale: #d96a4a;
+  /* BEDEUTUNGSFARBE, die sich NICHT dreht: der Punkt „laeuft" am Ablauf.
+   * Sie steht hier und fehlt im Hell-Block mit Absicht — ein Token ohne
+   * zweite Fassung ist die Aussage „diese Farbe bedeutet etwas". */
+  --dot-on: #5fd07a;
   /* Keine Rundungen (Guide S. 10). Der Name bleibt fuer die Aufrufer. */
   --radius: 0;
 }
@@ -93,6 +117,11 @@
   --warn-text: #8A5B12;
   --warn-text-soft: #7A5520;
   --good-text: #2C6B2F;
+  --text-tint-good: #2C6B2F;
+  --text-tint-stop: #A33A28;
+  --text-danger: #B0342A;
+  --text-est: #8A5B12;
+  --text-stale: #A33A28;
   --bg: #F6F5F0;
   --bg-2: #EDEDE7;
   --panel: #FFFFFF;
@@ -121,6 +150,11 @@
     --warn-text: #8A5B12;
     --warn-text-soft: #7A5520;
     --good-text: #2C6B2F;
+    --text-tint-good: #2C6B2F;
+    --text-tint-stop: #A33A28;
+    --text-danger: #B0342A;
+    --text-est: #8A5B12;
+    --text-stale: #A33A28;
     --bg: #F6F5F0;
     --bg-2: #EDEDE7;
     --panel: #FFFFFF;
@@ -2309,7 +2343,7 @@ input[type="range"]:disabled {
   width: 9px; height: 9px; border-radius: 0;
   border: 1px solid #6a7280; background: transparent; flex: 0 0 auto;
 }
-.sp-dot.on { background: #5fd07a; border-color: #5fd07a; box-shadow: none; }
+.sp-dot.on { background: var(--dot-on); border-color: var(--dot-on); box-shadow: none; }
 .sp-rename {
   flex: 1; padding: 4px 6px; border: 1px solid var(--accent);
   border-radius: 0; background: var(--panel); color: var(--text); font-size: 11.5px;
@@ -2320,11 +2354,11 @@ input[type="range"]:disabled {
   cursor: pointer; font-size: 12px; padding: 3px 4px; border-radius: 0; line-height: 1;
 }
 .sp-mini:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
-.sp-del:hover { color: #ff6b6b; }
+.sp-del:hover { color: var(--text-danger); }
 .sp-showall {
   width: 100%; padding: 6px 8px; margin-top: 2px;
   border: 1px solid #d8922e; border-radius: 0;
-  background: rgba(255, 170, 60, 0.12); color: #ffcc88;
+  background: rgba(255, 170, 60, 0.12); color: var(--warn-text);
   font-size: 11px; cursor: pointer;
 }
 .sp-showall:hover { background: rgba(255, 170, 60, 0.22); }
@@ -2341,17 +2375,17 @@ input[type="range"]:disabled {
   border: 1px solid transparent; border-radius: 0;
   font-size: 12px; line-height: 1; cursor: pointer; padding: 2px 6px;
 }
-.sp-ist-start { background: rgba(80, 200, 120, 0.16); border-color: #3f9d63; color: #8fe0ac; }
+.sp-ist-start { background: rgba(80, 200, 120, 0.16); border-color: #3f9d63; color: var(--text-tint-good); }
 .sp-ist-start:hover { background: rgba(80, 200, 120, 0.3); }
-.sp-ist-ende { background: rgba(255, 110, 90, 0.16); border-color: #c85a48; color: #ffa898; }
+.sp-ist-ende { background: rgba(255, 110, 90, 0.16); border-color: #c85a48; color: var(--text-tint-stop); }
 .sp-ist-ende:hover { background: rgba(255, 110, 90, 0.3); }
 /* Erfasst: kein Knopf mehr, sondern die Auskunft. Der Griff ueberschreibt
    nichts, also wird hier auch keiner angeboten. */
 .sp-ist-fertig { cursor: default; color: var(--text2); font-variant-numeric: tabular-nums; }
 .sp-ist-fertig em { font-style: normal; font-size: 10px; }
-.sp-ist-ohne-start { color: #ffa898; }
-.sp-ist-fertig em.plus { color: #ffa898; }
-.sp-ist-fertig em.minus { color: #8fe0ac; }
+.sp-ist-ohne-start { color: var(--text-tint-stop); }
+.sp-ist-fertig em.plus { color: var(--text-tint-stop); }
+.sp-ist-fertig em.minus { color: var(--text-tint-good); }
 /* Geplante Dauer. Schmal, weil sie eine Zahl ist und kein Formular. */
 .sp-plan {
   flex: 0 0 auto; width: 40px; border: 1px solid var(--line); border-radius: 0;
@@ -2949,7 +2983,7 @@ input[type="range"]:disabled {
 .tb-btn:hover { border-color: var(--line-2); }
 /* Der Primaerknopf traegt den Tally-Punkt links — er macht sichtbar,
  * welcher der EINE ist (ADR-007). Off-White-Flaeche, Navy darauf. */
-.tb-btn.primary { background: var(--accent); border-color: transparent; color: #132040; }
+.tb-btn.primary { background: var(--accent); border-color: transparent; color: var(--accent-text); }
 .tb-btn.primary::before { content: ''; width: 6px; height: 6px; background: var(--signal); flex: none; }
 .tb-div { width: 1px; height: 22px; background: var(--border); margin: 0 2px; }
 .topbar-right { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
@@ -3058,8 +3092,8 @@ input[type="range"]:disabled {
   color: var(--good-text);
   cursor: help;
 }
-.spec-src-est { color: #d9a441; }
-.spec-src-stale { color: #d96a4a; font-weight: 700; }
+.spec-src-est { color: var(--text-est); }
+.spec-src-stale { color: var(--text-stale); font-weight: 700; }
 
 /* ─── BEDARF 148 — Etiketten aus denselben Daten wie die Papiere ───────────
    Ein Etikettenbogen ist ein physischer Gegenstand: die Masse stehen deshalb
