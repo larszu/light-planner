@@ -8,6 +8,27 @@
 // vergisst die Palette, und der Griff ist nur noch fast derselbe.
 //
 // Deshalb baut diese Funktion die Liste, und beide lesen sie.
+//
+// ─── 2026-09-11: DIE LISTE WIRD JETZT AUCH GERENDERT ──────────────────────
+//
+// Bis heute las sie genau EINE Datei: `MenuBar.tsx` — die niemand
+// importierte und die `App.tsx` nie rendert. Die Kommandopalette hing darin;
+// Strg/Cmd+K tat in der laufenden App also nichts, obwohl `brand:check` das
+// Gegenteil zusicherte. Der Waechter stand an der falschen Tuer: er las eine
+// tote Datei und war darum immer gruen. Dieselbe Form wie B-13 (der
+// Sprachschalter, der nur in derselben toten Datei sass), eine Ebene hoeher.
+//
+// Jetzt liest `TopBar.tsx` die Liste und rendert sie als Menueleiste, und die
+// Palette haengt daneben in derselben, wirklich gerenderten Datei.
+// `MenuBar.tsx` ist geloescht — eine zweite Menue-Implementierung, die
+// niemand sieht, driftet lautlos.
+//
+// ─── DIE SPRACHE IST HIER RAUS ────────────────────────────────────────────
+//
+// Sie steht seit 2026-09-11 im Einstellungen-Dialog, wie im Cable Planner
+// und in den anderen Apps der Suite. Ein Sprachschalter mitten im
+// Hilfe-Menue war die Stelle, an der dieses Repo ihn zufaellig
+// untergebracht hatte, nicht die Stelle, an der jemand ihn sucht.
 // ───────────────────────────────────────────────────────────────────────────
 import type { ViewMode } from '../types';
 
@@ -31,6 +52,20 @@ export interface MenuBarProps {
   onToggleHeatMap: () => void;
   onToggleSnap: () => void;
   onAbout: () => void;
+  // Ab 2026-09-11: was frueher nur im Hamburger stand und der Palette
+  // deshalb fehlte. Wer einen Eintrag hier ergaenzt, bekommt ihn in beiden
+  // Wegen — das ist der ganze Punkt dieser Datei.
+  onExportAvplan: () => void;
+  onImportAvplan: () => void;
+  onExportVenue: () => void;
+  onImportVenue: () => void;
+  onExportPlot: () => void;
+  onUploadFloorPlan: () => void;
+  onChanges: () => void;
+  onVersions: () => void;
+  onToggleFocusNotes: () => void;
+  showFocusNotes: boolean;
+  onOpenSettings: () => void;
 }
 
 export interface MenuItem {
@@ -49,27 +84,33 @@ export interface MenuGroup {
 
 type Uebersetzen = (key: string, fallback: string) => string;
 
-export function buildMenus(
-  p: MenuBarProps,
-  t: Uebersetzen,
-  language: string,
-  setLanguage: (l: 'de' | 'en') => void,
-): MenuGroup[] {
+export function buildMenus(p: MenuBarProps, t: Uebersetzen): MenuGroup[] {
   return [
+    // DIE REIHENFOLGE IST DIE DES CABLE PLANNERS: File · Edit · Tools · View
+    // · Help. Sie ist keine Geschmacksfrage — wer zwischen zwei Werkzeugen
+    // der Suite wechselt, greift nach Muskelgedaechtnis und nicht nach dem
+    // Wort. `scripts/chrome-parity.mjs` in der Suite misst sie in allen Apps.
     { id: 'file', label: t('menu.file', 'File'), items: [
-      { label: t('menu.new', 'New'), shortcut: 'Strg+N', onClick: p.onNew },
-      { label: '', separator: true },
-      { label: t('menu.save', 'Save (browser)…'), shortcut: 'Strg+S', onClick: p.onSave },
-      { label: t('menu.load', 'Load (browser)…'), onClick: p.onLoad },
-      { label: '', separator: true },
-      { label: t('menu.saveFile', 'Project to file… (choose location)'), onClick: p.onSaveToFile },
+      { label: t('menu.new', 'New project'), shortcut: 'Strg+N', onClick: p.onNew },
+      { label: t('menu.load', 'Open… (browser)'), onClick: p.onLoad },
       { label: t('menu.loadFile', 'Open project file…'), onClick: p.onLoadFromFile },
       { label: '', separator: true },
+      { label: t('menu.save', 'Save (browser)'), shortcut: 'Strg+S', onClick: p.onSave },
+      // „Save as…" ist hier NICHT derselbe Aufruf mit anderem Namen: er
+      // schreibt in eine DATEI statt in den Browser-Speicher. Zwei Eintraege
+      // mit einem Verhalten waeren einer zu viel.
+      { label: t('menu.saveFile', 'Save as file…'), onClick: p.onSaveToFile },
+      { label: '', separator: true },
+      { label: t('menu.exportAvplan', 'Export whole project (.avplan)…'), onClick: p.onExportAvplan },
+      { label: t('menu.importAvplan', 'Import whole project (.avplan)…'), onClick: p.onImportAvplan },
+      { label: '', separator: true },
+      { label: t('menu.exportVenue', 'Export venue (.venue.json)…'), onClick: p.onExportVenue },
+      { label: t('menu.importVenue', 'Import venue…'), onClick: p.onImportVenue },
+      { label: '', separator: true },
+      { label: t('menu.printPlot', 'Print light plot (PDF)…'), onClick: p.onExportPlot },
       { label: t('menu.exportPng', 'Export as PNG…'), onClick: () => p.onExport('png') },
       { label: t('menu.exportJpg', 'Export as JPG…'), onClick: () => p.onExport('jpg') },
       { label: t('menu.exportPdf', 'Export as PDF…'), onClick: () => p.onExport('pdf') },
-      { label: '', separator: true },
-      { label: t('menu.schedule', 'Instrument schedule & patch…'), onClick: p.onOpenSchedule },
     ] },
     { id: 'edit', label: t('menu.edit', 'Edit'), items: [
       { label: t('menu.undo', 'Undo'), shortcut: 'Strg+Z', onClick: p.onUndo },
@@ -78,6 +119,13 @@ export function buildMenus(
       { label: t('menu.copy', 'Copy'), shortcut: 'Strg+C', onClick: p.onCopy },
       { label: t('menu.paste', 'Paste'), shortcut: 'Strg+V', onClick: p.onPaste },
       { label: t('menu.duplicate', 'Duplicate'), shortcut: 'Strg+D', onClick: p.onDuplicate },
+      { label: '', separator: true },
+      { label: t('menu.changes', 'History & changes…'), onClick: p.onChanges },
+      { label: t('menu.versions', 'Versions & comparison…'), onClick: p.onVersions },
+    ] },
+    { id: 'tools', label: t('menu.tools', 'Tools'), items: [
+      { label: t('menu.schedule', 'Instrument schedule & patch…'), onClick: p.onOpenSchedule },
+      { label: t('menu.floorPlan', 'Import floor plan (JPG/PNG/PDF)…'), onClick: p.onUploadFloorPlan },
     ] },
     { id: 'view', label: t('menu.view', 'View'), items: [
       { label: t('menu.plan2d', '2D plan'), checked: p.viewMode === '2d', onClick: () => p.onViewModeChange('2d') },
@@ -85,11 +133,14 @@ export function buildMenus(
       { label: '', separator: true },
       { label: t('menu.heatmap', 'Heat-map'), checked: p.showHeatMap, onClick: p.onToggleHeatMap },
       { label: t('menu.snap', 'Snap to grid'), checked: p.snapEnabled, onClick: p.onToggleSnap },
+      { label: t('menu.focusNotes', 'Focus notes (plan)'), checked: p.showFocusNotes, onClick: p.onToggleFocusNotes },
     ] },
     { id: 'help', label: t('menu.help', 'Help'), items: [
       { label: t('menu.about', 'About Light Planner…'), onClick: p.onAbout },
       { label: '', separator: true },
-      { label: language === 'de' ? t('menu.language', 'Language: English') : 'Sprache: Deutsch', checked: false, onClick: () => setLanguage(language === 'de' ? 'en' : 'de') },
+      // Die Sprache steht im Einstellungen-Dialog. Der Eintrag hier fuehrt
+      // dorthin, statt sie ein zweites Mal umzuschalten.
+      { label: t('menu.settings', 'Settings…'), onClick: p.onOpenSettings },
     ] },
   ];
 }

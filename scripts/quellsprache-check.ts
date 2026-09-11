@@ -6,10 +6,16 @@
 // die Sprache der Oberflaeche (die waehlt der Nutzer, sobald B-13 den Schalter
 // freilegt), nicht die des Woerterbuchs (das ist die Uebersetzung).
 //
-// DIE ENTSCHEIDUNG (Eigentuemer, 2026-09-08, E-17/E-20): die Quellsprache ist
-// eine Eigenschaft des REPOS, nicht der Suite. `light-planner` und
-// `cable-planner` sind deutsch-quellig; `multicam-planner` und
-// `sony-camera-bridge` englisch-quellig.
+// DIE ENTSCHEIDUNG (Eigentuemer, 2026-09-09, E-28 — HEBT E-17/E-20 AUF): die
+// Quellsprache ist `en`, und zwar fuer ALLE Repos der Suite, nicht mehr je
+// Repo. Deutsch ist die erste Uebersetzung.
+//
+// Der Absatz, der bis zum 2026-09-11 hier stand, nannte noch die alte Lage
+// („light-planner und cable-planner sind deutsch-quellig"). Gemessen hat der
+// Lauf trotzdem richtig — er liest `package.json` -> `avplan.sourceLanguage`
+// und nicht diesen Kommentar. Aber wer ihn las, nahm die aufgehobene
+// Entscheidung mit; und eine ueberholte Begruendung neben einer richtigen
+// Messung ist genau die Sorte Stelle, an der jemand die Messung „korrigiert".
 //
 // WARUM SIE GEMESSEN UND NICHT NUR ERKLAERT WIRD. Der Backlog vermisst den
 // Schaden: ohne Festlegung "vereinheitlicht" der naechste Durchgang die

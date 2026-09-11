@@ -95,8 +95,20 @@ const palette = lies('src/components/CommandPalette.tsx');
 assert.match(palette, /ctrlKey \|\| e\.metaKey/, 'Palette hoert nicht auf Strg/Cmd');
 assert.match(palette, /e\.key === 'k' \|\| e\.key === 'K'/, 'Palette hoert nicht auf K');
 assert.match(palette, /import type \{ MenuGroup \} from '\.\/menuModel'/, 'Palette liest nicht das Menue-Modell');
-const menubar = lies('src/components/MenuBar.tsx');
-assert.match(menubar, /buildMenus\(props, t, language, setLanguage\)/, 'Menueleiste baut nicht aus dem Modell');
-assert.ok(menubar.includes('<CommandPalette groups={menus} />'), 'Palette ist nicht gemountet');
+//
+// GEMESSEN WIRD JETZT `TopBar.tsx` UND NICHT MEHR `MenuBar.tsx`. Bis zum
+// 2026-09-11 las dieser Waechter eine Datei, die `App.tsx` nie rendert: die
+// Palette war dort gemountet, in der laufenden App tat Strg/Cmd+K also
+// nichts — und diese Zeile war trotzdem gruen. Der Waechter stand an der
+// falschen Tuer. `MenuBar.tsx` ist geloescht; die Leiste und die Palette
+// haengen in `TopBar.tsx`, das `App.tsx` wirklich rendert.
+//
+// DIE PRUEFUNG „wird gerendert" LEISTET DIESER LAUF NICHT SELBST — sie
+// gehoert `i18n-reachable-check.ts`, der dem Importgraphen von `App.tsx`
+// folgt. Hier steht nur, WAS in der Datei stehen muss.
+const topbar = lies('src/components/TopBar.tsx');
+assert.match(topbar, /buildMenus\(/, 'Menueleiste baut nicht aus dem Modell');
+assert.ok(topbar.includes('<TopMenu groups={menus} />'), 'Menueleiste ist nicht gemountet');
+assert.ok(topbar.includes('<CommandPalette groups={menus} />'), 'Palette ist nicht gemountet');
 
 console.log('brand:check ok — Oberflaechen-Regeln (ADR-007) eingehalten');
