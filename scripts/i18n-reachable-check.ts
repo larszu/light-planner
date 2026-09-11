@@ -49,8 +49,25 @@ function wirdImportiert(datei: string): boolean {
   return false;
 }
 
+/**
+ * Kommentare weg, bevor gezaehlt wird.
+ *
+ * Ohne das zaehlt ein BELEG als Aufruf: ein Kommentar, der die Bauform
+ * erklaert und dabei `t('…', '…')` woertlich zitiert, liest sich fuer den
+ * Ausdruck unten wie eine Fundstelle. Genau das ist am 2026-09-11 passiert —
+ * der Lauf meldete einen Schluessel namens „key", der nirgends existiert,
+ * weil im Kopf von `Dock.tsx` steht, wie das Muster aussieht.
+ *
+ * Ein Waechter, den man nicht erklaeren darf, ohne ihn auszuloesen, wird
+ * abgeschaltet. Dieselbe Korrektur traegt `rohe-farben-check.ts` seit
+ * demselben Tag und `quellsprache-check.ts` schon laenger.
+ */
+const ohneKommentare = (s: string) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/[^\n]*/gm, ' ');
+
 /** Alle t('key', 'Deutsch')-Aufrufe einer Datei. */
-const aufrufe = (s: string) => [...s.matchAll(/\bt\(\s*'([^']+)'/g)].map((m) => m[1]);
+const aufrufe = (s: string) =>
+  [...ohneKommentare(s).matchAll(/\bt\(\s*'([^']+)'/g)].map((m) => m[1]);
 
 /**
  * Die Schluessel der UEBERSETZUNG — seit E-28 ist das Deutsch.

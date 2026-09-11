@@ -6,7 +6,7 @@ export type IconName =
   | 'select' | 'pan' | 'marquee' | 'rect' | 'line' | 'measure' | 'person' | 'podium' | 'stage'
   | 'truss' | 'wall' | 'camera' | 'fixture' | 'plan2d' | 'cube3d' | 'photo' | 'grid'
   | 'heatmap' | 'settings' | 'import' | 'schedule' | 'export' | 'save' | 'open'
-  | 'undo' | 'redo' | 'search' | 'chevronRight' | 'chevronDown' | 'eye' | 'eyeOff'
+  | 'undo' | 'redo' | 'search' | 'chevronRight' | 'chevronLeft' | 'chevronDown' | 'eye' | 'eyeOff'
   | 'lock' | 'unlock' | 'plus' | 'minus' | 'snap' | 'ruler' | 'tag' | 'menu' | 'beam'
   | 'scene' | 'layers' | 'library' | 'lamp' | 'autolight' | 'distribute' | 'align'
   | 'group' | 'rotate' | 'trash' | 'info' | 'check' | 'close';
@@ -43,6 +43,10 @@ const P: Record<IconName, React.ReactNode> = {
   redo: <path d="m15 7 5 5-5 5M20 12H9a5 5 0 0 0 0 10h3" />,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></>,
   chevronRight: <path d="m9 6 6 6-6 6" />,
+  // Spiegelbild von chevronRight — die Seitenleisten brauchen beide
+  // Richtungen, und ein gedrehtes Zeichen per CSS waere an zwei Stellen zu
+  // pflegen statt an einer.
+  chevronLeft: <path d="m15 6-6 6 6 6" />,
   chevronDown: <path d="m6 9 6 6 6-6" />,
   eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
   eyeOff: <path d="M4 4l16 16M9.5 9.6A3 3 0 0 0 14.4 14.4M6.2 6.3C3.8 7.8 2 12 2 12s3.5 7 10 7a10 10 0 0 0 4-.8M9.8 5.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-2.4 3.3" />,
