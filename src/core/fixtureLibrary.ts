@@ -325,6 +325,12 @@ export const fixtureLibrary: Fixture[] = [
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [4, 50],
     colorTemp: 6000, weight: 26, mountType: 'yoke', dmxChannels: 26,
   },
+  {
+    id: 'claypaky-sharpy', name: 'Sharpy', manufacturer: 'Clay Paky', category: 'moving-beam',
+    wattage: 189, lumens: 7950, beamAngle: 3.8, fieldAngle: 3.8,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
+    colorTemp: 8000, weight: 19, mountType: 'yoke', dmxChannels: 16,
+  },
 
   // ═══════════════════════════════════════════════════════════
   // BLINDER / STROBE
