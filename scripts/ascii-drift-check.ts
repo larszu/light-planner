@@ -62,7 +62,7 @@ const HARMLOS = new Set(
     // „schauen" und „Lebensdauer" darueber. Der Waechter wurde rot an einer
     // richtigen Aenderung; deshalb steht das Wort hier und nicht der Umlaut
     // im Quelltext.
-    'zuschauer', 'quelle',
+    'zuschauer', 'quelle', 'quellsprache',
     'quellen', 'steuer', 'steuerung', 'sequenz', 'frequenz', 'zuerst', 'quer',
     'aktuellen', 'aktueller', 'aktuelles', 'aktuell',
     // Englisch, Bezeichner und Farben, die als Text auftauchen

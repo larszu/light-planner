@@ -55,7 +55,11 @@ body {
 /* ── App Layout ────────────────────────────────────────── */
 .app {
   display: grid;
-  grid-template-rows: 52px 1fr 28px;
+  /* ADR-007 Abschnitt 6: Kopfzeile 40 px, Statuszeile 24 px. Vorher stand
+     hier `52px 1fr 28px` — 52 war eine Zahl, die niemand entschieden hat,
+     und die 28 liessen unter der 24 px hohen `.statusbar` vier Pixel Luft
+     stehen, die wie ein Fehler aussahen. */
+  grid-template-rows: 40px 1fr 24px;
   height: 100vh;
   background: var(--bg);
 }
@@ -2803,9 +2807,31 @@ input[type="range"]:disabled {
 /* ── Top app bar ── */
 .topbar {
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px;
+  /* Die 40 stehen HIER und nicht nur im Raster der `.app`: sonst waere die
+     Hoehe eine Eigenschaft des Elternteils, und wer die Leiste woanders
+     einsetzt, bekaeme eine andere Kopfzeile. `flex: none` gehoert dazu —
+     ohne das schrumpft sie, sobald der Inhalt darunter waechst. */
+  height: 40px; flex: none;
   padding: 0 14px; background: var(--panel);
   border-bottom: 1px solid var(--border); position: relative; z-index: 30;
 }
+
+/* Die Menueleiste — fuenf Titel nebeneinander statt eines Hamburgers
+   (ADR-007 Abschnitt 6: kein Hamburger auf dem Desktop). */
+.tb-menubar { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.tb-menutitle { border: 1px solid transparent; background: transparent; color: var(--text2);
+  padding: 4px 8px; border-radius: 0; cursor: pointer; font: inherit; font-size: 12.5px; white-space: nowrap; }
+.tb-menutitle:hover { color: var(--text); background: var(--panel-alt); }
+.tb-menutitle.on { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+
+/* Der Einstellungen-Dialog. Er nutzt `.modal`; das hier ist nur der Abstand
+   zwischen seinen Abschnitten. */
+.settings-modal h4.settings-h { font-size: 11px; letter-spacing: .8px; text-transform: uppercase;
+  color: var(--text3); font-weight: 700; margin-top: 18px; }
+.settings-modal h4.settings-h:first-of-type { margin-top: 0; }
+.settings-hint { color: var(--text2); font-size: 12px; line-height: 1.45; margin-top: 4px; }
+.settings-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.settings-foot { display: flex; justify-content: flex-end; margin-top: 22px; }
 .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand-logo { width: 28px; height: 28px; border-radius: 0; overflow: hidden; flex: none;
   box-shadow: none; }
@@ -2835,7 +2861,7 @@ input[type="range"]:disabled {
 .tb-modeswitch button.on { background: var(--accent); color: #fff; box-shadow: none; }
 
 /* dropdown / popover */
-.tb-dropdown { position: absolute; top: 42px; min-width: 250px; background: var(--panel); border: 1px solid var(--line-2);
+.tb-dropdown { position: absolute; top: 100%; min-width: 250px; background: var(--panel); border: 1px solid var(--line-2);
   border-radius: 0; box-shadow: none; padding: 7px; z-index: 50; }
 .topbar-left .tb-dropdown { left: 0; }
 .topbar-right .tb-dropdown { right: 0; }

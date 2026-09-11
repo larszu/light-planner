@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from './Icon';
 import type { FloorMaterial, FloorPresetId, SunSettings } from '../types';
+import { buildMenus } from './menuModel';
+import TopMenu from './TopMenu';
+import CommandPalette from './CommandPalette';
+import SettingsDialog from './SettingsDialog';
 import { FLOOR_PRESETS, floorPreset } from '../core/surfaceTextures';
 import { useTranslation } from '../i18n';
 
@@ -54,13 +58,19 @@ interface Props {
   onVersions: () => void;
   onChanges: () => void;
   onAbout: () => void;
+  // Ab 2026-09-11 im Menue-Modell und damit auch in der Kommandopalette.
+  // Sie waren vorher nur an Tastenkuerzeln erreichbar.
+  onCopy: () => void;
+  onPaste: () => void;
+  onDuplicate: () => void;
 }
 
 const mode = (p: Props): Mode => (p.viewMode === '2d' ? '2d' : p.photoMode ? 'photo' : '3d');
 
 const TopBar: React.FC<Props> = (p) => {
-  const { t, language, setLanguage } = useTranslation();
-  const [open, setOpen] = useState<null | 'menu' | 'render'>(null);
+  const { t } = useTranslation();
+  const [open, setOpen] = useState<null | 'render'>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -71,6 +81,46 @@ const TopBar: React.FC<Props> = (p) => {
   const run = (fn: () => void) => () => { fn(); setOpen(null); };
   const m = mode(p);
 
+  // Die EINE Liste. Menueleiste und Kommandopalette lesen sie beide; wer
+  // einen Befehl ergaenzt, bekommt ihn in beiden Wegen.
+  const menus = buildMenus(
+    {
+      viewMode: p.viewMode,
+      showHeatMap: p.showHeatMap,
+      snapEnabled: p.snapStep > 0,
+      showFocusNotes: p.showFocusNotes,
+      onNew: p.onNew,
+      onSave: p.onSave,
+      onLoad: p.onLoad,
+      onSaveToFile: p.onSaveToFile,
+      onLoadFromFile: p.onLoadFromFile,
+      onExport: p.onExport,
+      onUndo: p.onUndo,
+      onRedo: p.onRedo,
+      onCopy: p.onCopy,
+      onPaste: p.onPaste,
+      onDuplicate: p.onDuplicate,
+      onOpenSchedule: p.onOpenSchedule,
+      onViewModeChange: (v) => p.onSetMode(v),
+      onToggleHeatMap: p.onToggleHeatMap,
+      onToggleSnap: p.onToggleSnap,
+      onToggleFocusNotes: p.onToggleFocusNotes,
+      onAbout: p.onAbout,
+      onExportAvplan: p.onExportAvplan,
+      onImportAvplan: p.onImportAvplan,
+      onExportVenue: p.onExportVenue,
+      onImportVenue: p.onImportVenue,
+      onExportPlot: p.onExportPlot,
+      // Der Grundriss kommt ueber ein verstecktes Datei-Feld herein; das
+      // Menue loest denselben Klick aus wie der Knopf daneben.
+      onUploadFloorPlan: () => fileRef.current?.click(),
+      onChanges: p.onChanges,
+      onVersions: p.onVersions,
+      onOpenSettings: () => setSettingsOpen(true),
+    },
+    t,
+  );
+
   return (
     <header className="topbar" ref={ref}>
       {/* ── left: brand + menu ── */}
@@ -79,55 +129,25 @@ const TopBar: React.FC<Props> = (p) => {
         <b className="brand-name">LightPlanner</b>
         <span className="brand-proj">{p.projectName || t('top.untitled', 'Untitled')}</span>
 
-        <div className="tb-menuwrap">
-          <button className={`tb-icon ${open === 'menu' ? 'on' : ''}`} title={t('top.menu', 'Menu')}
-            onClick={() => setOpen(open === 'menu' ? null : 'menu')}><Icon name="menu" /></button>
-          {open === 'menu' && (
-            <div className="tb-dropdown">
-              <div className="tb-dd-sec">{t('top.file', 'File')}</div>
-              <button className="tb-dd-item" onClick={run(p.onNew)}><Icon name="plus" size={15} />{t('top.new', 'New')}<kbd>{t('top.kbdNew', 'Ctrl N')}</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onSave)}><Icon name="save" size={15} />{t('top.saveBrowser', 'Save (browser)')}<kbd>{t('top.kbdSave', 'Ctrl S')}</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onLoad)}><Icon name="open" size={15} />{t('top.loadBrowser', 'Load (browser)…')}</button>
-              <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onSaveToFile)}><Icon name="export" size={15} />{t('top.saveFile', 'Project to file…')}</button>
-              <button className="tb-dd-item" onClick={run(p.onLoadFromFile)}><Icon name="import" size={15} />{t('top.loadFile', 'Open project file…')}</button>
-              <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onExportAvplan)} title={t('top.exportAvplanHint', 'Export the whole project (venue + light + cameras + cabling) losslessly — readable by all three apps, foreign data is preserved')}><Icon name="export" size={15} />{t('top.exportAvplan', 'Export whole project (.avplan)…')}</button>
-              <button className="tb-dd-item" onClick={run(p.onImportAvplan)} title={t('top.importAvplanHint', 'Import a whole project (.avplan) — light is loaded editable, camera/cabling data is preserved losslessly')}><Icon name="import" size={15} />{t('top.importAvplan', 'Import whole project (.avplan)…')}</button>
-              <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onExportVenue)} title={t('top.exportVenueHint', 'Export the shared venue (walls, stage, people, floor plan) — importable in MultiCam Planner')}><Icon name="export" size={15} />{t('top.exportVenue', 'Export venue (.venue.json)…')}</button>
-              <button className="tb-dd-item" onClick={run(p.onImportVenue)} title={t('top.importVenueHint', 'Import a shared venue — replaces walls, stage, people and floor plan; fixtures stay')}><Icon name="import" size={15} />{t('top.importVenue', 'Import venue…')}</button>
-              <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onExportPlot)}><Icon name="schedule" size={15} />{t('top.printPlot', 'Print light plot (PDF, title block + legend)…')}</button>
-              <button className="tb-dd-item" onClick={run(() => p.onExport('png'))}>{t('top.exportPng', 'Export as PNG…')}</button>
-              <button className="tb-dd-item" onClick={run(() => p.onExport('jpg'))}>{t('top.exportJpg', 'Export as JPG…')}</button>
-              <button className="tb-dd-item" onClick={run(() => p.onExport('pdf'))}>{t('top.exportPdf', 'Export as PDF (image)…')}</button>
-              <div className="tb-dd-sec">{t('top.edit', 'Edit')}</div>
-              <button className="tb-dd-item" onClick={run(p.onUndo)}><Icon name="undo" size={15} />{t('top.undo', 'Undo')}<kbd>{t('top.kbdUndo', 'Ctrl Z')}</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onRedo)}><Icon name="redo" size={15} />{t('top.redo', 'Redo')}<kbd>{t('top.kbdRedo', 'Ctrl Y')}</kbd></button>
-              <button className="tb-dd-item" onClick={run(p.onChanges)}><Icon name="tag" size={15} />{t('top.changes', 'History & changes…')}</button>
-              <button className="tb-dd-item" onClick={run(p.onVersions)}><Icon name="layers" size={15} />{t('top.versions', 'Versions & comparison…')}</button>
-              <div className="tb-dd-div" />
-              {/* B-13, letzter Schritt. Der Schalter lag bisher NUR in
-                  `MenuBar.tsx` -- einer Datei, die niemand importiert und die
-                  `App.tsx` nie rendert. Die i18n-Infrastruktur war also
-                  vollstaendig, und trotzdem konnte kein Nutzer die Sprache
-                  wechseln.
-                  Er kommt bewusst ZULETZT: waere er vor dem Wickeln
-                  freigelegt worden, haette wer Englisch waehlt eine zu
-                  ~85 % deutsche Oberflaeche bekommen und die Funktion zu
-                  Recht fuer kaputt gehalten. Seit diesem Branch meldet
-                  `i18n:check` 0 ungewickelte Komponenten. */}
-              <button className="tb-dd-item" onClick={run(() => setLanguage(language === 'de' ? 'en' : 'de'))}>
-                <span className="tb-glyph">🌐</span>
-                {/* Der Knopf nennt das ZIEL, nicht den aktuellen Zustand. */}
-                {language === 'de' ? t('top.langToEn', 'Language: English') : t('top.langToDe', 'Language: Deutsch')}
-              </button>
-              <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={run(p.onAbout)}><Icon name="info" size={15} />{t('top.about', 'About LightPlanner')}</button>
-            </div>
-          )}
-        </div>
+        {/* ─────────────────────────────────────────────────────────────
+            DIE MENUELEISTE — fuenf Titel statt eines Hamburgers.
+
+            NUTZER-AUFTRAG 2026-09-11: die obere Leiste in allen Repos gleich
+            aufbauen. ADR-007 Abschnitt 6 sagt dazu: Menues links, kein
+            Hamburger auf dem Desktop.
+
+            SIE LIEST DAS MODELL. Die Eintraege standen bis heute doppelt: als
+            Liste in `menuModel.ts` (fuer die Kommandopalette) und ein zweites
+            Mal getippt in dieser Klappe. Die beiden waren laengst
+            auseinander — im Hamburger standen .avplan, Venue und der
+            Lichtplan-Druck, in der Palette nicht.
+
+            UND DIE PALETTE HAENGT JETZT HIER. Sie war in `MenuBar.tsx`
+            montiert — einer Datei, die `App.tsx` nie rendert. Strg/Cmd+K tat
+            in der laufenden App also nichts, obwohl `brand:check` das
+            Gegenteil zusicherte: der Waechter las die tote Datei.
+            ───────────────────────────────────────────────────────────── */}
+        <TopMenu groups={menus} />
       </div>
 
       {/* ── center: mode switch ── */}
@@ -142,8 +162,10 @@ const TopBar: React.FC<Props> = (p) => {
         <button className={`tb-icon ${p.showHeatMap ? 'on' : ''}`} title={t('top.heatmap', 'Heat-map (colour by illuminance)')} onClick={p.onToggleHeatMap}><Icon name="heatmap" /></button>
 
         <div className="tb-menuwrap">
+          {/* Regler statt Zahnrad: zwei Zahnraeder nebeneinander, von denen
+              eines die App einstellt und das andere das Bild, sind ein Raten. */}
           <button className={`tb-icon ${open === 'render' ? 'on' : ''}`} title={t('top.displaySettings', 'Display & render settings')}
-            onClick={() => setOpen(open === 'render' ? null : 'render')}><Icon name="settings" /></button>
+            onClick={() => setOpen(open === 'render' ? null : 'render')}><Icon name="photo" /></button>
           {open === 'render' && (
             <div className="tb-dropdown tb-render">
               {(p.viewMode === '3d' && p.photoMode) ? (
@@ -224,7 +246,26 @@ const TopBar: React.FC<Props> = (p) => {
         <button className="tb-btn" onClick={p.onOpenSchedule}><Icon name="schedule" size={15} />{t('top.schedule', 'Schedule')}</button>
         <button className="tb-btn" onClick={() => p.onExport('png')}><Icon name="export" size={15} />{t('top.export', 'Export')}</button>
         <button className="tb-btn primary" onClick={p.onSave}><Icon name="save" size={15} />{t('top.save', 'Save')}</button>
+
+        {/* RECHTS AUSSEN, als LETZTER Bedienpunkt der Zeile — dieselbe Stelle
+            wie im Cable Planner. Nicht zu verwechseln mit dem Zahnrad daneben:
+            das sind die Anzeige- und Render-Regler (Belichtung, Boden,
+            Strahlen) und keine App-Einstellungen. Bis heute war es der
+            einzige Zahnrad-Knopf der Leiste, und damit sah es aus wie beides. */}
+        <button
+          className="tb-icon"
+          title={t('settings.title', 'Settings')}
+          aria-label={t('settings.title', 'Settings')}
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Icon name="settings" />
+        </button>
       </div>
+
+      {/* Die Kommandopalette — Strg/Cmd+K, ADR-007 Abschnitt 6. Sie liest
+          DIESELBE Liste wie die Menueleiste daneben. */}
+      <CommandPalette groups={menus} />
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </header>
   );
 };
