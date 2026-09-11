@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Icon from './Icon';
 import { useTranslation } from '../i18n';
 import type { FloorPlan } from '../types';
 import type { PlanMode } from '../App';
@@ -40,13 +41,16 @@ const FloorPlanPanel: React.FC<Props> = ({
     <div className={`floorplan-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="fp-header">
         <span className="fp-title" title={floorPlan.name}>
-          📐 {floorPlan.name || t('panel.floor.title', 'Floor plan')}
+          <Icon name="plan2d" size={14} />
+          {floorPlan.name || t('panel.floor.title', 'Floor plan')}
         </span>
         <div className="fp-header-actions">
           <button className="fp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Expand') : t('panel.collapse', 'Collapse')}>
-            {collapsed ? '▸' : '▾'}
+            <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} size={13} />
           </button>
-          <button className="fp-icon-btn fp-close" onClick={onRemove} title={t('panel.floor.remove', 'Remove floor plan')}>✕</button>
+          <button className="fp-icon-btn fp-close" onClick={onRemove} title={t('panel.floor.remove', 'Remove floor plan')}>
+            <Icon name="close" size={13} />
+          </button>
         </div>
       </div>
 
@@ -61,13 +65,15 @@ const FloorPlanPanel: React.FC<Props> = ({
                   className="fp-step-btn"
                   disabled={page <= 1}
                   onClick={() => onSetPage((floorPlan.pageIndex ?? 0) - 1)}
-                >◀</button>
+                  aria-label={t('panel.floor.prevPage', 'Previous page')}
+                ><Icon name="chevronLeft" size={12} /></button>
                 <span className="fp-page-label">{page} / {pages}</span>
                 <button
                   className="fp-step-btn"
                   disabled={page >= pages}
                   onClick={() => onSetPage((floorPlan.pageIndex ?? 0) + 1)}
-                >▶</button>
+                  aria-label={t('panel.floor.nextPage', 'Next page')}
+                ><Icon name="chevronRight" size={12} /></button>
               </div>
             </div>
           )}
@@ -78,7 +84,8 @@ const FloorPlanPanel: React.FC<Props> = ({
               className={`fp-calibrate-btn ${planMode === 'calibrate' ? 'active' : ''}`}
               onClick={() => onSetMode(planMode === 'calibrate' ? 'none' : 'calibrate')}
             >
-              📏 Maßstab kalibrieren
+              <Icon name="ruler" size={13} />
+              {t('panel.floor.calibrate', 'Calibrate scale')}
             </button>
             <div className="fp-row">
               <span>{t('panel.floor.width', 'Width')}</span>
@@ -111,7 +118,8 @@ const FloorPlanPanel: React.FC<Props> = ({
               className={`fp-move-btn ${planMode === 'move' ? 'active' : ''}`}
               onClick={() => onSetMode(planMode === 'move' ? 'none' : 'move')}
             >
-              ✋ Position anpassen
+              <Icon name="pan" size={13} />
+              {t('panel.floor.reposition', 'Adjust position')}
             </button>
             <div className="fp-row fp-pos">
               <span>X / Y</span>

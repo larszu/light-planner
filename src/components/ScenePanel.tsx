@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Icon from './Icon';
 import { useTranslation, format } from '../i18n';
 import { canParent, runningOrder } from '../core/runningOrder';
 import { auswertung, istDauer, naechsterGriff, type Griff } from '../core/actuals';
@@ -99,9 +100,9 @@ const ScenePanel: React.FC<Props> = ({
   return (
     <div className={`scene-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="sp-header">
-        <span className="sp-title">🎬 {t('panel.scene.title', 'Scenes')}{scenes.length > 0 ? ` (${scenes.length})` : ''}</span>
+        <span className="sp-title"><Icon name="scene" size={14} />{t('panel.scene.title', 'Scenes')}{scenes.length > 0 ? ` (${scenes.length})` : ''}</span>
         <button className="sp-icon-btn" onClick={() => setCollapsed((c) => !c)} title={collapsed ? t('panel.expand', 'Expand') : t('panel.collapse', 'Collapse')}>
-          {collapsed ? '▸' : '▾'}
+          <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} size={13} />
         </button>
       </div>
 
@@ -157,7 +158,7 @@ const ScenePanel: React.FC<Props> = ({
                             className="sp-ist sp-ist-start"
                             onClick={() => onCaptureActual(s.id, 'start')}
                             title={t('panel.scene.captureStart', 'Record the start now')}
-                          >▶</button>
+                          ><Icon name="chevronRight" size={12} /></button>
                         );
                       }
                       if (griff === 'ende') {
@@ -226,10 +227,10 @@ const ScenePanel: React.FC<Props> = ({
                         disabled={!s.parentId}
                         onClick={() => onReparentScene(s.id, null)}
                         title={t('panel.scene.outdent', 'Move back to the top level')}
-                      >←</button>
+                      ><Icon name="chevronLeft" size={12} /></button>
                       <button className="sp-mini" onClick={() => onUpdateScene(s.id)} title={t('panel.scene.overwrite', 'Overwrite with the current look')}>⟳</button>
                       <button className="sp-mini" onClick={() => startRename(s)} title={t('panel.scene.rename', 'Rename')}>✎</button>
-                      <button className="sp-mini sp-del" onClick={() => onDeleteScene(s.id)} title={t('panel.scene.delete', 'Delete scene')}>🗑</button>
+                      <button className="sp-mini sp-del" onClick={() => onDeleteScene(s.id)} title={t('panel.scene.delete', 'Delete scene')}><Icon name="trash" size={12} /></button>
                     </div>
                   </li>
                 );
@@ -265,7 +266,8 @@ const ScenePanel: React.FC<Props> = ({
 
           {hiddenCount > 0 && (
             <button className="sp-showall" onClick={onShowAll}>
-              👁 {format(t('panel.scene.showAllHidden', '{n} hidden - show all'), { n: hiddenCount })}
+              <Icon name="eye" size={13} />
+              {format(t('panel.scene.showAllHidden', '{n} hidden - show all'), { n: hiddenCount })}
             </button>
           )}
         </div>

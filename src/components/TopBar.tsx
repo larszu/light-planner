@@ -208,7 +208,7 @@ const TopBar: React.FC<Props> = (p) => {
               )}
               <div className="tb-dd-sec">{t('top.sun', 'Sun / daylight')}</div>
               <button className="tb-dd-item" onClick={() => p.onSunChange({ ...p.sun, enabled: !p.sun.enabled })} title={t('top.sunHint', 'Real sun: daylight & shadows from location, date and time – falls through windows into the room.')}>
-                <span className="tb-glyph">☀</span>{t('top.sunOn', 'Sun active')}<span className={`tb-check ${p.sun.enabled ? 'on' : ''}`}><Icon name="check" size={13} /></span>
+                <span className="tb-glyph"><Icon name="heatmap" size={13} /></span>{t('top.sunOn', 'Sun active')}<span className={`tb-check ${p.sun.enabled ? 'on' : ''}`}><Icon name="check" size={13} /></span>
               </button>
               {p.sun.enabled && (
                 <>

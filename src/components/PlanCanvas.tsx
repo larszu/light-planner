@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from '../i18n';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling, Layers, CameraView } from '../types';
 import type { PlanMode } from '../App';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../core/lightCalc';
@@ -125,6 +126,7 @@ const PlanCanvas: React.FC<Props> = ({
   onCalibrateSegment,
   onViewChange,
 }) => {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<ViewTransform>({ offsetX: RULER_SIZE + 60, offsetY: RULER_SIZE + 60, scale: 40 });
@@ -928,7 +930,7 @@ const PlanCanvas: React.FC<Props> = ({
       ctx.fillStyle = isSel ? '#ffcc33' : '#9fe7f0';
       ctx.font = `${10 / v.scale}px sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(`🎥 ${cam.label || 'Kamera'} · ${cam.fov}°`, cam.x, cam.y - 0.45);
+      ctx.fillText(`${cam.label || t('canvas.cameraFallback', 'Camera')} · ${cam.fov}°`, cam.x, cam.y - 0.45);
       ctx.textAlign = 'start';
       if (isSel) {
         ctx.setLineDash([4 / v.scale, 4 / v.scale]);
@@ -1086,7 +1088,7 @@ const PlanCanvas: React.FC<Props> = ({
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.fillText(`1m = ${v.scale.toFixed(0)}px | Zoom: ${((v.scale / 40) * 100).toFixed(0)}%`, RULER_SIZE + 10, h - 10);
-  }, [fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, showFocusNotes, planMode, activeTool, screenToWorld, drawRulers, onViewChange]);
+  }, [t, fixtures, shapes, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, showFocusNotes, planMode, activeTool, screenToWorld, drawRulers, onViewChange]);
 
   useEffect(() => {
     const container = containerRef.current;

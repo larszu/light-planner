@@ -444,7 +444,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           <h4 className="schedule-subhead">
             {t('sch.groups', 'Groups')} ({gruppen.length})
             <button className="btn-secondary" style={{ marginLeft: 8 }} onClick={exportGroups}>
-              ⬇ {t('sch.groups.csv', 'Group sheet (CSV)')}
+              <Icon name="export" size={12} /> {t('sch.groups.csv', 'Group sheet (CSV)')}
             </button>
           </h4>
           <table className="schedule-table">
@@ -1105,7 +1105,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           downloadCsv('vorflug.csv', [tb.header, ...tb.rows]
             .map((r) => r.map((v) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))).join(';'))
             .join('\r\n'));
-        }}>⬇ {t('sch.check.csv', 'Report (CSV)')}</button>
+        }}><Icon name="export" size={12} /> {t('sch.check.csv', 'Report (CSV)')}</button>
       </div>
       {bericht.assumed > 0 && (
         <div className="prop-derived">
@@ -1359,22 +1359,22 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
       <div className="export-row">
         <Icon name="schedule" size={22} className="er-icon" />
         <div className="er-text"><b>{t('sch.exp.schedule', 'Instrument schedule (CSV)')}</b><span>{t('sch.exp.scheduleNote', 'Patch, position, gel & purpose per fixture – for a spreadsheet.')}</span></div>
-        <button className="btn-secondary" onClick={exportSchedule}>⬇ CSV</button>
+        <button className="btn-secondary" onClick={exportSchedule}><Icon name="export" size={12} /> CSV</button>
       </div>
       <div className="export-row">
         <Icon name="truss" size={22} className="er-icon" />
         <div className="er-text"><b>{t('sch.exp.cables', 'Cable list (CSV)')}</b><span>{t('sch.exp.cablesNote', 'Power and DMX runs with length and connector — what MVR does not carry.')}</span></div>
-        <button className="btn-secondary" onClick={exportCables}>⬇ CSV</button>
+        <button className="btn-secondary" onClick={exportCables}><Icon name="export" size={12} /> CSV</button>
       </div>
       <div className="export-row">
         <Icon name="library" size={22} className="er-icon" />
         <div className="er-text"><b>{t('sch.exp.inventory', 'Equipment list (CSV)')}</b><span>{t('sch.exp.inventoryNote', 'Counts per type with power & weight – for ordering and logistics.')}</span></div>
-        <button className="btn-secondary" onClick={exportInventory}>⬇ CSV</button>
+        <button className="btn-secondary" onClick={exportInventory}><Icon name="export" size={12} /> CSV</button>
       </div>
       <div className="export-row">
         <Icon name="heatmap" size={22} className="er-icon" />
         <div className="er-text"><b>{t('sch.exp.colours', 'Colour list (CSV)')}</b><span>{t('sch.exp.coloursNote', 'Gel cuts per code – for ordering colour and prepping it.')}</span></div>
-        <button className="btn-secondary" onClick={exportColors} disabled={colors.length === 0}>⬇ CSV</button>
+        <button className="btn-secondary" onClick={exportColors} disabled={colors.length === 0}><Icon name="export" size={12} /> CSV</button>
       </div>
       <div className="export-row">
         <Icon name="tag" size={22} className="er-icon" />
@@ -1382,7 +1382,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           <b>{t('sch.exp.groups', 'Group sheet (CSV)')}</b>
           <span>{t('sch.exp.groupsNote', 'One row per group member with channel, unit, type and position \u2014 what otherwise gets rebuilt by hand on the console, in the visualiser and in the media server.')}</span>
         </div>
-        <button className="btn-secondary" onClick={exportGroups} disabled={gruppen.length === 0}>⬇ CSV</button>
+        <button className="btn-secondary" onClick={exportGroups} disabled={gruppen.length === 0}><Icon name="export" size={12} /> CSV</button>
       </div>
       {/* ── BEDARF 145 — die Bestellung faellt aus dem Plan ──────────────
           „Users must manually type equipment items" (jkarp7/showstack#29),
@@ -1502,7 +1502,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
             </ul>
           )}
         </div>
-        <button className="btn-secondary" onClick={exportMvr}>⬇ .mvr</button>
+        <button className="btn-secondary" onClick={exportMvr}><Icon name="export" size={12} /> .mvr</button>
       </div>
     </div>
   );
