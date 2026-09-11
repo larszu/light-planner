@@ -161,4 +161,43 @@ assert.ok(
   'MenuBar.tsx ist zurueck — eine zweite Menue-Implementierung, die niemand rendert, driftet lautlos',
 );
 
-console.log('kopfzeile:check ok — 40 px, kein Hamburger, File/Edit/Tools/View/Help, Einstellungen rechts aussen');
+// ── 8. Die Seitenleisten klappen wie im cable-planner ────────────────────
+//
+// ADR-007 Abschnitt 6 legt den Rahmen fest — Rail, Arbeitsflaeche, Inspektor
+// rechts. Was er bis zum 2026-09-11 NICHT festlegte, war der Griff: wie man
+// eine Spalte zuklappt. Verglichen ueber die fuenf Apps hatte jede eine
+// andere Antwort, und diese hier hatte gar keine.
+//
+// Gemessen wird die Form des Massstabs (`cable-planner`):
+//   - eingeklappt bleiben 32 px stehen, nicht 0 und nicht 20,
+//   - der Name der Spalte steht darin, senkrecht — sonst sagt die Leiste
+//     nicht, WAS dort zugeklappt ist,
+//   - und der Griff sitzt IN der Spalte, nicht in einem Streifen daneben.
+const seitenPanel = lies('src/components/SeitenPanel.tsx');
+assert.ok(seitenPanel.includes('panel-rail'), 'Es gibt keine eingeklappte Leiste');
+assert.ok(
+  /\.panel-rail\b[^}]*\{[^}]*\}/.test(appCss) || appCss.includes('.panel-rail'),
+  'Die eingeklappte Leiste hat keine Regel im Stilblatt',
+);
+assert.ok(
+  /gridTemplateColumns[^`]*`56px \$\{[^}]*\? '32px'/.test(lies('src/App.tsx')),
+  'Die eingeklappte Spalte ist nicht 32 px breit',
+);
+assert.ok(
+  seitenPanel.includes('writing-mode') || appCss.includes('writing-mode: vertical-rl'),
+  'Der Name der Spalte steht eingeklappt nicht senkrecht darin',
+);
+// Die Kopflinie aus ADR-007 traegt jetzt auch das Panel und nicht nur der
+// Dialog. Sie gab es laengst als `.panel-head`; benutzt hat sie nur die
+// Kommandopalette.
+// `includes('panel-head')` genuegt NICHT: die Datei nennt auch
+// `panel-head-titel` und `panel-head-btn`, und die Probe blieb damit gruen,
+// als die Klasse am Kopf-Element schon `kopf` hiess. Gemessen wird deshalb
+// das Attribut selbst.
+assert.ok(
+  /className="panel-head"/.test(seitenPanel),
+  'Die Seitenleiste traegt keine Kopflinie (.panel-head am Kopf-Element)',
+);
+assert.ok(appCss.includes('.panel-head {'), 'Die Kopflinie hat keine Regel im Stilblatt');
+
+console.log('kopfzeile:check ok — 40 px, kein Hamburger, File/Edit/Tools/View/Help, Einstellungen rechts aussen, Seitenleisten mit 32-px-Leiste und Kopflinie');

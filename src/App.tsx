@@ -8,6 +8,7 @@ import { convexHull } from './core/geometry';
 import { resolveSun, defaultSunSettings } from './core/sun';
 import TopBar from './components/TopBar';
 import ToolRail from './components/ToolRail';
+import SeitenPanel from './components/SeitenPanel';
 import Dock from './components/Dock';
 import StatusBar from './components/StatusBar';
 import CanvasActions from './components/CanvasActions';
@@ -111,6 +112,24 @@ const App: React.FC = () => {
   const [foreignCameras, setForeignCameras] = useState<ForeignCamera[]>([]);
   const [stageElements, setStageElements] = useState<StageElement[]>([]);
   const [customFixtures, setCustomFixtures] = useState<Fixture[]>([]);
+  /**
+   * Eingeklappte Seitenleisten — und die Wahl ueberlebt den Neustart.
+   *
+   * Im `cable-planner` liegt sie im `uiStore` und wird mitgespeichert; hier
+   * ist `localStorage` der Weg, den dieses Repo ohnehin geht. Wer die Spalte
+   * zuklappt, hat das fuer seine Arbeitsweise getan und nicht fuer eine
+   * Sitzung.
+   */
+  const [dockZu, setDockZu] = useState(() => {
+    try { return localStorage.getItem('lp-dock-zu') === '1'; } catch { return false; }
+  });
+  const [inspektorZu, setInspektorZu] = useState(() => {
+    try { return localStorage.getItem('lp-inspektor-zu') === '1'; } catch { return false; }
+  });
+  const merke = (schluessel: string, wert: boolean) => {
+    try { localStorage.setItem(schluessel, wert ? '1' : '0'); } catch { /* privates Fenster */ }
+  };
+
   const [activeTool, setActiveTool] = useState<Tool>('select');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [fixtureToPlace, setFixtureToPlace] = useState<Fixture | null>(null);
@@ -1591,8 +1610,22 @@ const App: React.FC = () => {
         onPaste={handlePaste}
         onDuplicate={handleDuplicate}
       />
-      <div className="app-body">
+      {/* Die Spaltenbreiten stehen hier und nicht im Stilblatt, weil sie sich
+          mit dem Zustand aendern. 32 px eingeklappt — dieselbe Zahl wie im
+          `cable-planner`, auf dem 8-px-Raster aus ADR-007. */}
+      <div
+        className="app-body"
+        style={{
+          gridTemplateColumns: `56px ${dockZu ? '32px' : '264px'} 1fr ${inspektorZu ? '32px' : '308px'}`,
+        }}
+      >
         <ToolRail activeTool={activeTool} onToolChange={handleToolChange} />
+        <SeitenPanel
+          seite="links"
+          titel={t('panel.tools', 'Tools')}
+          eingeklappt={dockZu}
+          onUmschalten={(zu) => { setDockZu(zu); merke('lp-dock-zu', zu); }}
+        >
         <Dock
           customFixtures={customFixtures}
           fixtureToPlace={fixtureToPlace}
@@ -1617,6 +1650,7 @@ const App: React.FC = () => {
           onCaptureActual={handleCaptureActual}
           onSetPlanned={handleSetPlanned}
         />
+        </SeitenPanel>
         <div className="canvas-area">
           {viewMode === '2d' ? (
             <PlanCanvas
@@ -1759,6 +1793,12 @@ const App: React.FC = () => {
             />
           )}
         </div>
+        <SeitenPanel
+          seite="rechts"
+          titel={t('panel.properties', 'Properties')}
+          eingeklappt={inspektorZu}
+          onUmschalten={(zu) => { setInspektorZu(zu); merke('lp-inspektor-zu', zu); }}
+        >
         <PropertyPanel
           fixtures={fixtures}
           persons={persons}
@@ -1783,6 +1823,7 @@ const App: React.FC = () => {
           onAutoThreePointForPerson={handleAutoThreePointForPerson}
           onAreaLight={() => setAreaLightOpen(true)}
         />
+        </SeitenPanel>
       </div>
       <StatusBar
         viewMode={viewMode}

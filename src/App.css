@@ -1329,16 +1329,11 @@ kbd {
   margin-right: 6px;
 }
 
-.panel-header {
-  padding: 8px 14px 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.panel-header h3 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent);
-}
+/* HIER STAND `.panel-header` — geloescht am 2026-09-11, weil sie NIEMAND
+ * benutzte und einen Buchstaben neben `.panel-head` sass, der Kopflinie aus
+ * ADR-007. Wer nach dem naheliegenderen Namen griff, bekam eine gedaempfte
+ * Linie statt des Akzents und wich still von jedem Dialog ab. Zwei Namen fuer
+ * beinahe dieselbe Sache sind eine Falle, kein Angebot. */
 
 .panel-sub {
   font-size: 11px;
@@ -3054,6 +3049,90 @@ input[type="range"]:disabled {
 
 /* ── Inspector (existing property panel fills its column) ── */
 .property-panel { width: 100%; min-width: 0; }
+
+/* ── Seitenleisten: Rahmen, Kopflinie, eingeklappte Leiste ────────────────
+ *
+ * Dieselbe Form wie im `cable-planner` (Massstab laut Eigentuemer-Weisung):
+ * der Griff sitzt IN der Spalte, eingeklappt bleiben 32 px mit dem Namen
+ * senkrecht darin stehen. 32 und nicht 20: die Zahl liegt auf dem 8-px-
+ * Raster aus ADR-007 Abschnitt 3, und eine Trefferflaeche unter 24 px waere
+ * unter der Norm, die `slider:check` fuer Regler schon haelt.
+ *
+ * Die Kopflinie ist `.panel-head` — die Klasse gab es laengst, benutzt hat
+ * sie nur die Kommandopalette. ADR-007 nennt sie „die Kopfzeile jedes Panels
+ * und jedes Dialogs"; die Seitenleisten trugen sie als einzige nicht. */
+.seiten-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--panel);
+}
+.seiten-panel-links { border-right: 1px solid var(--border); }
+.seiten-panel-rechts { border-left: 1px solid var(--border); }
+.seiten-panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+/* Den eigenen Rand der Kinder abraeumen: der Rahmen gehoert jetzt der
+   Seitenleiste. Ohne das stuenden zwei Linien uebereinander — 2 px statt 1,
+   und zwar nur in dieser App. */
+.seiten-panel-body > .dock { border-right: 0; flex: 1; }
+.seiten-panel-body > .property-panel { border-left: 0; flex: 1; overflow-y: auto; }
+.panel-head-titel {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+.panel-head-btn,
+.panel-rail-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--panel-alt);
+  color: var(--text2);
+  cursor: pointer;
+  padding: 0;
+}
+.panel-head-btn:hover,
+.panel-rail-btn:hover { color: var(--text); border-color: var(--accent); }
+.panel-head-btn:focus-visible,
+.panel-rail-btn:focus-visible,
+.panel-rail-titel:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+
+.panel-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding-top: 4px;
+  background: var(--panel);
+}
+.panel-rail-links { border-right: 1px solid var(--border); }
+.panel-rail-rechts { border-left: 1px solid var(--border); }
+/* Der Name der Spalte, senkrecht. `rotate(180deg)` dreht ihn so, dass er von
+   unten nach oben liest — sonst stuende er auf dem Kopf. */
+.panel-rail-titel {
+  flex: 1;
+  align-self: stretch;
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text3);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.panel-rail-titel:hover { color: var(--text2); }
 
 /* ── Status bar ── */
 /* ADR-007 Abschnitt 6: „Statusleiste unten, 24 px. Sie meldet; sie bedient
