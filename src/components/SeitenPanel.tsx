@@ -88,7 +88,7 @@ const SeitenPanel: React.FC<SeitenPanelProps> = ({
 
   return (
     <aside className={`seiten-panel seiten-panel-${seite}`}>
-      <div className="panel-head">
+      <div className="spaltenkopf panel-head">
         <span className="panel-head-titel">{titel}</span>
         <button
           type="button"

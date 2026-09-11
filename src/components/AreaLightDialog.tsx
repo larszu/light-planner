@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Icon from './Icon';
 import type { LightSide, LightArea, AreaLightConfig } from '../core/autoLighting';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import { useTranslation } from '../i18n';
@@ -60,7 +61,7 @@ const AreaLightDialog: React.FC<Props> = ({ area, defaultTargetLux, trusses, onG
   return (
     <div className="modal-overlay" onMouseDown={onCancel}>
       <div className="modal area-light-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h3>🔆 {t('dlg.area.title', 'Light up area')}</h3>
+        <h3><Icon name="beam" size={14} />{t('dlg.area.title', 'Light up area')}</h3>
         {/* Zwei Schluessel statt einem: die Groesse steht fett MITTEN im Satz.
             Ein einziger Schluessel mit Platzhalter koennte die Auszeichnung
             nicht tragen, und ein Satz um das Markup herum zerschnitten ist die

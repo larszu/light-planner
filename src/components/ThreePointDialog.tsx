@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Icon from './Icon';
 import type { Fixture, Truss } from '../types';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import type { ThreePointConfig } from '../core/autoLighting';
@@ -64,7 +65,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
 
         {/* Target Lux */}
         <div className="three-point-role">
-          <div className="three-point-role-label">🎯 {t('dlg.3pt.goal', 'Lighting target')}</div>
+          <div className="three-point-role-label"><Icon name="tag" size={13} />{t('dlg.3pt.goal', 'Lighting target')}</div>
           <div className="three-point-dim">
             <span>{t('dlg.3pt.keyTarget', 'Key target')}</span>
             <input type="number" min={0} max={100000} step={10}
@@ -85,7 +86,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
 
         {/* Position: truss + distance so throws aren't random */}
         <div className="three-point-role">
-          <div className="three-point-role-label">📐 {t('dlg.3pt.position', 'Fixture positions')}</div>
+          <div className="three-point-role-label"><Icon name="plan2d" size={13} />{t('dlg.3pt.position', 'Fixture positions')}</div>
           <select value={trussId} onChange={(e) => setTrussId(e.target.value)}>
             <option value="">{t('dlg.3pt.freePos', 'Free position (no truss)')}</option>
             {trusses.map((tr, i) => (
@@ -107,7 +108,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
 
         {/* Contrast Ratio */}
         <div className="three-point-role">
-          <div className="three-point-role-label">⚖ {t('dlg.3pt.ratio', 'Contrast ratio (key : fill)')}</div>
+          <div className="three-point-role-label"><Icon name="distribute" size={13} />{t('dlg.3pt.ratio', 'Contrast ratio (key : fill)')}</div>
           <select value={contrastRatio}
             onChange={(e) => setContrastRatio(Number(e.target.value))}>
             {CONTRAST_PRESETS.map((p) => (
@@ -125,7 +126,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
 
         {/* Fixture selectors */}
         <div className="three-point-role">
-          <div className="three-point-role-label">🔆 {t('dlg.3pt.key', 'Key (main light)')}</div>
+          <div className="three-point-role-label"><Icon name="beam" size={13} />{t('dlg.3pt.key', 'Key (main light)')}</div>
           <select value={keyId} onChange={(e) => setKeyId(e.target.value)}>
             {fixtureLibrary.map((f) => (
               <option key={f.id} value={f.id}>{f.name} ({f.manufacturer}) – {f.beamAngle}°</option>
@@ -142,7 +143,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
         </div>
 
         <div className="three-point-role">
-          <div className="three-point-role-label">🌤 {t('dlg.3pt.fill', 'Fill')}</div>
+          <div className="three-point-role-label"><Icon name="heatmap" size={13} />{t('dlg.3pt.fill', 'Fill')}</div>
           <select value={fillId} onChange={(e) => setFillId(e.target.value)}>
             {fixtureLibrary.map((f) => (
               <option key={f.id} value={f.id}>{f.name} ({f.manufacturer}) – {f.beamAngle}°</option>
@@ -158,7 +159,7 @@ const ThreePointDialog: React.FC<Props> = ({ targetLux, trusses, onGenerate, onC
         </div>
 
         <div className="three-point-role">
-          <div className="three-point-role-label">✨ {t('dlg.3pt.back', 'Back (rim light)')}</div>
+          <div className="three-point-role-label"><Icon name="autolight" size={13} />{t('dlg.3pt.back', 'Back (rim light)')}</div>
           <select value={backId} onChange={(e) => setBackId(e.target.value)}>
             {fixtureLibrary.map((f) => (
               <option key={f.id} value={f.id}>{f.name} ({f.manufacturer}) – {f.beamAngle}°</option>

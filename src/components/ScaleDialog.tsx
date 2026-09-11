@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import Icon from './Icon';
 import { useTranslation } from '../i18n';
 
 interface Props {
@@ -28,7 +29,7 @@ const ScaleDialog: React.FC<Props> = ({ measuredMeters, onApply, onCancel }) => 
   return (
     <div className="modal-overlay" onMouseDown={onCancel}>
       <div className="modal scale-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <h3>📏 {t('dlg.scale.title', 'Calibrate scale')}</h3>
+        <h3><Icon name="ruler" size={14} />{t('dlg.scale.title', 'Calibrate scale')}</h3>
         <p className="dialog-hint">
           {t('dlg.scale.hintPre', 'The line you drew currently measures')} <strong>{measuredMeters.toFixed(2)} m</strong>{' '}
           {t('dlg.scale.hintPost', '. Enter its real length – the floor plan is scaled to match.')}

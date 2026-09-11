@@ -194,8 +194,13 @@ assert.ok(
 // `panel-head-titel` und `panel-head-btn`, und die Probe blieb damit gruen,
 // als die Klasse am Kopf-Element schon `kopf` hiess. Gemessen wird deshalb
 // das Attribut selbst.
+// Die Klasse darf NEBEN anderen stehen (seit 2026-09-11 traegt dasselbe
+// Element zusaetzlich `spaltenkopf`, an dem `chrome:parity` die Kopfzeile
+// erkennt). Der Trennzeichen-Rahmen bleibt: `panel-head-titel` faellt weiter
+// durch, weil vor und hinter dem Namen entweder ein Leerzeichen oder das
+// Ende des Attributs stehen muss.
 assert.ok(
-  /className="panel-head"/.test(seitenPanel),
+  /className="(?:[^"]*\s)?panel-head(?:\s[^"]*)?"/.test(seitenPanel),
   'Die Seitenleiste traegt keine Kopflinie (.panel-head am Kopf-Element)',
 );
 assert.ok(appCss.includes('.panel-head {'), 'Die Kopflinie hat keine Regel im Stilblatt');

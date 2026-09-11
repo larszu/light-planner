@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Icon from './Icon';
 import type { Fixture, FixtureCategory, BeamShape, LensType, MountType, DmxMode, DmxModeOrigin } from '../types';
 import { extractFixtureSpecs, AI_MODELS, type ExtractedFields, type VerificationItem } from '../utils/aiExtract';
 import { useHost } from '../integration/hostContext';
@@ -150,7 +151,9 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
 
         <div className="ai-assist">
           <button type="button" className={`ai-toggle ${aiOpen ? 'open' : ''}`} onClick={() => setAiOpen((o) => !o)}>
-            ✨ {t('fx.aiToggle', 'AI assistant – pull data from a datasheet')} {aiOpen ? '▾' : '▸'}
+            <Icon name="autolight" size={13} />
+            {t('fx.aiToggle', 'AI assistant – pull data from a datasheet')}
+            <Icon name={aiOpen ? 'chevronDown' : 'chevronRight'} size={12} />
           </button>
           {aiOpen && (
             <div className="ai-body">
