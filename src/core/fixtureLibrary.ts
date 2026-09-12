@@ -247,12 +247,6 @@ export const fixtureLibrary: Fixture[] = [
   // ═══════════════════════════════════════════════════════════
   // BEAM-EFFEKTLEUCHTEN
   // ═══════════════════════════════════════════════════════════
-  {
-    id: 'claypaky-sharpy', name: 'Sharpy', manufacturer: 'Clay Paky', category: 'beam',
-    wattage: 189, lumens: 7500, beamAngle: 3.8, fieldAngle: 6,
-    beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
-    colorTemp: 6000, weight: 16, mountType: 'yoke', dmxChannels: 16,
-  },
 
   // ═══════════════════════════════════════════════════════════
   // MOVING HEAD WASH
@@ -379,6 +373,30 @@ export const fixtureLibrary: Fixture[] = [
     wattage: 468, lumens: 39400, beamAngle: 12, fieldAngle: 48,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [12, 48],
     colorTemp: 6000, weight: 31, mountType: 'yoke' },
+  { id: 'martin-mac-aura-xip', name: 'MAC Aura XIP', manufacturer: 'Martin / Harman', category: 'moving-wash',
+    wattage: 300, lumens: 6000, beamAngle: 8, fieldAngle: 60,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [8, 60],
+    colorTemp: 0, weight: 8.95, mountType: 'yoke', ipRating: 'IP65' },
+  { id: 'elation-fuze-max-profile', name: 'Fuze Max Profile', manufacturer: 'Elation', category: 'moving-spot',
+    wattage: 800, lumens: 21000, beamAngle: 5.5, fieldAngle: 52,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [5.5, 52],
+    colorTemp: 0, weight: 34.6, mountType: 'yoke' },
+  { id: 'sgm-p6', name: 'P-6', manufacturer: 'SGM', category: 'flood',
+    wattage: 576, lumens: 18297, beamAngle: 21, fieldAngle: 21,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
+    colorTemp: 0, weight: 14.5, mountType: 'yoke', ipRating: 'IP66' },
+  { id: 'adj-vizi-beam-12rx', name: 'Vizi Beam 12RX', manufacturer: 'ADJ', category: 'moving-beam',
+    wattage: 260, lumens: 9400, beamAngle: 2, fieldAngle: 2,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
+    colorTemp: 7800, weight: 18, mountType: 'yoke' },
+  { id: 'astera-ax1-pixeltube', name: 'AX1 PixelTube', manufacturer: 'Astera', category: 'cyc',
+    wattage: 28, lumens: 723, beamAngle: 120, fieldAngle: 180,
+    beamShape: 'linear', beamRatioWH: 8, lensType: 'fixed',
+    colorTemp: 0, weight: 1, mountType: 'clamp', ipRating: 'IP65' },
+  { id: 'chauvet-rogue-r2-spot', name: 'Rogue R2 Spot', manufacturer: 'Chauvet Professional', category: 'moving-spot',
+    wattage: 300, lumens: 11000, beamAngle: 16.5, fieldAngle: 16.5,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
+    colorTemp: 7000, weight: 21, mountType: 'yoke' },
   // ── Cameo (Adam Hall; Kern-Specs laut Cameo-Produktdaten 2026-09; * = Herstellerklasse-Schaetzwert) ──
   { id: 'cameo-opus-s5', name: 'OPUS S5', manufacturer: 'Cameo', category: 'moving-spot',
     wattage: 380, lumens: 17500, beamAngle: 6, fieldAngle: 46,
