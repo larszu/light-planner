@@ -23,9 +23,13 @@
 //     nachgeschlagen; ein Umlaut darin bringt die Klammer in den Dialog.
 //   * DIE ALIAS-LISTE in `consolePatch` — sie NIMMT „geraetetyp" von fremden
 //     Pult-Exporten ENTGEGEN. Wer sie „korrigiert", verliert die Spalte.
-//   * ZWEI DATEINAMEN von Ausgaben (`geraeteliste.csv`, `rueckweg-pult.csv`).
-//     Ein Umlaut im Dateinamen laeuft ueber drei Betriebssysteme
-//     unterschiedlich; sie sind Kennungen, keine Anzeige.
+//   * DATEINAMEN von Ausgaben (`geraeteliste.csv`, `geraeteliste.pdf`,
+//     `rueckweg-pult.csv`). Ein Umlaut im Dateinamen laeuft ueber drei
+//     Betriebssysteme unterschiedlich; sie sind Kennungen, keine Anzeige.
+//     `geraeteliste.pdf` kam mit #123 dazu — dieselbe Liste, anderes Format,
+//     und sie heisst deshalb gleich. Der Check hat sie beim ersten Lauf
+//     gemeldet, und das ist die richtige Beweislast: eine neue Ausnahme wird
+//     eingetragen, nicht stillschweigend mitgenommen.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -78,7 +82,7 @@ const HARMLOS = new Set(
 );
 
 /** Kennungen: Dateinamen von Ausgaben und Alias-Eintraege fremder Formate. */
-const KENNUNGEN = new Set(['geraeteliste.csv', 'rueckweg-pult.csv', 'geraetetyp']);
+const KENNUNGEN = new Set(['geraeteliste.csv', 'geraeteliste.pdf', 'rueckweg-pult.csv', 'geraetetyp']);
 
 const istHex = (wort: string) => /^[0-9a-f]+$/i.test(wort);
 
