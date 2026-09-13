@@ -261,7 +261,13 @@ const TopBar: React.FC<Props> = (p) => {
           onChange={(e) => { const f = e.target.files?.[0]; if (f) p.onUploadFloorPlan(f); e.target.value = ''; }} />
 
         <span className="tb-div" />
-        <button className="tb-btn primary" onClick={p.onSave}><Icon name="save" size={15} />{t('top.save', 'Save')}</button>
+        {/* `title` UND `aria-label` wie beim Umschalter daneben: unter 820 px
+            blendet die Stilvorlage die Beschriftung aus (B-77), damit die
+            Leiste auf einem Telefon ueberhaupt aufgeht. Ohne beides waere der
+            Knopf danach namenlos — und ausgerechnet dieser ist der eine, den
+            man mehrmals je Sitzung braucht. */}
+        <button className="tb-btn primary" onClick={p.onSave}
+          title={t('top.save', 'Save')} aria-label={t('top.save', 'Save')}><Icon name="save" size={15} />{t('top.save', 'Save')}</button>
 
         {/* RECHTS AUSSEN, als LETZTER Bedienpunkt der Zeile — dieselbe Stelle
             wie im Cable Planner. Nicht zu verwechseln mit dem Zahnrad daneben:
