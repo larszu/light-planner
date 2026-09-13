@@ -3070,11 +3070,19 @@ input[type="range"]:disabled {
   .tb-menubar { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   .tb-menubar::-webkit-scrollbar { display: none; }
   .tb-modeswitch { flex: none; }
-  .topbar-right { flex: none; }
+  /* Auch die rechte Gruppe darf nachgeben und rollen. In der Suite-Fassung
+   * stehen dort zwei Knoepfe mehr (Geraeteliste, Export) als im
+   * eigenstaendigen Repo, wo sie seit `light#125` Menuepunkte sind — mit
+   * `flex: none` sprengte sie in einem 390-px-Fenster die Zeile auf 448 px
+   * und drueckte die Menuetitel auf null Breite. Eine Gruppe, die rollt,
+   * bleibt erreichbar; eine, die andere hinausdrueckt, nimmt zwei Dinge
+   * gleichzeitig weg. */
+  .topbar-right { flex: 0 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .topbar-right::-webkit-scrollbar { display: none; }
   /* Nur die Beschriftung geht, das Sinnbild bleibt — wie beim Umschalter
    * unter 980 px. `title` und `aria-label` tragen den Namen weiter. */
-  .tb-btn.primary { font-size: 0; gap: 0; padding: 6px 10px; }
-  .tb-btn.primary svg { font-size: 15px; }
+  .tb-btn { font-size: 0; gap: 0; padding: 6px 10px; }
+  .tb-btn svg { font-size: 15px; }
 }
 
 /* ── Tool rail ── */

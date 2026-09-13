@@ -69,19 +69,33 @@ const TopMenu: React.FC<{ groups: MenuGroup[] }> = ({ groups }) => {
     const esc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(null);
     };
-    // Groesse und Rollen des Fensters schliessen die Klappe, statt sie
-    // nachzufuehren: eine Klappe, die beim Rollen stehenbleibt, zeigt auf
-    // einen Titel, der nicht mehr dort ist.
+    // ROLLEN FUEHRT NACH, GROESSE SCHLIESST.
+    //
+    // Beides muss etwas tun, weil die Klappe am Fenster haengt: sie weiss von
+    // sich aus nicht, dass ihr Titel sich bewegt hat. Die Menueleiste rollt
+    // unter 820 px waagerecht, also bewegt er sich.
+    //
+    // Der erste Anlauf SCHLOSS bei beidem, und das war falsch — gemessen im
+    // `multicam-planner` mit derselben Bauart: liegt ein Titel ausserhalb der
+    // Leiste, rollt ein Klick sie erst dorthin, und das Rollereignis kam NACH
+    // dem Klick. Die Klappe ging auf und sofort wieder zu. Nachfuehren ist
+    // ausserdem das bessere Verhalten: die Klappe bleibt an ihrem Titel.
+    const nachfuehren = () => {
+      const knopf = ref.current?.querySelector('.tb-menutitle.on') as HTMLElement | null;
+      if (!knopf) return;
+      const r = knopf.getBoundingClientRect();
+      setAnker({ links: r.left, oben: r.bottom });
+    };
     const weg = () => setOpen(null);
     window.addEventListener('mousedown', away);
     window.addEventListener('keydown', esc);
     window.addEventListener('resize', weg);
-    window.addEventListener('scroll', weg, true);
+    window.addEventListener('scroll', nachfuehren, true);
     return () => {
       window.removeEventListener('mousedown', away);
       window.removeEventListener('keydown', esc);
       window.removeEventListener('resize', weg);
-      window.removeEventListener('scroll', weg, true);
+      window.removeEventListener('scroll', nachfuehren, true);
     };
   }, [open]);
 
