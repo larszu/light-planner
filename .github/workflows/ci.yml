@@ -294,6 +294,13 @@ jobs:
       - name: Der DMX-Modus entscheidet den Fussabdruck
         run: npm run dmx:check
 
+      # #123: die Listen gibt es auch als PDF, und zwar gesetzt statt
+      # fotografiert. Der Lauf liest die erzeugten Bytes: steht der Text drin,
+      # bricht eine lange Liste um, laeuft keine Zeile ueber den Rand, und
+      # zerlegt eine Klammer in einer Zelle die Datei nicht.
+      - name: Die Listen als PDF
+        run: npm run pdf:check
+
       # Bedarf 132: die Szenen waren eine flache Liste. Wer den dritten Song
       # nach vorn zieht, musste seine Teil-Stimmungen einzeln hinterherziehen
       # -- und vergisst eine; dann steht im Ablauf ein Chorus vor seinem Intro,

@@ -24,9 +24,22 @@ type Group = Entry[];
 
 type TFn = (key: string, de: string) => string;
 
+// ─── „AUSWAHL UND VERSCHIEBEN" STEHT NICHT MEHR IN DER LEISTE ──────────────
+//
+// NUTZER-MELDUNG (#121): „Auswahl und verschieben Menuepunkt muss nicht mehr
+// existieren, da Canvas jetzt intuitiver bedienbar ist."
+//
+// Das Werkzeug `select` GIBT ES WEITER — es ist der Ruhezustand der Flaeche
+// (`useState<Tool>('select')`), und die Flaeche waehlt und schiebt in ihm.
+// Was verschwindet, ist sein KNOPF: ein Werkzeug anzubieten, das ohnehin
+// gilt, sobald man kein anderes gewaehlt hat, macht aus dem Ruhezustand eine
+// Entscheidung. Wer ein anderes Werkzeug wieder loswerden will, drueckt Esc
+// oder waehlt es ab — beides fuehrt nach `select` zurueck.
+//
+// Nicht zu verwechseln mit Streichen: die Zeile unten in `Tool` bleibt, und
+// jeder Zweig in `PlanCanvas`, der `activeTool === 'select'` prueft, auch.
 const groupsFor = (t: TFn): Group[] => [
   [
-    { id: 'select', icon: 'select', label: t('tool.select', 'Select'), hint: t('tool.select.hint', 'Select & move — V') },
     { id: 'pan', icon: 'pan', label: t('tool.pan', 'Pan'), hint: t('tool.pan.hint', 'Drag on empty canvas already pans — this also pans over objects') },
     { id: 'marquee', icon: 'marquee', label: t('tool.marquee', 'Marquee'), hint: t('tool.marquee.hint', 'Frame-select without Shift — for touch devices') },
   ],

@@ -42,6 +42,8 @@ interface Props {
   // actions
   onUploadFloorPlan: (f: File) => void;
   onOpenSchedule: () => void;
+  /** Lager/Bestand oeffnen — seit #124 ein Menuepunkt unter „Tools". */
+  onOpenInventory: () => void;
   onExport: (format: 'png' | 'jpg' | 'pdf') => void;
   onExportPlot: () => void;
   onNew: () => void;
@@ -101,6 +103,7 @@ const TopBar: React.FC<Props> = (p) => {
       onPaste: p.onPaste,
       onDuplicate: p.onDuplicate,
       onOpenSchedule: p.onOpenSchedule,
+      onOpenInventory: p.onOpenInventory,
       onViewModeChange: (v) => p.onSetMode(v),
       onToggleHeatMap: p.onToggleHeatMap,
       onToggleSnap: p.onToggleSnap,
@@ -152,9 +155,12 @@ const TopBar: React.FC<Props> = (p) => {
 
       {/* ── center: mode switch ── */}
       <div className="tb-modeswitch" role="tablist" aria-label={t('top.view', 'View')}>
-        <button className={m === '2d' ? 'on' : ''} onClick={() => p.onSetMode('2d')}><Icon name="plan2d" size={15} />{t('top.plan2d', '2D plan')}</button>
-        <button className={m === '3d' ? 'on' : ''} onClick={() => p.onSetMode('3d')}><Icon name="cube3d" size={15} />{t('top.view3d', '3D')}</button>
-        <button className={m === 'photo' ? 'on' : ''} onClick={() => p.onSetMode('photo')} title={t('top.renderHint', 'Render: photoreal preview of the 3D scene (real fixtures, shadows, beams, realistic people)')}><Icon name="photo" size={15} />{t('top.render', 'Render')}</button>
+        {/* `title` UND `aria-label`: unter 980 px blendet die Stilvorlage die
+            Beschriftung aus (#124). Ohne beides waere der Knopf danach fuer
+            einen Screenreader namenlos und fuer die Maus stumm. */}
+        <button className={m === '2d' ? 'on' : ''} onClick={() => p.onSetMode('2d')} title={t('top.plan2d', '2D plan')} aria-label={t('top.plan2d', '2D plan')}><Icon name="plan2d" size={15} />{t('top.plan2d', '2D plan')}</button>
+        <button className={m === '3d' ? 'on' : ''} onClick={() => p.onSetMode('3d')} title={t('top.view3d', '3D')} aria-label={t('top.view3d', '3D')}><Icon name="cube3d" size={15} />{t('top.view3d', '3D')}</button>
+        <button className={m === 'photo' ? 'on' : ''} onClick={() => p.onSetMode('photo')} aria-label={t('top.render', 'Render')} title={t('top.renderHint', 'Render: photoreal preview of the 3D scene (real fixtures, shadows, beams, realistic people)')}><Icon name="photo" size={15} />{t('top.render', 'Render')}</button>
       </div>
 
       {/* ── right: display toggles, render settings, actions ── */}
@@ -238,13 +244,23 @@ const TopBar: React.FC<Props> = (p) => {
           )}
         </div>
 
-        <button className="tb-icon" title={t('top.importFloorPlan', 'Import floor plan (JPG/PNG/PDF)')} onClick={() => fileRef.current?.click()}><Icon name="import" /></button>
+        {/* ─── DREI KNOEPFE WENIGER ────────────────────────────────────────
+            NUTZER-MELDUNG (#124): „Geraeteliste, Export, Import etc. kann auch
+            in das normale Dropdown-Menue unter Datei etc. integriert werden."
+
+            Grundriss-Import, Geraeteliste/Patch und Export standen hier ALS
+            KNOPF und gleichzeitig IM MENUE — dieselbe Sache zweimal, und das
+            auf der Seite der Leiste, die mit dem mittigen Umschalter um den
+            Platz streitet. Das versteckte Datei-Feld bleibt: der Menuepunkt
+            loest es aus.
+
+            „Speichern" bleibt als einziger Knopf stehen. Es ist der einzige
+            Griff dieser Leiste, den man mehrmals je Sitzung braucht, und ihn
+            in ein Menue zu legen hiesse, ihn zweimal zu klicken. */}
         <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) p.onUploadFloorPlan(f); e.target.value = ''; }} />
 
         <span className="tb-div" />
-        <button className="tb-btn" onClick={p.onOpenSchedule}><Icon name="schedule" size={15} />{t('top.schedule', 'Schedule')}</button>
-        <button className="tb-btn" onClick={() => p.onExport('png')}><Icon name="export" size={15} />{t('top.export', 'Export')}</button>
         <button className="tb-btn primary" onClick={p.onSave}><Icon name="save" size={15} />{t('top.save', 'Save')}</button>
 
         {/* RECHTS AUSSEN, als LETZTER Bedienpunkt der Zeile — dieselbe Stelle

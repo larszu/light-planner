@@ -66,6 +66,9 @@ export interface MenuBarProps {
   onToggleFocusNotes: () => void;
   showFocusNotes: boolean;
   onOpenSettings: () => void;
+  /** Lager/Bestand — seit #124 ein Menuepunkt statt eines Knopfes auf der
+   *  Flaeche. */
+  onOpenInventory: () => void;
 }
 
 export interface MenuItem {
@@ -125,6 +128,12 @@ export function buildMenus(p: MenuBarProps, t: Uebersetzen): MenuGroup[] {
     ] },
     { id: 'tools', label: t('menu.tools', 'Tools'), items: [
       { label: t('menu.schedule', 'Instrument schedule & patch…'), onClick: p.onOpenSchedule },
+      // ─── DAS LAGER IST EIN MENUEPUNKT ─────────────────────────────────
+      // NUTZER-MELDUNG (#124): „‚Lager‘-Button unten links ueberlagert alles
+      // und bietet keinen Mehrwert." Er war ein `position: fixed`-Knopf mit
+      // `zIndex: 150` — er lag ueber der Zeichenflaeche, ueber dem Dock und
+      // ueber allem, was dort sonst haette stehen koennen.
+      { label: t('menu.inventory', 'Inventory / stock…'), onClick: p.onOpenInventory },
       { label: t('menu.floorPlan', 'Import floor plan (JPG/PNG/PDF)…'), onClick: p.onUploadFloorPlan },
     ] },
     { id: 'view', label: t('menu.view', 'View'), items: [

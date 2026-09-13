@@ -3,6 +3,7 @@ import type { FixtureGroup, PlacedFixture, Truss, Wall, Ceiling, WorkNote, WorkN
 import { computePower, fixtureCounts, footprint, footprintOrNull, trussLoads, circuitBreakdown, colorCounts, nearestTrussId } from '../core/patch';
 import { documentFingerprint, stampForStand, type DocumentStamp } from '../core/documentStamp';
 import { colorTable, gelCodes, inventoryTable, scheduleOrder, scheduleTable, tableToCsv, type DocumentTable } from '../core/documentTables';
+import { tableToPdfBlob } from '../utils/pdfTable';
 import {
   RETURN_KIND_LABEL, parseConsolePatch, patchReturn, returnFindings, returnTable,
   type PatchReturn,
@@ -299,6 +300,33 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
   const exportTable = (dateiname: string, tabelle: (f: PlacedFixture[]) => DocumentTable) =>
     downloadCsv(dateiname, tableToCsv(tabelle(fixtures), stempel(tabelle)));
 
+  // ─── DIESELBE LISTE, GESETZT ──────────────────────────────────────────────
+  //
+  // NUTZER-MELDUNG (#123): „Man muss Patchlisten und alle anderen, die man
+  // aktuell nur als CSV exportieren kann, auch als schoen aufbereitete PDF
+  // exportieren koennen."
+  //
+  // Sie geht durch DIESELBE Tabellen-Funktion und denselben Stempel wie die
+  // CSV. Das ist die ganze Absicht: zwei Wege, die dieselbe Liste bauen,
+  // waeren zwei Listen — und die eine, die jemand ausdruckt, waere irgendwann
+  // nicht mehr die, die jemand auswertet.
+  const exportTablePdf = (
+    dateiname: string,
+    titel: string,
+    tabelle: (f: PlacedFixture[]) => DocumentTable,
+    untertitel?: string,
+  ) => {
+    const tb = tabelle(fixtures);
+    triggerDownload(
+      tableToPdfBlob({ header: tb.header, rows: tb.rows }, {
+        title: titel,
+        subtitle: untertitel,
+        stamp: stempel(tabelle),
+      }),
+      dateiname,
+    );
+  };
+
   const exportSchedule = () => exportTable('instrument-schedule.csv', scheduleTable);
   const exportInventory = () => exportTable('geraeteliste.csv', inventoryTable);
   const exportColors = () => exportTable('farbliste.csv', colorTable);
@@ -552,6 +580,20 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         {lesarten.length > 0 && (
           <button className="btn-secondary" style={{ marginLeft: 8 }} onClick={exportUniverses}>
             &#8595; {t('sch.uni.csv', 'Universe sheet (CSV)')}
+          </button>
+        )}
+        {lesarten.length > 0 && (
+          <button
+            className="btn-secondary"
+            style={{ marginLeft: 6 }}
+            onClick={() => exportTablePdf(
+              'universes.pdf',
+              t('sch.uni.pdfTitle', 'Universe sheet'),
+              (fs: PlacedFixture[]) => universeTable(universeReadings(fs.map((f) => f.universe), dmxProtocol)),
+              projectName || undefined,
+            )}
+          >
+            &#8595; {t('sch.uni.pdf', 'Universe sheet (PDF)')}
           </button>
         )}
       </h4>
@@ -945,6 +987,22 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         <button className="btn-secondary" onClick={exportReport}>
           &#8595; {t('sch.rep.csv', 'This sheet (CSV)')}
         </button>
+        <button
+          className="btn-secondary"
+          onClick={() => {
+            const def = findReport(reportId) ?? REPORTS[0];
+            exportTablePdf(
+              `${def.id}.pdf`,
+              def.label,
+              (fs: PlacedFixture[]) => reportTable(
+                renderReport(def, fs, fieldContext(fs, trusses, dmxProtocol, phaseTemplate)),
+              ),
+              projectName || undefined,
+            );
+          }}
+        >
+          &#8595; {t('sch.rep.pdf', 'This sheet (PDF)')}
+        </button>
       </div>
       <div className="prop-derived">{bericht143.def.purpose}</div>
       <table className="schedule-table">
@@ -1204,6 +1262,20 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
             &#8595; {t('sch.pwr.csv', 'Circuit list (CSV)')}
           </button>
         )}
+        {verteilung.assignments.length > 0 && (
+          <button
+            className="btn-secondary"
+            style={{ marginLeft: 6 }}
+            onClick={() => exportTablePdf(
+              'kreisliste.pdf',
+              t('sch.pwr.pdfTitle', 'Circuit list'),
+              (fs: PlacedFixture[]) => circuitTable(distributionFor(fs, phaseTemplate)),
+              projectName || undefined,
+            )}
+          >
+            &#8595; {t('sch.pwr.pdf', 'Circuit list (PDF)')}
+          </button>
+        )}
       </h4>
       <div className="schedule-actions">
         <label>
@@ -1360,21 +1432,25 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
         <Icon name="schedule" size={22} className="er-icon" />
         <div className="er-text"><b>{t('sch.exp.schedule', 'Instrument schedule (CSV)')}</b><span>{t('sch.exp.scheduleNote', 'Patch, position, gel & purpose per fixture – for a spreadsheet.')}</span></div>
         <button className="btn-secondary" onClick={exportSchedule}><Icon name="export" size={12} /> CSV</button>
+        <button className="btn-secondary" onClick={() => exportTablePdf('instrument-schedule.pdf', t('sch.exp.schedule.pdfTitle', 'Instrument schedule'), scheduleTable, projectName || undefined)}><Icon name="export" size={12} /> PDF</button>
       </div>
       <div className="export-row">
         <Icon name="truss" size={22} className="er-icon" />
         <div className="er-text"><b>{t('sch.exp.cables', 'Cable list (CSV)')}</b><span>{t('sch.exp.cablesNote', 'Power and DMX runs with length and connector — what MVR does not carry.')}</span></div>
         <button className="btn-secondary" onClick={exportCables}><Icon name="export" size={12} /> CSV</button>
+        <button className="btn-secondary" onClick={() => exportTablePdf('kabelliste.pdf', t('sch.exp.cables.pdfTitle', 'Cable list'), (fs: PlacedFixture[]) => cableTable(cableRuns(fs, trusses, phaseTemplate)), projectName || undefined)}><Icon name="export" size={12} /> PDF</button>
       </div>
       <div className="export-row">
         <Icon name="library" size={22} className="er-icon" />
         <div className="er-text"><b>{t('sch.exp.inventory', 'Equipment list (CSV)')}</b><span>{t('sch.exp.inventoryNote', 'Counts per type with power & weight – for ordering and logistics.')}</span></div>
         <button className="btn-secondary" onClick={exportInventory}><Icon name="export" size={12} /> CSV</button>
+        <button className="btn-secondary" onClick={() => exportTablePdf('geraeteliste.pdf', t('sch.exp.inventory.pdfTitle', 'Equipment list'), inventoryTable, projectName || undefined)}><Icon name="export" size={12} /> PDF</button>
       </div>
       <div className="export-row">
         <Icon name="heatmap" size={22} className="er-icon" />
         <div className="er-text"><b>{t('sch.exp.colours', 'Colour list (CSV)')}</b><span>{t('sch.exp.coloursNote', 'Gel cuts per code – for ordering colour and prepping it.')}</span></div>
         <button className="btn-secondary" onClick={exportColors} disabled={colors.length === 0}><Icon name="export" size={12} /> CSV</button>
+        <button className="btn-secondary" onClick={() => exportTablePdf('farbliste.pdf', t('sch.exp.colours.pdfTitle', 'Colour list'), colorTable, projectName || undefined)} disabled={colors.length === 0}><Icon name="export" size={12} /> PDF</button>
       </div>
       <div className="export-row">
         <Icon name="tag" size={22} className="er-icon" />
@@ -1383,6 +1459,7 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           <span>{t('sch.exp.groupsNote', 'One row per group member with channel, unit, type and position \u2014 what otherwise gets rebuilt by hand on the console, in the visualiser and in the media server.')}</span>
         </div>
         <button className="btn-secondary" onClick={exportGroups} disabled={gruppen.length === 0}><Icon name="export" size={12} /> CSV</button>
+        <button className="btn-secondary" onClick={() => exportTablePdf('gruppen.pdf', t('sch.exp.groups.pdfTitle', 'Group sheet'), () => groupTable(gruppen), projectName || undefined)} disabled={gruppen.length === 0}><Icon name="export" size={12} /> PDF</button>
       </div>
       {/* ── BEDARF 145 — die Bestellung faellt aus dem Plan ──────────────
           „Users must manually type equipment items" (jkarp7/showstack#29),
@@ -1419,6 +1496,16 @@ const ScheduleDialog: React.FC<Props> = ({ fixtures, trusses, walls, ceilings, a
           onClick={exportShopOrder}
           disabled={bestellung.lines.length === 0}
         >&#8595; CSV</button>
+        <button
+          className="btn-secondary"
+          onClick={() => exportTablePdf(
+            'bestellung.pdf',
+            t('sch.exp.shop.pdfTitle', 'Shop order'),
+            (fs: PlacedFixture[]) => shopOrderTable(shopOrder(fs, lagerBestand)),
+            projectName || undefined,
+          )}
+          disabled={bestellung.lines.length === 0}
+        >&#8595; PDF</button>
       </div>
       {/* ── BEDARF 146 — den Patch ans Pult schicken statt abtippen ──────
           Der Beleg nennt zwei Fallen ausdruecklich: Eos will Tabulatoren und
