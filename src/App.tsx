@@ -1590,6 +1590,7 @@ const App: React.FC = () => {
         onToggleFocusNotes={toggleFocusNotes}
         onUploadFloorPlan={handleUploadFloorPlan}
         onOpenSchedule={() => setScheduleOpen(true)}
+        onOpenInventory={() => setInventoryOpen(true)}
         onExport={handleExport}
         onExportPlot={handleExportPlot}
         onNew={handleNew}
@@ -1948,14 +1949,9 @@ const App: React.FC = () => {
         />
       )}
       {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
-      <button
-        type="button"
-        onClick={() => setInventoryOpen(true)}
-        title={t('app.inventoryTitle', 'Inventory / stock')}
-        style={{ position: 'fixed', bottom: 16, left: 16, zIndex: 150, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 999, cursor: 'pointer' }}
-      >
-        <Icon name="library" size={16} /> {t('app.inventory', 'Inventory')}
-      </button>
+      {/* Der fixierte „Lager"-Knopf unten links ist mit #124 weg — er lag mit
+          `zIndex: 150` ueber allem. Das Lager oeffnet jetzt ueber
+          Werkzeuge > Lager/Bestand. */}
       {inventoryOpen && <InventoryDialog onClose={() => setInventoryOpen(false)} />}
     </div>
   );

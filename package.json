@@ -58,6 +58,7 @@
     "canvas:check": "node scripts/canvas-steuerung-check.mjs",
     "zoom:check": "node scripts/zoom-grenze-check.mjs",
     "dmx:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/dmx-mode-check.ts",
+    "pdf:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/pdf-table-check.ts",
     "kopfzeile:check": "node --experimental-strip-types scripts/kopfzeile-check.ts",
     "farben:check": "node --experimental-strip-types scripts/rohe-farben-check.ts"
   },

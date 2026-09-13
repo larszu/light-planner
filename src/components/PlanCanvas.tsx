@@ -1113,9 +1113,25 @@ const PlanCanvas: React.FC<Props> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') { e.preventDefault(); spaceDownRef.current = true; }
-      if (e.code === 'Delete' && selectedIds.size > 0) {
-        const el = document.activeElement;
-        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+      // ─── LOESCHEN: ENTF UND RUECKTASTE ──────────────────────────────────
+      //
+      // NUTZER-MELDUNG (#122): „Man muss Geraete mit Backspace loeschen
+      // koennen." Hier stand nur `Delete`. Auf einer Mac-Tastatur ohne
+      // Zehnerblock gibt es diese Taste nicht — dort loescht die Ruecktaste,
+      // und wer sie drueckte, sah gar nichts passieren.
+      //
+      // `preventDefault` gehoert dazu und ist kein Beiwerk: die Ruecktaste
+      // blaettert in manchen Browsern zurueck. Ohne sie waere die Antwort auf
+      // „loeschen" das Verlassen der Seite.
+      //
+      // Die Abfrage auf ein Eingabefeld steht VOR beidem: wer in einem
+      // Namensfeld einen Buchstaben loescht, loescht kein Geraet. Sie deckt
+      // jetzt auch `contentEditable` ab — der Fall kam mit den Notizfeldern
+      // hinzu und war hier nie nachgezogen.
+      if ((e.code === 'Delete' || e.code === 'Backspace') && selectedIds.size > 0) {
+        const el = document.activeElement as HTMLElement | null;
+        if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+        if (e.code === 'Backspace') e.preventDefault();
         for (const id of selectedIds) {
           window.dispatchEvent(new CustomEvent('lp-delete', { detail: id }));
         }
