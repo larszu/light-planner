@@ -47,7 +47,22 @@ export const useUiStore = create<UiState>((set) => ({
   ambience: 0.55,
   snapStep: 0,
   showFocusNotes: false,
-  language: (typeof localStorage !== 'undefined' && localStorage.getItem('lp-lang') === 'en' ? 'en' : 'de'),
+  /**
+   * E-28 — DIE VORGABE IST ENGLISCH.
+   *
+   * Hier stand bis B-77 das Gegenteil: alles ausser einem ausdruecklichen
+   * `'en'` im Speicher wurde zu `'de'`, eine frische Installation lief also
+   * auf Deutsch. Das widerspricht der Entscheidung des Eigentuemers vom
+   * 2026-09-09 (E-28, in `CLAUDE.md`): Quellsprache ist Englisch, Deutsch ist
+   * die erste UEBERSETZUNG. Dieses Repo war das einzige der Suite mit der
+   * umgekehrten Vorgabe — `multicam-planner` und `inventory-planner`
+   * beginnen beide auf Englisch.
+   *
+   * Wer Deutsch will, waehlt es einmal unter Ansicht; die Wahl liegt in
+   * `lp-lang` und ueberlebt den Neustart. Fuer alle, die sie schon einmal
+   * getroffen haben, aendert sich damit nichts.
+   */
+  language: (typeof localStorage !== 'undefined' && localStorage.getItem('lp-lang') === 'de' ? 'de' : 'en'),
 
   setViewMode: (viewMode) => set({ viewMode }),
   setShowHeatMap: (showHeatMap) => set({ showHeatMap }),

@@ -130,6 +130,52 @@ const App: React.FC = () => {
     try { localStorage.setItem(schluessel, wert ? '1' : '0'); } catch { /* privates Fenster */ }
   };
 
+  /**
+   * B-77 — ist das Fenster zu schmal fuer vier nebeneinanderstehende Spalten?
+   *
+   * 820 px ist dieselbe Grenze, ab der die Kopfzeile in `App.css` nachgibt;
+   * eine zweite Zahl waere ein zweiter Umbruchpunkt, und dann saehe die eine
+   * Haelfte der Oberflaeche anders aus als die andere.
+   *
+   * Warum im Zustand und nicht als `@media`-Regel: die Spaltenbreiten stehen
+   * als Inline-Stil am Element (sie haengen vom Zustand ab), und eine
+   * Stilvorlage kaeme dagegen nur mit `!important` an. Eine Regel, die sich
+   * mit ihrem eigenen Inline-Stil prueegelt, liest spaeter niemand richtig.
+   */
+  const [schmal, setSchmal] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 820px)');
+    const folge = (e: MediaQueryListEvent) => setSchmal(e.matches);
+    mq.addEventListener('change', folge);
+    return () => mq.removeEventListener('change', folge);
+  }, []);
+
+  /**
+   * Schmal beginnen beide Spalten ZU.
+   *
+   * Eine Spalte, die sich ueber die ganze Arbeitsflaeche legt, darf nicht der
+   * erste Anblick sein — sonst startet die App auf dem Telefon mit einer
+   * Bibliothek statt mit dem Plan. Auf dem Schreibtisch gilt weiter, was in
+   * `localStorage` steht.
+   *
+   * Die Wahl wird hier NICHT gespeichert (siehe `onUmschalten` unten): wer
+   * auf dem Telefon kurz die Bibliothek aufmacht, hat damit nichts ueber
+   * seinen Schreibtisch gesagt.
+   */
+  useEffect(() => {
+    if (schmal) {
+      setDockZu(true);
+      setInspektorZu(true);
+      return;
+    }
+    try {
+      setDockZu(localStorage.getItem('lp-dock-zu') === '1');
+      setInspektorZu(localStorage.getItem('lp-inspektor-zu') === '1');
+    } catch { /* privates Fenster — dann eben beide offen */ }
+  }, [schmal]);
+
   const [activeTool, setActiveTool] = useState<Tool>('select');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [fixtureToPlace, setFixtureToPlace] = useState<Fixture | null>(null);
@@ -1615,9 +1661,16 @@ const App: React.FC = () => {
           mit dem Zustand aendern. 32 px eingeklappt — dieselbe Zahl wie im
           `cable-planner`, auf dem 8-px-Raster aus ADR-007. */}
       <div
-        className="app-body"
+        className={`app-body${schmal ? ' app-body-schmal' : ''}`}
         style={{
-          gridTemplateColumns: `56px ${dockZu ? '32px' : '264px'} 1fr ${inspektorZu ? '32px' : '308px'}`,
+          // Schmal: beide Spalten stehen als 32-px-Griff im Raster, das
+          // GEOEFFNETE Panel legt sich darueber (`.app-body-schmal` in
+          // `App.css`). Sonst bekaeme die Arbeitsflaeche in einem
+          // 390-px-Fenster keine Breite mehr — gemessen ragten dort acht
+          // Elemente bis 628 px hinaus.
+          gridTemplateColumns: schmal
+            ? '56px 32px 1fr 32px'
+            : `56px ${dockZu ? '32px' : '264px'} 1fr ${inspektorZu ? '32px' : '308px'}`,
         }}
       >
         <ToolRail activeTool={activeTool} onToolChange={handleToolChange} />
@@ -1625,7 +1678,7 @@ const App: React.FC = () => {
           seite="links"
           titel={t('panel.tools', 'Tools')}
           eingeklappt={dockZu}
-          onUmschalten={(zu) => { setDockZu(zu); merke('lp-dock-zu', zu); }}
+          onUmschalten={(zu) => { setDockZu(zu); if (!schmal) merke('lp-dock-zu', zu); }}
         >
         <Dock
           customFixtures={customFixtures}
@@ -1798,7 +1851,7 @@ const App: React.FC = () => {
           seite="rechts"
           titel={t('panel.properties', 'Properties')}
           eingeklappt={inspektorZu}
-          onUmschalten={(zu) => { setInspektorZu(zu); merke('lp-inspektor-zu', zu); }}
+          onUmschalten={(zu) => { setInspektorZu(zu); if (!schmal) merke('lp-inspektor-zu', zu); }}
         >
         <PropertyPanel
           fixtures={fixtures}

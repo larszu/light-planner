@@ -12,30 +12,49 @@ interface Props {
   onSelectFixtureToPlace: (f: Fixture) => void;
 }
 
-// Die deutschen Formen bleiben hier stehen — sie sind die Quellsprache und
-// zugleich der Fallback. Uebersetzt wird ueber `translate`, nicht ueber eine
-// zweite Map: eine zweite Map liefe auseinander, sobald jemand eine Kategorie
-// ergaenzt und nur eine Seite pflegt.
-const CATEGORY_LABELS: Record<FixtureCategory, string> = {
-  profile: 'Profilscheinwerfer',
-  fresnel: 'Stufenlinsen',
-  par: 'PAR-Scheinwerfer',
-  wash: 'LED Wash',
-  spot: 'LED Spot',
-  beam: 'Beam-Effekt',
-  'moving-wash': 'Moving Head Wash',
-  'moving-spot': 'Moving Head Spot',
-  'moving-beam': 'Moving Head Beam',
-  blinder: 'Blinder / Strobe',
-  cyc: 'Horizontleuchte',
-  flood: 'Fluter',
-  followspot: 'Verfolger',
-  'led-panel': 'LED-Flächenleuchten',
-  custom: 'Eigene',
+/**
+ * Der Name einer Kategorie — EIN `translate`-Aufruf je Kategorie, mit dem
+ * englischen Quelltext daneben.
+ *
+ * VORHER STAND HIER EINE MAP deutscher Formen, aus der ein einziger Aufruf
+ * `translate(language, \`fixtureCategory.${cat}\`, CATEGORY_LABELS[cat])`
+ * seinen Fallback zog. Zwei Dinge waren daran falsch, und beide fielen erst
+ * im Browser auf (B-77, Bildschirmfoto bei 1440 px):
+ *
+ *   1. DIE BIBLIOTHEK STAND AUF DEUTSCH, AUCH AUF ENGLISCH. Der Schluessel
+ *      `fixtureCategory.*` kam in `i18n/de.ts` NIE vor — dort heisst dieselbe
+ *      Sache `fx.cat.*`, wie sie der Leuchten-Editor schon benutzt. Zwei
+ *      Schluesselfamilien fuer denselben Begriff, und die eine davon leer:
+ *      der Aufruf fiel also immer auf die deutsche Form zurueck. Auf Englisch
+ *      las die Liste „Profilscheinwerfer, Stufenlinsen, PAR-Scheinwerfer".
+ *   2. DER WAECHTER SAH ES NICHT. `lang:check` liest den Fallback als
+ *      LITERAL am Aufruf (`fallbackMuster`). Steht dort ein Ausdruck
+ *      (`CATEGORY_LABELS[cat]`), misst er nichts — und meldete „0 deutsch"
+ *      ueber fuenfzehn deutsche Beschriftungen. Genau davor warnt CLAUDE.md
+ *      mit „nie hinter einem Hilfsmodul verstecken".
+ *
+ * Die Wiederholung ist deshalb der Punkt und kein Schoenheitsfehler: jede
+ * Zeile ist eine, die der Waechter zaehlen kann.
+ */
+const categoryLabel = (language: 'de' | 'en', cat: FixtureCategory): string => {
+  switch (cat) {
+    case 'profile': return translate(language, 'fx.cat.profile', 'Profile spot');
+    case 'fresnel': return translate(language, 'fx.cat.fresnel', 'Fresnel');
+    case 'par': return translate(language, 'fx.cat.par', 'PAR can');
+    case 'wash': return translate(language, 'fx.cat.wash', 'LED wash');
+    case 'spot': return translate(language, 'fx.cat.spot', 'LED spot');
+    case 'beam': return translate(language, 'fx.cat.beam', 'Beam effect');
+    case 'moving-wash': return translate(language, 'fx.cat.movingWash', 'Moving head wash');
+    case 'moving-spot': return translate(language, 'fx.cat.movingSpot', 'Moving head spot');
+    case 'moving-beam': return translate(language, 'fx.cat.movingBeam', 'Moving head beam');
+    case 'blinder': return translate(language, 'fx.cat.blinder', 'Blinder / strobe');
+    case 'cyc': return translate(language, 'fx.cat.cyc', 'Cyc light');
+    case 'flood': return translate(language, 'fx.cat.flood', 'Flood');
+    case 'followspot': return translate(language, 'fx.cat.followspot', 'Followspot');
+    case 'led-panel': return translate(language, 'fx.cat.ledPanel', 'LED panel');
+    case 'custom': return translate(language, 'fx.cat.custom', 'Custom');
+  }
 };
-
-const categoryLabel = (language: 'de' | 'en', cat: FixtureCategory): string =>
-  translate(language, `fixtureCategory.${cat}`, CATEGORY_LABELS[cat]);
 
 const CATEGORIES: FixtureCategory[] = [
   'profile', 'fresnel', 'par', 'wash', 'spot', 'beam',
@@ -85,8 +104,13 @@ const Sidebar: React.FC<Props> = ({
       </div>
 
       <div className="sidebar-search">
+        {/* `aria-label` und nicht nur `placeholder` (B-77): der Platzhalter
+            verschwindet, sobald jemand tippt — danach ist das Feld fuer einen
+            Screenreader namenlos. Es war das einzige Feld dieser App ohne
+            Namen; `bedienbar:check` in der Suite misst genau das. */}
         <input
           type="text"
+          aria-label={t('sidebar.search', 'Search…')}
           placeholder={t('sidebar.search', 'Search…')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}

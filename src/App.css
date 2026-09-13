@@ -14,6 +14,15 @@
    * 2.0). `--bg-2` und `--panel-alt` sind aus der Navy-Rampe ABGELEITET —
    * ein Control-Surface braucht mehr Flaechen, als ein Marken-Handbuch
    * vorsieht. */
+  /* B-77 — die Mindesthoehe (und bei Sinnbild-Knoepfen die Mindestbreite)
+   * eines Bedienpunkts. Dieselbe Zahl wie `--ziel` im `inventory-planner`
+   * und im `larszu-facility-planner`, dieselbe, die `bedienbar:check` in der
+   * Suite misst. WCAG 2.2 zieht die Untergrenze bei 24 px (SC 2.5.8) und
+   * empfiehlt 44 px (SC 2.5.5); 32 liegt auf dem 8-px-Raster aus ADR-007 und
+   * ist die Breite einer eingeklappten Spalte. Eine zweite Zahl waere eine
+   * zweite Wahrheit. */
+  --ziel: 32px;
+
   --bg: #132040;            /* Deep Navy — Grund */
   --bg-2: #182948;          /* abgeleitet */
   --panel: #1D324F;         /* Zumpe Navy */
@@ -194,6 +203,19 @@ body {
      und die 28 liessen unter der 24 px hohen `.statusbar` vier Pixel Luft
      stehen, die wie ein Fehler aussahen. */
   grid-template-rows: 40px 1fr 24px;
+  /* B-77 — DIE SPALTE MUSS GEDECKELT SEIN.
+   *
+   * Ohne diese Zeile hat das Raster EINE implizite Spalte der Groesse `auto`,
+   * und `auto` heisst hier: so breit wie der breiteste Inhalt. In einem
+   * 390-px-Fenster wuchs die Spalte damit auf 597 px — die Kopfzeile bekam
+   * 597 px zugewiesen, sah also nie zu wenig Platz und schrumpfte nichts.
+   * Alle `flex-shrink`- und `min-width: 0`-Regeln darin liefen ins Leere,
+   * weil es gar keinen Mangel zu verteilen gab.
+   *
+   * `minmax(0, 1fr)` deckelt die Spalte auf die Breite des Fensters. Erst
+   * damit wird Enge zu Enge, und erst dann greifen die Regeln, die sie
+   * verteilen. */
+  grid-template-columns: minmax(0, 1fr);
   height: 100vh;
   background: var(--bg);
 }
@@ -2910,6 +2932,69 @@ input[type="range"]:disabled {
 .tb-btn.primary::before { content: ''; width: 6px; height: 6px; background: var(--signal); flex: none; }
 .tb-div { width: 1px; height: 22px; background: var(--border); margin: 0 2px; }
 
+.topbar-right { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+
+.tb-modeswitch { display: flex; background: var(--bg-2); border: 1px solid var(--border); border-radius: 0; padding: 3px; gap: 2px; justify-self: center; }
+.tb-modeswitch button { appearance: none; border: 0; background: transparent; color: var(--text2); font: inherit; font-weight: 600;
+  font-size: 13px; padding: 6px 16px; border-radius: 0; cursor: pointer; display: flex; align-items: center; gap: 7px; }
+.tb-modeswitch button:hover { color: var(--text); }
+.tb-modeswitch button.on { background: var(--accent); color: var(--accent-text); box-shadow: none; }
+
+/* dropdown / popover */
+.tb-dropdown { position: absolute; top: 100%; min-width: 250px; background: var(--panel); border: 1px solid var(--line-2);
+  border-radius: 0; box-shadow: none; padding: 7px; z-index: 50; }
+.topbar-left .tb-dropdown { left: 0; }
+.topbar-right .tb-dropdown { right: 0; }
+/* Die Menue-Klappe haengt am FENSTER. `left`/`top` setzt `TopMenu.tsx` nach
+ * dem Messen; die Werte hier sind nur der Ausgangspunkt vor dem ersten
+ * Layout-Durchlauf. Die Deckelung ist dieselbe wie im Cable Planner: eine
+ * Klappe darf nie laenger werden als das Fenster, sonst haengt ihr letzter
+ * Eintrag unten heraus (die Datei-Klappe ist 505 px hoch — auf einem
+ * 390x844-Telefon passt sie nur mit Rollbereich). */
+.tb-menuklappe { position: fixed; top: 0; left: 0; max-height: calc(100vh - 56px); overflow-y: auto; }
+
+.tb-render { width: 280px; }
+.tb-dd-sec { font-size: 10px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text3); font-weight: 700; padding: 9px 10px 5px; }
+.tb-dd-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: transparent; border: 0;
+  color: var(--text); font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 0; cursor: pointer; }
+.tb-dd-item:hover { background: var(--panel-alt); }
+.tb-dd-item kbd { margin-left: auto; color: var(--text3); font-size: 11px; font-family: ui-monospace, monospace; }
+.tb-dd-item .tb-check { margin-left: auto; color: var(--text3); opacity: 0; }
+.tb-dd-item .tb-check.on { opacity: 1; color: var(--accent); }
+.tb-dd-div { height: 1px; background: var(--border); margin: 6px 4px; }
+.tb-hint { color: var(--text2); font-size: 12px; padding: 10px; line-height: 1.45; }
+.tb-hint b { color: var(--text); }
+.tb-slider { display: grid; grid-template-columns: 78px 1fr 44px; align-items: center; gap: 8px; padding: 7px 10px; color: var(--text2); font-size: 12px; }
+.tb-slider input[type=range] { accent-color: var(--accent); }
+.tb-slider input[type=number] { width: 100%; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 0; padding: 4px 6px; font: inherit; }
+.tb-slider em { color: var(--text); font-style: normal; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.tb-slider input[type=color] { width: 100%; height: 24px; padding: 0; background: var(--bg-2); border: 1px solid var(--border); border-radius: 0; cursor: pointer; }
+.tb-slider input[type=date], .tb-slider input[type=time] { width: 100%; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 0; padding: 4px 6px; font: inherit; color-scheme: dark; }
+/* Leading glyph for dropdown items without an icon (e.g. the sun toggle, #28) */
+.tb-glyph { display: inline-flex; width: 15px; justify-content: center; color: var(--warm); font-size: 14px; }
+/* preset chips (floor / wall finishes) */
+.tb-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 10px 8px; }
+.tb-chip { border: 1px solid var(--border); background: var(--bg-2); color: var(--text2); border-radius: 0;
+  padding: 4px 11px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .12s, color .12s, border-color .12s; }
+.tb-chip:hover { color: var(--text); border-color: var(--text3); }
+.tb-chip.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * DIE KOPFZEILE BRICHT NICHT UM — und diese Regeln stehen HIER und nicht
+ * weiter oben.
+ *
+ * WARUM DER ORT ZAEHLT (B-77). Der Block hing bis 2026-09-13 VOR den
+ * Grundregeln von `.tb-modeswitch button`. Beide haben dasselbe Gewicht
+ * (0,1,1) — bei Gleichstand gewinnt die SPAETERE. Die Zeile
+ * `.tb-modeswitch button { font-size: 13px; padding: 6px 16px }` stand
+ * fuenfzehn Zeilen darunter und hob die Media-Regel damit wieder auf.
+ *
+ * Die Folge war nicht theoretisch: „unter 980 px zeigt der Umschalter nur
+ * noch seine Sinnbilder" (#124) ist nie passiert. Im 390-px-Fenster
+ * nachgemessen — der 2D-Plan-Knopf war 111 px breit statt 36, und mit ihm
+ * sprengte der Umschalter die Kopfzeile. Ein `@media`-Block, der nichts tut,
+ * sieht im Quelltext genauso aus wie einer, der wirkt.
+ * ─────────────────────────────────────────────────────────────────────────── */
 /* ─── DIE KOPFZEILE UEBERLAGERT SICH NICHT MEHR ───────────────────────────
  *
  * NUTZER-MELDUNG (#124): „‚Werkzeuge, Ansicht, Hilfe‘-Menueleiste ist nicht
@@ -2936,7 +3021,22 @@ input[type="range"]:disabled {
  * Kopfzeile, die zweizeilig wird, verschiebt die ganze Anwendung nach unten.
  */
 .topbar { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
-.tb-menubar { overflow: hidden; }
+/* B-77 — HIER STAND `.tb-menubar { overflow: hidden }`, und das war der
+ * Fehler. Es hielt zwar die Kopfzeile einzeilig, schnitt aber zwei Dinge mit
+ * ab, die niemand abschneiden wollte:
+ *
+ *   1. JEDE KLAPPE. Sie war ein `absolute`-Kind dieser Leiste. Gemessen bei
+ *      1440 px: Datei-Klappe 250 x 505 px gross, davon 0 px sichtbar. Vier
+ *      Menues, kein einziges ging auf.
+ *   2. DEN LETZTEN TITEL. Bei 1440 px war „Hilfe" abgeschnitten — die linke
+ *      Spalte des Kopfzeilen-Rasters bekommt `1fr` und war 25 px zu schmal.
+ *
+ * Jetzt: die Klappe haengt am Fenster (`.tb-menuklappe`, siehe `TopMenu.tsx`)
+ * und braucht keinen Platz mehr in der Leiste. Und die Titel geben als
+ * LETZTE nach — `flex: none` heisst, dass zuerst der Projektname
+ * schrumpft, der dafuer schon `text-overflow: ellipsis` traegt. */
+.tb-menubar { flex: none; }
+.tb-menutitle { flex: none; }
 
 @media (max-width: 1180px) {
   .brand-proj { display: none; }
@@ -2951,48 +3051,31 @@ input[type="range"]:disabled {
   .tb-modeswitch button svg { font-size: 13px; }
 }
 @media (max-width: 820px) {
-  .topbar { gap: 8px; padding: 0 8px; }
-  .tb-menubar { overflow-x: auto; scrollbar-width: none; }
+  /* B-77 — UNTER 820 PX IST DAS DREI-SPALTEN-RASTER DAS PROBLEM.
+   *
+   * `minmax(0,1fr) auto minmax(0,1fr)` haelt den Umschalter MITTIG, und
+   * dafuer bekommt die linke Spalte in einem 390-px-Fenster 124 px. Logo und
+   * fuenf Menuetitel passen da nicht hinein — sie ragten nicht heraus
+   * (nichts wurde breiter als das Fenster), sie LAGEN UEBEREINANDER: der
+   * Umschalter nahm die Klicks entgegen, die dem Datei-Menue galten. Im
+   * Browser nachgestellt (2026-09-13): ein Klick auf „File" bei 390 px
+   * erreichte den Titel nie.
+   *
+   * Auf einem Telefon ist eine Reihe deshalb besser als drei Spalten: die
+   * Mitte gibt ihre Mitte auf, jedes Stueck bekommt die Breite, die es
+   * braucht, und nur die Menueleiste rollt. Was nicht hineinpasst, bleibt so
+   * erreichbar, statt verdeckt zu werden. */
+  .topbar { display: flex; gap: 8px; padding: 0 8px; }
+  .topbar-left { flex: 1 1 auto; min-width: 0; }
+  .tb-menubar { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
   .tb-menubar::-webkit-scrollbar { display: none; }
+  .tb-modeswitch { flex: none; }
+  .topbar-right { flex: none; }
+  /* Nur die Beschriftung geht, das Sinnbild bleibt — wie beim Umschalter
+   * unter 980 px. `title` und `aria-label` tragen den Namen weiter. */
+  .tb-btn.primary { font-size: 0; gap: 0; padding: 6px 10px; }
+  .tb-btn.primary svg { font-size: 15px; }
 }
-.topbar-right { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
-
-.tb-modeswitch { display: flex; background: var(--bg-2); border: 1px solid var(--border); border-radius: 0; padding: 3px; gap: 2px; justify-self: center; }
-.tb-modeswitch button { appearance: none; border: 0; background: transparent; color: var(--text2); font: inherit; font-weight: 600;
-  font-size: 13px; padding: 6px 16px; border-radius: 0; cursor: pointer; display: flex; align-items: center; gap: 7px; }
-.tb-modeswitch button:hover { color: var(--text); }
-.tb-modeswitch button.on { background: var(--accent); color: var(--accent-text); box-shadow: none; }
-
-/* dropdown / popover */
-.tb-dropdown { position: absolute; top: 100%; min-width: 250px; background: var(--panel); border: 1px solid var(--line-2);
-  border-radius: 0; box-shadow: none; padding: 7px; z-index: 50; }
-.topbar-left .tb-dropdown { left: 0; }
-.topbar-right .tb-dropdown { right: 0; }
-.tb-render { width: 280px; }
-.tb-dd-sec { font-size: 10px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--text3); font-weight: 700; padding: 9px 10px 5px; }
-.tb-dd-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: transparent; border: 0;
-  color: var(--text); font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 0; cursor: pointer; }
-.tb-dd-item:hover { background: var(--panel-alt); }
-.tb-dd-item kbd { margin-left: auto; color: var(--text3); font-size: 11px; font-family: ui-monospace, monospace; }
-.tb-dd-item .tb-check { margin-left: auto; color: var(--text3); opacity: 0; }
-.tb-dd-item .tb-check.on { opacity: 1; color: var(--accent); }
-.tb-dd-div { height: 1px; background: var(--border); margin: 6px 4px; }
-.tb-hint { color: var(--text2); font-size: 12px; padding: 10px; line-height: 1.45; }
-.tb-hint b { color: var(--text); }
-.tb-slider { display: grid; grid-template-columns: 78px 1fr 44px; align-items: center; gap: 8px; padding: 7px 10px; color: var(--text2); font-size: 12px; }
-.tb-slider input[type=range] { accent-color: var(--accent); }
-.tb-slider input[type=number] { width: 100%; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 0; padding: 4px 6px; font: inherit; }
-.tb-slider em { color: var(--text); font-style: normal; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
-.tb-slider input[type=color] { width: 100%; height: 24px; padding: 0; background: var(--bg-2); border: 1px solid var(--border); border-radius: 0; cursor: pointer; }
-.tb-slider input[type=date], .tb-slider input[type=time] { width: 100%; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 0; padding: 4px 6px; font: inherit; color-scheme: dark; }
-/* Leading glyph for dropdown items without an icon (e.g. the sun toggle, #28) */
-.tb-glyph { display: inline-flex; width: 15px; justify-content: center; color: var(--warm); font-size: 14px; }
-/* preset chips (floor / wall finishes) */
-.tb-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 10px 8px; }
-.tb-chip { border: 1px solid var(--border); background: var(--bg-2); color: var(--text2); border-radius: 0;
-  padding: 4px 11px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .12s, color .12s, border-color .12s; }
-.tb-chip:hover { color: var(--text); border-color: var(--text3); }
-.tb-chip.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 
 /* ── Tool rail ── */
 .toolrail { background: var(--bg-2); border-right: 1px solid var(--border); display: flex; flex-direction: column;
@@ -3111,9 +3194,18 @@ input[type="range"]:disabled {
 /* ── Status bar ── */
 /* ADR-007 Abschnitt 6: „Statusleiste unten, 24 px. Sie meldet; sie bedient
    nicht." Die Hoehe stand vorher nirgends — sie ergab sich aus dem Inhalt. */
+/* Die Statusleiste rollt waagerecht, statt hinauszuragen (B-77): im
+ * Render-Modus stehen mehr Zaehler darin als im 2D-Plan, und in einem
+ * 390-px-Fenster ragte der letzte 27 px ueber den Rand. Umbrechen darf sie
+ * nicht — sie ist 24 px hoch (ADR-007), und eine zweite Zeile schoebe die
+ * Arbeitsflaeche nach oben. Die Rollleiste bleibt unsichtbar; eine 24-px-Zeile
+ * mit einem 15-px-Balken darin waere kein Gewinn. */
 .statusbar { display: flex; align-items: center; gap: 16px; height: 24px; flex: none;
-  padding: 0 12px; background: var(--bg-2);
+  padding: 0 12px; background: var(--bg-2); overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;
   border-top: 1px solid var(--border); color: var(--text2); font-size: 11.5px; }
+.statusbar::-webkit-scrollbar { display: none; }
+.sb-item { flex: none; }
 .sb-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .sb-item b { color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600; }
 .sb-lux b { color: var(--warm); }
@@ -3285,3 +3377,90 @@ textarea:focus-visible,
 }
 .cmdk-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmdk-shortcut { color: var(--text2); font-size: 11.5px; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * B-77 — EIN BEDIENPUNKT IST 32 PX HOCH.
+ *
+ * GEMESSEN, nicht vermutet (2026-09-13, `bedienbar:check` der Suite gegen den
+ * gebauten `dist/`, 390/768/1440 px — in allen drei Breiten dieselben 24):
+ *
+ *   Menuetitel (Datei · Bearbeiten · Werkzeuge · Ansicht · Hilfe)   25 px
+ *   Ansichts-Umschalter (2D-Plan · 3D · Render)                    27 px
+ *   Spalte einklappen, links und rechts                        24 x 24 px
+ *   Suchfeld der Bibliothek                                        28 px
+ *   die 13 Gruppenkoepfe der Bibliothek                            28 px
+ *
+ * Keiner davon ist ein Randfall: das sind die Griffe, mit denen man diese
+ * App bedient. 25 px trifft man mit der Maus, mit dem Finger nicht.
+ *
+ * WARUM EINE GLOBALE REGEL. Die Hoehen entstehen aus Polsterung
+ * (`padding: 4px 8px`), nicht aus einer Hoehen-Angabe — sie einzeln
+ * nachzuziehen hiesse, dieselbe Entscheidung an 24 Stellen zu wiederholen,
+ * und die 25. faellt morgen wieder durch. `min-height` gewinnt ausserdem
+ * gegen `height`, deshalb hebt die Regel auch die ausdruecklich auf 24 px
+ * gesetzten Spaltenknoepfe an.
+ *
+ * AUSGENOMMEN sind Kontrollkaestchen, Auswahlknoepfe und Schieberegler:
+ * ein 32-px-Kaestchen ist kein besseres Kaestchen, und der Regler wird ueber
+ * seinen Griff bedient (`slider:check`). Dieselbe Ausnahme trifft die Sonde
+ * in der Suite.
+ * ─────────────────────────────────────────────────────────────────────────── */
+button,
+summary,
+[role='button'],
+select,
+textarea,
+input:not([type='checkbox']):not([type='radio']):not([type='range']) {
+  min-height: var(--ziel);
+}
+
+/* Die Breite nur dort, wo ein Knopf zum Quadrat schrumpfen kann. Ein
+ * Eingabefeld ist nie zu schmal; ein Sinnbild-Knopf ohne Beschriftung schon. */
+button,
+summary,
+[role='button'] {
+  min-width: var(--ziel);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * B-77 — DIE APP PASST AUF EIN TELEFON.
+ *
+ * WAS GEMESSEN WAR. `.app-body` fuehrt vier Spalten: Werkzeugleiste 56,
+ * Bibliothek 264, Arbeitsflaeche, Eigenschaften 308. Das sind 628 px, bevor
+ * die Arbeitsflaeche ein einziges Pixel bekommt. In einem 390-px-Fenster
+ * ragten deshalb acht Elemente bis 628 px hinaus — die Arbeitsflaeche und
+ * die rechte Spalte lagen vollstaendig ausserhalb des Fensters und waren
+ * nicht erreichbar, weil `.app-body` sie mit `overflow: hidden` abschneidet.
+ *
+ * DIE LOESUNG IST NICHT „schmaler". Zwei Spalten a 264 und 308 px sind
+ * Listen mit Namen, Zahlen und Reglern; auf 120 px gequetscht waeren sie
+ * unlesbar. Unter 820 px stehen die Spalten deshalb EINGEKLAPPT (32 px, der
+ * vorhandene Zustand) und legen sich beim Oeffnen UEBER die Arbeitsflaeche,
+ * statt ihr Breite wegzunehmen. Beides zusammen ist auf einem Telefon die
+ * einzige Aufteilung, die beides bedienbar laesst.
+ *
+ * `position: absolute` nimmt das offene Panel aus dem Raster; die 32-px-Spalte
+ * bleibt als Griff stehen, ueber den es wieder zugeht. Die Breite deckelt bei
+ * `100% - 56px`, damit die Werkzeugleiste nie verdeckt wird — sonst koennte
+ * man das Werkzeug nicht wechseln, waehrend eine Spalte offen ist.
+ * ─────────────────────────────────────────────────────────────────────────── */
+.app-body-schmal {
+  position: relative;
+}
+
+.app-body-schmal > .seiten-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 25;
+  width: min(320px, calc(100% - 56px));
+  box-shadow: none;
+}
+
+.app-body-schmal > .seiten-panel-links {
+  left: 56px;
+}
+
+.app-body-schmal > .seiten-panel-rechts {
+  right: 0;
+}
