@@ -301,6 +301,14 @@ jobs:
       - name: Die Listen als PDF
         run: npm run pdf:check
 
+      # #123 (Kommentar): der LICHTPLAN als PDF, mit denselben Einstellungen
+      # wie im Cable Planner. Der Lauf misst das Blatt: A4 quer ist 842 x 595
+      # Punkte, der Plan wird nicht gedehnt (sonst loege der eingezeichnete
+      # Massstabsbalken), er bleibt innerhalb der Raender, und ein unsinniger
+      # Rand kostet keine Datei.
+      - name: Der Lichtplan auf einem echten Blatt
+        run: npm run plot:check
+
       # Bedarf 132: die Szenen waren eine flache Liste. Wer den dritten Song
       # nach vorn zieht, musste seine Teil-Stimmungen einzeln hinterherziehen
       # -- und vergisst eine; dann steht im Ablauf ein Chorus vor seinem Intro,

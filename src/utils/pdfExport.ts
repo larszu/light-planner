@@ -2,6 +2,8 @@
 // PDF support embeds a JPEG directly via the /DCTDecode filter, so we don't
 // need a heavy PDF library just to wrap a single rendered image.
 
+import type { SeitenLayout } from './plotPage';
+
 export function dataUrlToBytes(dataUrl: string): Uint8Array {
   const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
   const bin = atob(base64);
@@ -10,8 +12,23 @@ export function dataUrlToBytes(dataUrl: string): Uint8Array {
   return bytes;
 }
 
-// Build a one-page PDF that contains the given JPEG, scaled to fill the page.
-export function jpegToPdfBlob(jpegBytes: Uint8Array, pxW: number, pxH: number): Blob {
+// Build a one-page PDF that contains the given JPEG.
+//
+// Ohne Layout ist die Seite so gross wie das Bild — die Form, die es hier
+// seit jeher gab. Mit Layout (siehe `plotPage.ts`) liegt das Bild auf einem
+// echten Papierformat: derselbe Schreiber, zwei Aufrufe, damit es nicht zwei
+// PDF-Schreiber gibt, die beim naechsten Umbau auseinanderlaufen.
+export function jpegToPdfBlob(
+  jpegBytes: Uint8Array,
+  pxW: number,
+  pxH: number,
+  layout?: SeitenLayout,
+): Blob {
+  const l: SeitenLayout = layout ?? {
+    seiteBreite: pxW, seiteHoehe: pxH,
+    bildX: 0, bildY: 0, bildBreite: pxW, bildHoehe: pxH,
+    massstab: 1,
+  };
   const enc = new TextEncoder();
   const chunks: Uint8Array[] = [];
   let offset = 0;
@@ -21,11 +38,14 @@ export function jpegToPdfBlob(jpegBytes: Uint8Array, pxW: number, pxH: number): 
     chunks.push(bytes); offset += bytes.length;
   };
   const obj = (n: number, body: string) => { offsets[n] = offset; push(`${n} 0 obj\n${body}\nendobj\n`); };
+  // Zahlen im Seiteninhalt: drei Nachkommastellen reichen fuer 1/1000 Punkt
+  // und halten die Datei frei von 17-stelligen Gleitkomma-Schwaenzen.
+  const z = (n: number) => (Math.round(n * 1000) / 1000).toString();
 
   push('%PDF-1.4\n');
   obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
   obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-  obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pxW} ${pxH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
+  obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${z(l.seiteBreite)} ${z(l.seiteHoehe)}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
 
   // Image XObject (binary stream → written manually)
   offsets[4] = offset;
@@ -33,7 +53,7 @@ export function jpegToPdfBlob(jpegBytes: Uint8Array, pxW: number, pxH: number): 
   push(jpegBytes);
   push('\nendstream\nendobj\n');
 
-  const content = `q ${pxW} 0 0 ${pxH} 0 0 cm /Im0 Do Q`;
+  const content = `q ${z(l.bildBreite)} 0 0 ${z(l.bildHoehe)} ${z(l.bildX)} ${z(l.bildY)} cm /Im0 Do Q`;
   obj(5, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
 
   const xrefStart = offset;

@@ -218,8 +218,13 @@ for (const datei of ['instrument-schedule.csv', 'geraeteliste.csv', 'farbliste.c
 }
 
 const app = lies('../src/App.tsx');
+// Das schliessende `})` OHNE Semikolon, seit der Plan-Druck (#123) den Aufruf
+// in einen Bedingungsausdruck gesetzt hat: ohne Titelblock geht die
+// Zeichenflaeche unveraendert aufs Blatt. Die alte Fassung verlangte `});`
+// und wurde an einer richtigen Aenderung rot — sie mass die Zeichensetzung
+// und nicht die Zusage. Gemeint ist: im Aufruf steht `stamp`.
 assert.ok(
-  /planContentFingerprint\(/.test(app) && /stamp,?\s*\n?\s*\}\);/.test(app.slice(app.indexOf('composePlot('))),
+  /planContentFingerprint\(/.test(app) && /stamp,?\s*\n?\s*\}\)/.test(app.slice(app.indexOf('composePlot('))),
   'App.tsx reicht keinen Stempel an composePlot',
 );
 

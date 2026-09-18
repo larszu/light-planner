@@ -96,6 +96,8 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 ### 💾 Save / open · export
 - One project file with everything in it — fixtures, trusses, and the calibrated building plan — in local storage, no cloud
 - File menu with undo / redo, and export of the current view as PNG, JPG or PDF
+- **Print the light plot as PDF on a real sheet** — A4 to A0+, portrait or landscape, margin, optional title block with legend and scale bar. The plan is placed centred and never distorted, so the scale bar on it stays true. "Original" keeps the old behaviour: the page is as large as the drawing.
+- Every list you can export as CSV is also available as a typeset PDF (searchable text, not a photo of a table)
 
 ---
 

@@ -23,6 +23,7 @@ import { saveVersion, versionsFor } from './utils/versionStore';
 import { planContentFingerprint, stampForStand } from './core/documentStamp';
 import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
+import PlotExportDialog, { type PlotExportWahl } from './components/PlotExportDialog';
 import ScheduleDialog from './components/ScheduleDialog';
 import { autoPatch, findPatchConflicts } from './core/patch';
 import { generate3PointLighting, generateAreaLighting } from './core/autoLighting';
@@ -31,6 +32,7 @@ import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
 import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
 import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
+import { seitenLayout } from './utils/plotPage';
 import { composePlot } from './utils/plotExport';
 import AboutDialog from './components/AboutDialog';
 import { Icon } from './components/Icon';
@@ -1342,9 +1344,27 @@ const App: React.FC = () => {
   // The 2D plan's current draw scale (backing px per metre), reported by
   // PlanCanvas — used to size an accurate scale bar in the printed plot.
   const planPxPerMeterRef = useRef(40);
-  const handleExportPlot = useCallback(async () => {
-    const srcCanvas = document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
-    if (viewMode !== '2d' || !srcCanvas) { window.alert(t('app.printNeeds2d', 'Printing the light plan: please do this from the 2D plan view.')); return; }
+  // ─── DER PLAN-DRUCK FRAGT JETZT NACH DEM BLATT (#123) ────────────────
+  // Der Menuepunkt oeffnet den Einstellungs-Dialog; gedruckt wird erst nach
+  // der Auswahl. Vorher ging beides in einem Klick, und die Seitengroesse
+  // war die des Fensters — bei jedem Nutzer eine andere.
+  const [plotDialogOffen, setPlotDialogOffen] = useState(false);
+  const [plotWahl, setPlotWahl] = useState<PlotExportWahl>({
+    papier: 'a3', ausrichtung: 'quer', randMm: 10, titelblock: true,
+  });
+  const planCanvas = (): HTMLCanvasElement | null =>
+    document.querySelector('.plan-canvas') as HTMLCanvasElement | null;
+
+  const handleExportPlot = useCallback(() => {
+    if (viewMode !== '2d' || !planCanvas()) { window.alert(t('app.printNeeds2d', 'Printing the light plan: please do this from the 2D plan view.')); return; }
+    setPlotDialogOffen(true);
+  }, [viewMode, t]);
+
+  const handlePlotExportieren = useCallback(async (wahl: PlotExportWahl) => {
+    setPlotWahl(wahl);
+    setPlotDialogOffen(false);
+    const srcCanvas = planCanvas();
+    if (!srcCanvas) return;
     // Stand-Angabe fuer das Blatt (ADR-004). Fuer den PLAN-Ausdruck zaehlen
     // auch Positionen — sie sind darauf zu sehen; eine verschobene Leuchte
     // macht ein anderes Blatt. Der Vergleichswert kommt aus dem juengsten
@@ -1367,13 +1387,22 @@ const App: React.FC = () => {
         : undefined,
       now: new Date(),
     });
-    const out = composePlot(srcCanvas, planPxPerMeterRef.current, fixtures, {
-      projectName: projectMeta?.name || 'Lichtplan', author: projectMeta?.author, stamp,
-    });
+    // Ohne Titelblock geht die Zeichenflaeche unveraendert aufs Blatt. Das
+    // ist kein Sparmodus, sondern der Fall „der Plan kommt in ein fremdes
+    // Layout" — ein zweiter Titelblock daneben waere dort falsch.
+    const out = wahl.titelblock
+      ? composePlot(srcCanvas, planPxPerMeterRef.current, fixtures, {
+          projectName: projectMeta?.name || 'Lichtplan', author: projectMeta?.author, stamp,
+        })
+      : srcCanvas;
     const base = `${projectMeta?.name || 'Lichtplan'} Plan ${String(exportCounterRef.current++).padStart(3, '0')}`;
     const bytes = dataUrlToBytes(out.toDataURL('image/jpeg', 0.92));
-    await host.exportFile(jpegToPdfBlob(bytes, out.width, out.height), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
-  }, [viewMode, fixtures, trusses, walls, persons, stageElements, projectId, projectMeta, host]);
+    const layout = seitenLayout({
+      bildBreitePx: out.width, bildHoehePx: out.height,
+      papier: wahl.papier, ausrichtung: wahl.ausrichtung, randMm: wahl.randMm,
+    });
+    await host.exportFile(jpegToPdfBlob(bytes, out.width, out.height, layout), `${base}.pdf`, { 'application/pdf': ['.pdf'] });
+  }, [fixtures, trusses, walls, persons, stageElements, projectId, projectMeta, host]);
 
   // Current project document as a single object (used by version snapshots).
   const buildCurrentDoc = useCallback((): ProjectData => {
@@ -1896,6 +1925,15 @@ const App: React.FC = () => {
           trusses={trusses}
           onGenerate={handleAutoThreePointConfigured}
           onCancel={() => setShowThreePointDialog(false)}
+        />
+      )}
+      {plotDialogOffen && (
+        <PlotExportDialog
+          bildBreitePx={planCanvas()?.width ?? 1600}
+          bildHoehePx={planCanvas()?.height ?? 1000}
+          vorgabe={plotWahl}
+          onApply={handlePlotExportieren}
+          onCancel={() => setPlotDialogOffen(false)}
         />
       )}
       {pendingCalibration && (
