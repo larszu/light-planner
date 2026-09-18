@@ -68,6 +68,11 @@ const HARMLOS = new Set(
     // im Quelltext.
     'zuschauer', 'quelle', 'quellsprache',
     'quellen', 'steuer', 'steuerung', 'sequenz', 'frequenz', 'zuerst', 'quer',
+    // 2026-09-18: „Querformat" kam mit dem Lichtplan-Druck (#123) dazu.
+    // „quer" stand schon hier; das Wort wird nur dann geteilt, wenn im
+    // Innern ein Grossbuchstabe steht, und ein zusammengesetztes deutsches
+    // Wort hat keinen.
+    'querformat',
     'aktuellen', 'aktueller', 'aktuelles', 'aktuell',
     // Englisch, Bezeichner und Farben, die als Text auftauchen
     'marquee', 'parquet', 'colvalue', 'value', 'values', 'venue', 'venues',
