@@ -79,7 +79,10 @@ const HARMLOS = new Set(
     'venueexchange', 'issues',
     'exportvenue', 'exportvenuehint', 'importvenue', 'importvenuehint',
     'coefficient', 'rogue', 'blue', 'true', 'due', 'issue', 'unique', 'query',
-    'request', 'does', 'goes', 'guess', 'continue', 'sequence',
+    // 2026-09-25: „requested" steht im Kopf `x-requested-with` des
+    // Bibliotheks-Clients — einer unveraenderten Kopie aus
+    // larszu/av-device-library, die hier nicht umgeschrieben werden darf.
+    'request', 'requested', 'does', 'goes', 'guess', 'continue', 'sequence',
     // Ein Paar fuer sich ist nie ein deutsches Wort — es kommt aus einer UUID,
     // einer Farbe oder einem Pfad.
     'ae', 'oe', 'ue',

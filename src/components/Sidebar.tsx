@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Icon from './Icon';
 import type { Fixture, FixtureCategory } from '../types';
 import { fixtureLibrary } from '../core/fixtureLibrary';
 import FixtureEditor from './FixtureEditor';
-import { useTranslation, translate } from '../i18n';
+import { format, useTranslation, translate } from '../i18n';
+import { useDeviceLibrary } from '../store/deviceLibraryStore';
+import { deviceUrl } from '../core/deviceLibraryClient';
+import DeviceLibraryProposeDialog from './DeviceLibraryProposeDialog';
+import { libraryStatusText } from './deviceLibraryText';
 
 interface Props {
   customFixtures: Fixture[];
@@ -72,15 +76,25 @@ const Sidebar: React.FC<Props> = ({
   const [search, setSearch] = useState('');
   const [expandedCat, setExpandedCat] = useState<FixtureCategory | null>(null); // all categories collapsed by default
   const [showEditor, setShowEditor] = useState(false);
+  const [showPropose, setShowPropose] = useState(false);
+  const [libOpen, setLibOpen] = useState(false);
+  const libInit = useDeviceLibrary((s) => s.init);
+  const libEntries = useDeviceLibrary((s) => s.cache.entries);
+  const libServer = useDeviceLibrary((s) => s.server);
+  useEffect(() => {
+    void libInit();
+  }, [libInit]);
 
+  const matches = (f: Fixture) =>
+    !search ||
+    f.name.toLowerCase().includes(search.toLowerCase()) ||
+    f.manufacturer.toLowerCase().includes(search.toLowerCase());
+
+  // Die Bibliothek ist eine eigene, schreibgeschuetzte Quelle: sie steht als
+  // eigene Gruppe und mischt sich nicht in die Kategorien des Katalogs.
+  const libFiltered = libEntries.filter((e) => matches(e.fixture));
   const allFixtures = [...fixtureLibrary, ...customFixtures];
-  const filtered = search
-    ? allFixtures.filter(
-        (f) =>
-          f.name.toLowerCase().includes(search.toLowerCase()) ||
-          f.manufacturer.toLowerCase().includes(search.toLowerCase()),
-      )
-    : allFixtures;
+  const filtered = allFixtures.filter(matches);
 
   const grouped = CATEGORIES.map((cat) => ({
     category: cat,
@@ -118,6 +132,47 @@ const Sidebar: React.FC<Props> = ({
       </div>
 
       <div className="sidebar-list">
+        {libFiltered.length > 0 && (
+          <div className="fixture-group">
+            <button className="group-header" onClick={() => setLibOpen(!libOpen)}>
+              <span className="group-arrow">{searching || libOpen ? '▾' : '▸'}</span>
+              <span>{t('devlib.group', 'Device library')}</span>
+              <span className="group-count">{libFiltered.length}</span>
+            </button>
+            {(searching || libOpen) && (
+              <div className="group-items">
+                {libFiltered.map(({ slug, status, confirmations, fixture: f }) => (
+                  <div key={slug} className="devlib-item">
+                    <button
+                      className={`fixture-item ${fixtureToPlace?.id === f.id ? 'selected' : ''}`}
+                      onClick={() => onSelectFixtureToPlace(f)}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, f)}
+                    >
+                      <div className="fixture-item-name">{f.name}</div>
+                      <div className="fixture-item-info">
+                        {f.manufacturer} · {categoryLabel(language, f.category)} · {f.wattage}W · {f.beamAngle}°
+                      </div>
+                      <div className="fixture-item-info">
+                        {libraryStatusText(t, status)} · {format(t('devlib.confirmations', '{n} confirmations'), { n: confirmations })}
+                      </div>
+                    </button>
+                    <a
+                      className="devlib-link"
+                      href={deviceUrl(libServer, slug)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={t('devlib.openEntry', 'Open in the device library')}
+                      aria-label={t('devlib.openEntry', 'Open in the device library')}
+                    >
+                      ↗
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {grouped.map((g) => {
           const expanded = searching || expandedCat === g.category;
           return (
@@ -176,7 +231,14 @@ const Sidebar: React.FC<Props> = ({
         <button className="add-fixture-btn" onClick={() => setShowEditor(true)}>
           {t('sidebar.addCustom', '+ Add custom fixture')}
         </button>
+        <button className="add-fixture-btn devlib-propose-btn" onClick={() => setShowPropose(true)}>
+          {t('devlib.propose.button', 'Submit to device library…')}
+        </button>
       </div>
+
+      {showPropose && (
+        <DeviceLibraryProposeDialog fixtures={customFixtures} onClose={() => setShowPropose(false)} />
+      )}
 
       {showEditor && (
         <FixtureEditor

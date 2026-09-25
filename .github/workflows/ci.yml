@@ -294,6 +294,13 @@ jobs:
       - name: Der DMX-Modus entscheidet den Fussabdruck
         run: npm run dmx:check
 
+      # Die Geraetebibliothek (devices.zumpelars.de): Einreichen und Import
+      # ergeben dasselbe Leuchtenprofil, der Abgleich schreibt ueber
+      # `latestSeq` fort und zaehlt Ungueltige, die CSP laesst den
+      # Werks-Server zu, und das Token steht in keinem State, Projekt oder Log.
+      - name: Geraetebibliothek — Facet-Rundlauf, Abgleich, Token
+        run: npm run library:check
+
       # #123: die Listen gibt es auch als PDF, und zwar gesetzt statt
       # fotografiert. Der Lauf liest die erzeugten Bytes: steht der Text drin,
       # bricht eine lange Liste um, laeuft keine Zeile ueber den Rand, und
