@@ -168,7 +168,7 @@ ok('Cache gehoert zu genau einem Server');
 assert.equal(DEFAULT_DEVICE_LIBRARY_URL, 'https://devices.zumpelars.de');
 assert.deepEqual(normalizeServerUrl(' https://devices.zumpelars.de/ '), { ok: true, url: 'https://devices.zumpelars.de' });
 assert.deepEqual(normalizeServerUrl('http://devices.zumpelars.de'), { ok: false, reason: 'insecure' });
-assert.deepEqual(normalizeServerUrl('http://localhost:4190'), { ok: true, url: 'http://localhost:4190' });
+assert.deepEqual(normalizeServerUrl('http://127.0.0.1:4190'), { ok: true, url: 'http://127.0.0.1:4190' });
 assert.deepEqual(normalizeServerUrl('devices'), { ok: false, reason: 'invalid' });
 ok('Server-Adresse: https Pflicht, http nur lokal');
 
