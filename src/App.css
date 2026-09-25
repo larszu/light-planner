@@ -3472,3 +3472,15 @@ summary,
 .app-body-schmal > .seiten-panel-rechts {
   right: 0;
 }
+
+/* Geraetebibliothek — Einstellungen, eigene Gruppe in der Leuchtenliste. */
+.devlib-grid { max-height: none; margin-top: 8px; }
+.devlib-grid input, .devlib-grid select { flex: 0 0 240px; max-width: 240px; }
+.devlib-error { color: var(--text-danger); font-size: 12px; line-height: 1.45; margin-top: 6px; }
+.devlib-invalid { font-size: 12px; color: var(--text2); margin-top: 6px; }
+.devlib-invalid ul { margin: 4px 0 0 16px; }
+.devlib-item { display: flex; align-items: stretch; }
+.devlib-item .fixture-item { flex: 1; min-width: 0; }
+.devlib-link { flex: none; display: grid; place-items: center; width: 28px; color: var(--text2); text-decoration: none; }
+.devlib-link:hover { color: var(--accent); background: var(--panel-alt); }
+.devlib-propose-btn { margin-top: 6px; }

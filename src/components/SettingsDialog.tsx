@@ -33,6 +33,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../i18n';
 import { APP_VERSION } from '../version';
 import { liesThema, setzeThema, type Thema } from '../lib/thema';
+import DeviceLibrarySettings from './DeviceLibrarySettings';
 
 const LANGUAGES: { id: 'en' | 'de'; label: string }[] = [
   { id: 'en', label: 'English' },
@@ -61,9 +62,10 @@ const SettingsDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
     <div
       className="modal-backdrop"
-      /* B-44 — Klick auf den Hintergrund schliesst. Ohne Schutzabfrage: in
-         diesem Dialog gibt es kein ungesichertes Eingabefeld, jede Auswahl
-         wirkt sofort. */
+      /* B-44 — Klick auf den Hintergrund schliesst. Ohne Schutzabfrage: jede
+         Auswahl wirkt sofort; das einzige Eingabefeld mit Wert ist die
+         Anmeldung der Geraetebibliothek, und ein verlorenes Passwortfeld ist
+         schnell neu getippt. */
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -114,6 +116,9 @@ const SettingsDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </button>
           ))}
         </div>
+
+        <h4 className="settings-h">{t('settings.deviceLibrary', 'Device library')}</h4>
+        <DeviceLibrarySettings />
 
         <h4 className="settings-h">{t('settings.about', 'About')}</h4>
         <p className="settings-hint">LightPlanner v{APP_VERSION}</p>
