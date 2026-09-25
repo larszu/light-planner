@@ -34,9 +34,10 @@ import {
   fixtureToProposal, isDatasheetLink, normalizeServerUrl, readCache,
 } from '../src/core/deviceLibrary.ts';
 import {
-  DEFAULT_DEVICE_LIBRARY_URL, signIn, sync, verifySecondFactor,
-  type SyncDevice, type SyncResponse,
+  DEFAULT_DEVICE_LIBRARY_URL, LibraryError, propose, signIn, sync, verifySecondFactor,
+  type LibraryErrorCode, type SyncDevice, type SyncResponse,
 } from '../src/core/deviceLibraryClient.ts';
+import { libraryErrorText } from '../src/components/deviceLibraryText.ts';
 import type { Fixture } from '../src/types.ts';
 
 const wurzel = new URL('../', import.meta.url);
@@ -206,6 +207,35 @@ await sync(S, 'tok-1', 'light', 5);
 assert.equal(aufrufe[2].url, `${S}/api/sync?planner=light&after=5`);
 assert.equal((aufrufe[2].init.headers as Record<string, string>).authorization, 'Bearer tok-1');
 ok('Client: 2FA ueber x-auth-challenge, ohne Cookies, Abgleich mit planner=light&after=<seq>');
+
+// Die Bibliotheks-Routen antworten mit klein geschriebenen Codes (Better Auth
+// mit grossen). Jeder Fall muss beim richtigen Code ankommen — ein
+// `guidelines-outdated` als „wrong-credentials" gelesen, und der Planer
+// meldet den Nutzer ab, statt ihn zur Website zu schicken.
+const fehlerCode = async (status: number, body: unknown): Promise<LibraryErrorCode> => {
+  antworten.push(new Response(JSON.stringify(body), { status }));
+  try {
+    await propose(S, 'tok-1', 'light', core, facet as unknown as Record<string, unknown>);
+  } catch (e) {
+    assert.ok(e instanceof LibraryError);
+    return e.code;
+  }
+  throw new Error('propose haette scheitern muessen');
+};
+assert.equal(await fehlerCode(409, { error: 'exists' }), 'exists');
+assert.equal(await fehlerCode(403, { error: 'guidelines-outdated' }), 'guidelines-outdated');
+assert.equal(await fehlerCode(403, { error: 'email-not-verified' }), 'email-not-verified');
+assert.equal(await fehlerCode(401, { error: 'not-signed-in' }), 'not-signed-in');
+const alleCodes: LibraryErrorCode[] = [
+  'wrong-credentials', 'email-not-verified', 'guidelines-outdated', 'exists', 'wrong-code',
+  'rate-limited', 'not-signed-in', 'offline', 'server',
+];
+const texte = alleCodes.map((c) => libraryErrorText((_k, en) => en, c));
+assert.equal(new Set(texte).size, alleCodes.length, 'jeder Fehlercode braucht einen eigenen Text');
+assert.ok(/\/guidelines`/.test(lies('src/components/DeviceLibraryError.tsx')), 'guidelines-outdated ohne Link auf <server>/guidelines');
+const store0 = lies('src/store/deviceLibraryStore.ts');
+assert.ok(!/guidelines-outdated'\)\s*await forgetSession/.test(store0), 'geaenderte Richtlinien sind kein Grund zum Abmelden');
+ok('Fehlercodes: exists (409), guidelines-outdated mit Link, klein geschriebene Codes, jeder Code mit eigenem Text');
 
 // ── 6. Wo das Token NICHT stehen darf ───────────────────────────────────────
 const store = lies('src/store/deviceLibraryStore.ts');

@@ -4,11 +4,11 @@
 import React, { useState } from 'react';
 import type { Fixture } from '../types';
 import { format, useTranslation } from '../i18n';
-import { LibraryError, deviceUrl } from '../core/deviceLibraryClient';
+import { LibraryError, deviceUrl, type LibraryErrorCode } from '../core/deviceLibraryClient';
 import { isDatasheetLink, isLibraryFixture } from '../core/deviceLibrary';
 import { validateFixtureProfile } from '../core/fixtureProfile';
 import { useDeviceLibrary } from '../store/deviceLibraryStore';
-import { libraryErrorText } from './deviceLibraryText';
+import DeviceLibraryError from './DeviceLibraryError';
 
 const DeviceLibraryProposeDialog: React.FC<{ fixtures: Fixture[]; onClose: () => void }> = ({ fixtures, onClose }) => {
   const { t } = useTranslation();
@@ -17,7 +17,7 @@ const DeviceLibraryProposeDialog: React.FC<{ fixtures: Fixture[]; onClose: () =>
   const [id, setId] = useState(own[0]?.id ?? '');
   const [sourceUrl, setSourceUrl] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ code: LibraryErrorCode } | { text: string } | null>(null);
   const [done, setDone] = useState<{ slug: string; state: string } | null>(null);
 
   const fixture = own.find((f) => f.id === id);
@@ -31,7 +31,7 @@ const DeviceLibraryProposeDialog: React.FC<{ fixtures: Fixture[]; onClose: () =>
     try {
       setDone(await propose(fixture, sourceUrl));
     } catch (e) {
-      setError(e instanceof LibraryError ? libraryErrorText(t, e.code) : String(e));
+      setError(e instanceof LibraryError ? { code: e.code } : { text: String(e) });
     } finally {
       setBusy(false);
     }
@@ -75,7 +75,9 @@ const DeviceLibraryProposeDialog: React.FC<{ fixtures: Fixture[]; onClose: () =>
                 {format(t('devlib.propose.invalid', 'This profile fails the profile check: {problems}'), { problems: check.problems.join('; ') })}
               </p>
             )}
-            {error && <p className="devlib-error" role="alert">{error}</p>}
+            {error && ('code' in error
+              ? <DeviceLibraryError code={error.code} />
+              : <p className="devlib-error" role="alert">{error.text}</p>)}
           </>
         )}
         <div className="modal-actions">

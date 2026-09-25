@@ -13,7 +13,8 @@ import {
 } from '../core/deviceLibraryClient';
 import { connectSrcAllows, normalizeServerUrl } from '../core/deviceLibrary';
 import { useDeviceLibrary } from '../store/deviceLibraryStore';
-import { libraryErrorText } from './deviceLibraryText';
+import DeviceLibraryError from './DeviceLibraryError';
+import type { LibraryErrorCode } from '../core/deviceLibraryClient';
 
 const cspOf = (): string =>
   document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') ?? '';
@@ -28,7 +29,7 @@ const DeviceLibrarySettings: React.FC = () => {
   const [code, setCode] = useState('');
   const [challenge, setChallenge] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LibraryErrorCode | null>(null);
 
   const init = useDeviceLibrary((s) => s.init);
   useEffect(() => {
@@ -60,7 +61,7 @@ const DeviceLibrarySettings: React.FC = () => {
     try {
       const r = challenge ? await lib.verify(challenge, code) : await lib.signIn(login, password);
       if (r.kind === 'second-factor') setChallenge(r.challenge);
-      else if (r.kind === 'error') setError(libraryErrorText(t, r.code));
+      else if (r.kind === 'error') setError(r.code);
       else {
         setPassword('');
         setCode('');
@@ -120,7 +121,7 @@ const DeviceLibrarySettings: React.FC = () => {
           {!lib.cacheSaved && (
             <p className="devlib-error" role="alert">{t('devlib.cacheNotSaved', 'The synced profiles could not be stored on this computer; they are gone after a restart.')}</p>
           )}
-          {lib.syncError && <p className="devlib-error" role="alert">{libraryErrorText(t, lib.syncError)}</p>}
+          {lib.syncError && <DeviceLibraryError code={lib.syncError} />}
           {cache.invalid.length > 0 && (
             <details className="devlib-invalid">
               <summary>{t('devlib.invalidList', 'Show entries that failed the check')}</summary>
@@ -171,7 +172,7 @@ const DeviceLibrarySettings: React.FC = () => {
             )}
           </div>
           {challenge && <p className="settings-hint">{t('devlib.codeHint', 'Two-factor sign-in is on for this account. Enter the six-digit code from your authenticator app.')}</p>}
-          {error && <p className="devlib-error" role="alert">{error}</p>}
+          {error && <DeviceLibraryError code={error} />}
           <div className="settings-chips">
             <button
               type="submit"
