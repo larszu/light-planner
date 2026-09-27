@@ -86,7 +86,7 @@ for (const f of fixtureLibrary) {
   const erlaubt = HERSTELLER_DOMAINS[f.manufacturer] ?? [];
   assert.ok(erlaubt.some((d) => host === d || host.endsWith(`.${d}`)), `${f.id}: ${host} ist keine Domain von ${f.manufacturer}`);
 }
-assert.ok(belegt >= 69, `nur ${belegt} Katalog-Profile mit Datenblatt-Link — ist ein Beleg verloren gegangen?`);
+assert.ok(belegt >= 74, `nur ${belegt} Katalog-Profile mit Datenblatt-Link — ist ein Beleg verloren gegangen?`);
 ok(`${belegt} Katalog-Profile mit Datenblatt-Link, alle auf der Domain ihres Herstellers`);
 
 const MUSTER: Fixture = {
