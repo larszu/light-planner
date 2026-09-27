@@ -12,7 +12,7 @@
 // provides and pass to <HostProvider adapter={...}>.
 // ───────────────────────────────────────────────────────────────────────────
 
-import type { HostAdapter } from './hostAdapter';
+import type { DeviceLibraryTokenVault, HostAdapter } from './hostAdapter';
 import type { ExtractResult } from '../utils/aiExtract';
 
 interface CablePlannerBridgeFs {
@@ -30,6 +30,8 @@ export interface CablePlannerHostDeps {
   onLoadDocument?: () => Promise<{ name: string; text: string } | null>;
   /** Route AI datasheet extraction through the host's aiSuggestions service. */
   aiExtract?: (datasheet: string, opts: { apiKey: string; model: string }) => Promise<ExtractResult>;
+  /** Device-library token in the host's keychain (e.g. cable-planner's safeStorage). */
+  deviceLibraryToken?: DeviceLibraryTokenVault;
   /** Optional direct bridge fs (defaults to window.bridge.fs if present). */
   fs?: CablePlannerBridgeFs;
 }
@@ -46,6 +48,7 @@ export function createCablePlannerHost(deps: CablePlannerHostDeps = {}): HostAda
 
   return {
     info: { name: 'Cable-Planner', canPickLocation: true },
+    ...(deps.deviceLibraryToken ? { deviceLibraryToken: deps.deviceLibraryToken } : {}),
 
     async exportFile(blob, suggestedName) {
       if (deps.saveBinary) { await deps.saveBinary(blob, suggestedName); return; }

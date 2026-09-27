@@ -76,6 +76,7 @@ export function validateFixtureProfile(raw: unknown): ProfileCheck {
   opt('tlci', num, 'not a number');
   opt('ipRating', str, 'not text');
   opt('powerConnector', str, 'not text');
+  opt('datasheetUrl', str, 'not text');
   opt('dmxChannels', channelCount(0), 'not a channel count 0–512');
   opt('photometric', (v) => isObj(v) && num(v.lux) && v.lux > 0 && num(v.distance) && v.distance > 0, 'needs lux and distance > 0');
 

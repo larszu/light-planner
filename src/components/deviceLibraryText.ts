@@ -1,4 +1,5 @@
 import type { LibraryErrorCode, SyncDevice } from '../core/deviceLibraryClient';
+import type { LocalUploadState } from '../core/deviceLibrary';
 
 type T = (key: string, en: string) => string;
 
@@ -23,5 +24,21 @@ export const libraryStatusText = (t: T, status: SyncDevice['status']): string =>
     case 'confirmed': return t('devlib.status.confirmed', 'Confirmed');
     case 'unconfirmed': return t('devlib.status.unconfirmed', 'Unconfirmed');
     case 'disputed': return t('devlib.status.disputed', 'Disputed');
+  }
+};
+
+/** Zustand eines eigenen Profils gegenueber der Bibliothek. */
+export const uploadStateText = (t: T, state: LocalUploadState | 'changed' | 'new'): string => {
+  switch (state) {
+    case 'created': return t('devlib.up.created', 'Uploaded — awaiting moderation');
+    case 'edit-proposed': return t('devlib.up.editProposed', 'Uploaded as the next version — awaiting moderation');
+    case 'pending-updated': return t('devlib.up.pendingUpdated', 'Open proposal updated');
+    case 'approved': return t('devlib.up.approved', 'Live in the library');
+    case 'in-sync': return t('devlib.up.inSync', 'In sync with the library');
+    case 'blocked': return t('devlib.up.blocked', 'Rejected by the library checks');
+    case 'error': return t('devlib.up.error', 'Upload failed');
+    case 'needs-source': return t('devlib.up.needsSource', 'Needs a datasheet link before it can be uploaded');
+    case 'changed': return t('devlib.up.changed', 'Changed since the last upload');
+    case 'new': return t('devlib.up.new', 'Not uploaded yet');
   }
 };

@@ -19,6 +19,18 @@ export interface HostInfo {
   readonly canPickLocation: boolean;
 }
 
+/**
+ * Sicherer Ablageort fuer das Token der Geraetebibliothek. Ein Host, der den
+ * Planer einbettet (cable-planner), reicht hier seinen Schluesselbund durch;
+ * ohne ihn landete das Token im localStorage des Hosts.
+ */
+export interface DeviceLibraryTokenVault {
+  get(): Promise<{ server: string; token: string } | null>;
+  /** `false`: nicht dauerhaft gespeichert. */
+  set(value: { server: string; token: string }): Promise<boolean>;
+  clear(): Promise<void>;
+}
+
 export interface HostAdapter {
   readonly info: HostInfo;
 
@@ -33,4 +45,7 @@ export interface HostAdapter {
 
   /** Optional: extract fixture specs from a datasheet (host may use its own AI). */
   extractDatasheet?(datasheet: string, opts: { apiKey: string; model: string }): Promise<ExtractResult>;
+
+  /** Optional: where the device-library token lives (host keychain). */
+  deviceLibraryToken?: DeviceLibraryTokenVault;
 }

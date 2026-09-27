@@ -32,6 +32,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
   const [zoomMax, setZoomMax] = useState(initial?.zoomRange?.[1] ?? 30);
   const [cri, setCri] = useState(initial?.cri ?? 90);
   const [ipRating, setIpRating] = useState(initial?.ipRating ?? '');
+  const [datasheetUrl, setDatasheetUrl] = useState(initial?.datasheetUrl ?? '');
   const [dmxChannels, setDmxChannels] = useState(initial?.dmxChannels ?? 1);
   // Die Betriebsmodi. Leer heisst: ueber die Modi dieses Geraets ist nichts
   // erklaert — dann gilt die Kanalzahl darueber als EIN Modus geschaetzter
@@ -128,6 +129,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
       cri,
       tlci: tlci || undefined,
       ipRating: ipRating || undefined,
+      datasheetUrl: datasheetUrl.trim() || undefined,
       dmxChannels: dmxChannels || undefined,
       dmxModes: dmxModes.length > 0 ? dmxModes : undefined,
       photometric: hasPhotometric ? { lux: photoLux, distance: photoDistance, beamAngle, colorTemp: colorTemp || 5600 } : undefined,
@@ -286,6 +288,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
           <label>CRI<input type="number" value={cri} onChange={(e) => setCri(Number(e.target.value))} min={0} max={100} /></label>
           <label>TLCI<input type="number" value={tlci} onChange={(e) => setTlci(Number(e.target.value))} min={0} max={100} /></label>
           <label>{t('fx.ipRating', 'IP rating')}<input value={ipRating} onChange={(e) => setIpRating(e.target.value)} placeholder={t('fx.ipRatingPh', 'e.g. 65')} /></label>
+          <label>{t('fx.datasheetUrl', 'Datasheet link')}<input type="url" value={datasheetUrl} onChange={(e) => setDatasheetUrl(e.target.value)} placeholder="https://" /></label>
           <label>{t('fx.dmxChannels', 'DMX channels')}<input type="number" value={dmxChannels} onChange={(e) => setDmxChannels(Number(e.target.value))} min={0} /></label>
 
           {/* ── Betriebsmodi ───────────────────────────────────────────────

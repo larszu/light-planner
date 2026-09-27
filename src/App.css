@@ -3484,3 +3484,7 @@ summary,
 .devlib-link { flex: none; display: grid; place-items: center; width: 28px; color: var(--text2); text-decoration: none; }
 .devlib-link:hover { color: var(--accent); background: var(--panel-alt); }
 .devlib-propose-btn { margin-top: 6px; }
+.devlib-toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text); margin-top: 10px; }
+.devlib-own { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 30vh; overflow-y: auto; }
+.devlib-own li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.devlib-own-state { color: var(--text2); }

@@ -50,6 +50,7 @@ import './App.css';
 import { canParent, moveItem } from './core/runningOrder';
 import { erfassen, type Griff } from './core/actuals';
 import { useTranslation, format } from './i18n';
+import { useDeviceLibrary } from './store/deviceLibraryStore';
 
 export type PlanMode = 'none' | 'calibrate' | 'move';
 
@@ -1486,7 +1487,21 @@ const App: React.FC = () => {
       ? { ...s, points: s.points.map((p) => ({ x: Math.round((p.x + dx) * 10) / 10, y: Math.round((p.y + dy) * 10) / 10 })) }
       : s)));
   }, [pushHistoryThrottled]);
-  const handleAddCustomFixture = useCallback((f: Fixture) => { setCustomFixtures((prev) => [...prev, f]); }, []);
+  // Hinzufuegen ODER ersetzen (gleiche Id): der Upload-Dialog traegt den
+  // Datenblatt-Link am vorhandenen Profil nach.
+  const handleAddCustomFixture = useCallback((f: Fixture) => {
+    setCustomFixtures((prev) => (prev.some((x) => x.id === f.id) ? prev.map((x) => (x.id === f.id ? f : x)) : [...prev, f]));
+  }, []);
+
+  // Geraetebibliothek: die eigenen Profile melden (Reihenfolge zaehlt — erst
+  // die Profile, dann die Anmeldung, damit der Start-Upload sie schon kennt),
+  // und das Token dort ablegen, wo der Host es haben will.
+  useEffect(() => {
+    useDeviceLibrary.getState().setLocalFixtures(customFixtures);
+  }, [customFixtures]);
+  useEffect(() => {
+    void useDeviceLibrary.getState().init(host.deviceLibraryToken);
+  }, [host]);
 
   // ── Scenes / Looks ──
   const applyLooks = useCallback((looks: Record<string, SceneFixtureState>) => {
