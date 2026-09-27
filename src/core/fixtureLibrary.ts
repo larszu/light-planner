@@ -148,11 +148,17 @@ export const fixtureLibrary: Fixture[] = [
     powerConnector: 'powerCON TRUE1', dmxChannels: 5,
   },
   {
-    id: 'robert-juliat-714', name: '714SX2 Suiveur 2,5kW', manufacturer: 'Robert Juliat', category: 'profile',
+    // Robert Juliat DSEN074_714SX2 (read 2026-09-27): a tungsten PROFILE SPOT,
+    // not a followspot. CP91 2500 W, 65,000 lm, 3200 K; zoom 15°–40° field
+    // angle; 20 kg (23.2 kg is the shipping weight); Schuko on an attached
+    // cord, no DMX. The datasheet gives no beam angle; 8° stays as it was.
+    id: 'robert-juliat-714', name: '714SX2', manufacturer: 'Robert Juliat', category: 'profile',
     datasheetUrl: 'https://www.robertjuliat.com/Product_Specifications/Fiches_EN/Standard/DSEN074_714SX2.pdf',
-    wattage: 2500, lumens: 68000, beamAngle: 8, fieldAngle: 16,
-    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [8, 16],
-    colorTemp: 3200, weight: 23, mountType: 'yoke',
+    wattage: 2500, lumens: 65000, beamAngle: 8, fieldAngle: 15,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [15, 40],
+    colorTemp: 3200, weight: 20, mountType: 'yoke',
+    photometric: { lux: 20000, distance: 5, beamAngle: 15, colorTemp: 3200 },
+    powerConnector: 'Schuko (CEE 7/7)', dmxChannels: 0,
   },
 
   // ═══════════════════════════════════════════════════════════
@@ -172,11 +178,28 @@ export const fixtureLibrary: Fixture[] = [
     colorTemp: 3200, weight: 10.2, mountType: 'clamp',
   },
   {
-    id: 'etc-cs-fresnel', name: 'ColorSource Fresnel', manufacturer: 'ETC', category: 'fresnel',
-    wattage: 125, lumens: 3250, beamAngle: 15, fieldAngle: 50,
-    beamShape: 'circular', beamRatioWH: 1, lensType: 'fresnel', zoomRange: [15, 50],
-    colorTemp: 0, colorTempRange: [2700, 6500], cri: 92, weight: 5.2, mountType: 'clamp',
-    dmxChannels: 5,
+    // ETC datasheet "ColorSource Fresnel V" (read 2026-09-27): 5330 lm max,
+    // 149 W full on, zoom 13°–44°, spot beam 13° / field 22.8°, 86,166 cd at
+    // 13° direct (76,845 cd at 5600 K), 6.24 kg, powerCON TRUE1, 9 DMX profiles (p. 6).
+    // CCT range and CRI are not in the datasheet and stay as they were.
+    id: 'etc-cs-fresnel', name: 'ColorSource Fresnel V', manufacturer: 'ETC', category: 'fresnel',
+    datasheetUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/ColorSource-Fresnel-V/Features.aspx',
+    wattage: 149, lumens: 5330, beamAngle: 13, fieldAngle: 22.8,
+    beamShape: 'circular', beamRatioWH: 1, lensType: 'fresnel', zoomRange: [13, 44],
+    colorTemp: 0, colorTempRange: [2700, 6500], cri: 92, weight: 6.24, mountType: 'clamp',
+    photometric: { lux: 76845, distance: 1, beamAngle: 13, colorTemp: 5600 },
+    powerConnector: 'powerCON TRUE1', dmxChannels: 8,
+    dmxModes: [
+      { id: 'stn', name: 'Stn: Standard', channels: 8, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6 (default mode)' },
+      { id: 'rgb', name: 'RGB', channels: 4, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6' },
+      { id: '1ch', name: '1ch: 1-channel', channels: 1, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6' },
+      { id: 'dir', name: 'Dir: Direct', channels: 10, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6' },
+      { id: '6ch', name: '6ch: 6-channel', channels: 6, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6' },
+      { id: 'cct', name: 'CCT: Studio', channels: 8, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6' },
+      { id: 'st2', name: 'St2: Standard 16-bit', channels: 12, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6' },
+      { id: 'dr2', name: 'Dr2: Direct 16-bit', channels: 16, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6' },
+      { id: 'ct2', name: 'CT2: Studio 16-bit', channels: 10, origin: 'manual', evidence: 'ETC datasheet ColorSource Fresnel V, p. 6' },
+    ],
   },
 
   // ═══════════════════════════════════════════════════════════
@@ -219,10 +242,23 @@ export const fixtureLibrary: Fixture[] = [
     colorTemp: 0, weight: 1.4, mountType: 'clamp', dmxChannels: 12,
   },
   {
-    id: 'chauvet-colordash-h18ip', name: 'COLORdash Par H18IP', manufacturer: 'Chauvet Professional', category: 'wash',
-    wattage: 180, lumens: 5736, beamAngle: 22, fieldAngle: 38,
+    // Chauvet product page and user manual Rev. 1 (read 2026-09-27): 150 W at
+    // 230 V, 5,567 lm, beam 25.4° / field 39°, 1,106 lux at 5 m, 2,800–10,000 K,
+    // 6.6 kg, Seetronic Powerkon IP65, personalities 6/8/9/13/14CH.
+    id: 'chauvet-colordash-h18ip', name: 'COLORdash PAR H18 XIP', manufacturer: 'Chauvet Professional', category: 'wash',
+    datasheetUrl: 'https://chauvetprofessional.com/product/colordash-par-h18-xip/',
+    wattage: 150, lumens: 5567, beamAngle: 25.4, fieldAngle: 39,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
-    colorTemp: 0, ipRating: 'IP65', weight: 4.8, mountType: 'clamp', dmxChannels: 14,
+    colorTemp: 0, colorTempRange: [2800, 10000], ipRating: 'IP65', weight: 6.6, mountType: 'clamp',
+    photometric: { lux: 1106, distance: 5, beamAngle: 25.4, colorTemp: 8439 },
+    powerConnector: 'Seetronic Powerkon IP65', dmxChannels: 14,
+    dmxModes: [
+      { id: '6ch', name: '6CH', channels: 6, origin: 'manual', evidence: 'Chauvet user manual COLORdash Par-H18XIP Rev. 1' },
+      { id: '8ch', name: '8CH', channels: 8, origin: 'manual', evidence: 'Chauvet user manual COLORdash Par-H18XIP Rev. 1' },
+      { id: '9ch', name: '9CH', channels: 9, origin: 'manual', evidence: 'Chauvet user manual COLORdash Par-H18XIP Rev. 1' },
+      { id: '13ch', name: '13CH', channels: 13, origin: 'manual', evidence: 'Chauvet user manual COLORdash Par-H18XIP Rev. 1' },
+      { id: '14ch', name: '14CH', channels: 14, origin: 'manual', evidence: 'Chauvet user manual COLORdash Par-H18XIP Rev. 1' },
+    ],
   },
   {
     id: 'elation-sixpar-300', name: 'SixPar 300', manufacturer: 'Elation', category: 'wash',
@@ -392,10 +428,18 @@ export const fixtureLibrary: Fixture[] = [
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [5.5, 55],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke', ipRating: 'IP65', dmxChannels: 37 },
-  { id: 'robe-iforte-ltx', name: 'iForte LTX', manufacturer: 'Robe', category: 'moving-spot',
-    wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
+  // Robe iFORTE LTX WB leaflet (read 2026-09-27), XP engine: max. 1,250 W,
+  // 43,800 lm (goniophotometer), 355,000 lx at 5 m, 6,700 K, CTO 3,000–6,700 K,
+  // CRI 70, zoom 3.5°–52°, 49 kg, powerCON TRUE1, one DMX mode with 54
+  // channels. No field angle in the leaflet; 10° stays as it was.
+  { id: 'robe-iforte-ltx', name: 'iFORTE LTX WB', manufacturer: 'Robe', category: 'moving-spot',
+  datasheetUrl: 'https://www.robe.cz/iforte-ltx-wb',
+    wattage: 1250, lumens: 43800, beamAngle: 3.5, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [3.5, 52],
-    colorTemp: 6800, weight: 42.5, mountType: 'yoke', ipRating: 'IP65' },
+    colorTemp: 6700, colorTempRange: [3000, 6700], cri: 70, weight: 49, mountType: 'yoke', ipRating: 'IP65',
+    photometric: { lux: 355000, distance: 5, beamAngle: 3.5, colorTemp: 6700 },
+    powerConnector: 'powerCON TRUE1', dmxChannels: 54,
+    dmxModes: [{ id: 'mode-1', name: 'Mode 1', channels: 54, origin: 'manual', evidence: 'Robe iFORTE LTX WB leaflet: DMX protocol modes 1, control channels 54' }] },
   { id: 'martin-mac-encore-perf-cld', name: 'MAC Encore Performance CLD', manufacturer: 'Martin / Harman', category: 'moving-spot',
   datasheetUrl: 'https://www.martin.com/en/products/mac-encore-performance-cld',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
@@ -624,13 +668,19 @@ export const fixtureLibrary: Fixture[] = [
     ],
   },
   {
-    id: 'aputure-ls-300x-ii', name: 'LS 300x II', manufacturer: 'Aputure', category: 'led-panel',
+    // Aputure product page and LS 300x product manual (read 2026-09-27):
+    // 350 W max, 2700–6500 K, CRI/TLCI >= 96, 6,300 lux at 1 m bare at 5500 K,
+    // Neutrik powerCON, DMX chart with 6 channels. Lamp-head weight is not
+    // given separately (7.315 kg with control box); 3.45 kg stays as it was.
+    // Discontinued; the manufacturer names STORM 400x as successor.
+    id: 'aputure-ls-300x-ii', name: 'LS 300x', manufacturer: 'Aputure', category: 'led-panel',
+    datasheetUrl: 'https://aputure.com/en-US/products/ls-300x',
     wattage: 350, lumens: 18000, beamAngle: 55, fieldAngle: 80,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'reflector',
-    colorTemp: 0, colorTempRange: [2700, 6500], cri: 96, tlci: 97,
+    colorTemp: 0, colorTempRange: [2700, 6500], cri: 96, tlci: 96,
     weight: 3.45, mountType: 'bowens',
-    photometric: { lux: 8050, distance: 1, beamAngle: 55, colorTemp: 5600 },
-    powerConnector: 'Neutrik TRUE1', dmxChannels: 4,
+    photometric: { lux: 6300, distance: 1, beamAngle: 55, colorTemp: 5500 },
+    powerConnector: 'Neutrik powerCON', dmxChannels: 6,
     compatibleAttachments: [
       attachmentLibrary.find((a) => a.id === 'aputure-f10-fresnel')!,
       attachmentLibrary.find((a) => a.id === 'aputure-hyper-reflector')!,
@@ -670,12 +720,29 @@ export const fixtureLibrary: Fixture[] = [
     powerConnector: 'powerCON TRUE1', dmxChannels: 18,
   },
   {
-    id: 'elation-kl-panel-fc', name: 'KL Panel FC', manufacturer: 'Elation', category: 'led-panel',
-    wattage: 295, lumens: 24000, beamAngle: 64, fieldAngle: 90,
+    // Elation KL Panel data sheet (12/11/2025), DMX traits and photometric
+    // test report (read 2026-09-27): 295 W, 24,000 lm, with diffuser beam 101°
+    // / field 159.4°, 2000–10000 K, CRI 95, 13 kg with barn door; 5600 K with
+    // diffuser 7,921 cd peak, TLCI 88. Nine DMX modes; the old 16 was none of
+    // them. Power connector is "locking IP65", type not named — unchanged.
+    id: 'elation-kl-panel-fc', name: 'KL Panel', manufacturer: 'Elation', category: 'led-panel',
+    datasheetUrl: 'https://www.elationlighting.com/products/kl-panel',
+    wattage: 295, lumens: 24000, beamAngle: 101, fieldAngle: 159.4,
     beamShape: 'rectangular', beamRatioWH: 1, lensType: 'fixed',
-    colorTemp: 0, colorTempRange: [2000, 10000], cri: 95, tlci: 92, weight: 13.0, mountType: 'clamp',
-    photometric: { lux: 13000, distance: 1, beamAngle: 64, colorTemp: 5600 },
-    powerConnector: 'powerCON TRUE1', dmxChannels: 16,
+    colorTemp: 0, colorTempRange: [2000, 10000], cri: 95, tlci: 88, weight: 13.0, mountType: 'clamp',
+    photometric: { lux: 7921, distance: 1, beamAngle: 101, colorTemp: 5600 },
+    powerConnector: 'powerCON TRUE1', dmxChannels: 14,
+    dmxModes: [
+      { id: '1ch', name: '1-CH Dimmer', channels: 1, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+      { id: '4ch', name: '4-CH Dimmer Color', channels: 4, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+      { id: '7ch', name: '7-CH Dimmer Color FX', channels: 7, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+      { id: '6ch', name: '6-CH RGBWLC', channels: 6, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+      { id: '12ch', name: '12-CH RGBWLC 16-bit', channels: 12, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+      { id: '14ch', name: '14-CH Standard', channels: 14, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+      { id: '23ch', name: '23-CH Extended', channels: 23, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+      { id: '4ch-hsi', name: '4-CH HSI', channels: 4, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+      { id: '12ch-hsi', name: '12-CH HSI Extended', channels: 12, origin: 'manual', evidence: 'Elation KL Panel DMX traits' },
+    ],
   },
   {
     id: 'elation-kl-profile-fc', name: 'KL Profile FC', manufacturer: 'Elation', category: 'profile',
