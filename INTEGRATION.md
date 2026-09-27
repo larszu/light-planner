@@ -29,6 +29,27 @@ px `x/y/width/height`, `categoryProps`, `powerConsumptionWatts`, `weightKg`).
 `outputs: [DMX Thru]`, `category: 'Licht'` — drop straight into
 `projectStore.addEquipment(...)`.
 
+### Device-library token (`deviceLibraryToken`)
+
+The lighting planner signs in to the device library (devices.zumpelars.de)
+with a bearer token. Standalone it keeps the token in Electron `safeStorage`
+(desktop) or `localStorage` (web). Embedded, pass the host's keychain so the
+token does not land in the host page's `localStorage`:
+
+```ts
+// `bridge.secrets` stands for whatever keychain API the host has.
+createCablePlannerHost({
+  deviceLibraryToken: {
+    get: () => bridge.secrets.get('device-library-token'),   // { server, token } | null
+    set: (v) => bridge.secrets.set('device-library-token', v), // resolves true when stored
+    clear: () => bridge.secrets.delete('device-library-token'),
+  },
+});
+```
+
+`get` returns `{ server, token }` or `null`; a token for another server is
+discarded. The planner never logs it and never writes it into the document.
+
 ### Real bridge API (`src/integration/cablePlannerHost.ts`)
 `window.bridge.project.{ saveProject(project, path?), openProject(), saveProjectAs() }`
 and `window.bridge.fs.{ readFile, writeFile }`. The lighting document is embedded

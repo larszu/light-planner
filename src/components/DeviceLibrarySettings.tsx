@@ -11,7 +11,7 @@ import {
   forgotPasswordUrl,
   registerUrl,
 } from '../core/deviceLibraryClient';
-import { connectSrcAllows, normalizeServerUrl } from '../core/deviceLibrary';
+import { connectSrcAllows, isLibraryFixture, normalizeServerUrl, uploadStatus } from '../core/deviceLibrary';
 import { useDeviceLibrary } from '../store/deviceLibraryStore';
 import DeviceLibraryError from './DeviceLibraryError';
 import type { LibraryErrorCode } from '../core/deviceLibraryClient';
@@ -31,10 +31,6 @@ const DeviceLibrarySettings: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<LibraryErrorCode | null>(null);
 
-  const init = useDeviceLibrary((s) => s.init);
-  useEffect(() => {
-    void init();
-  }, [init]);
 
   const applyServer = async (raw: string) => {
     const r = normalizeServerUrl(raw);
@@ -74,6 +70,14 @@ const DeviceLibrarySettings: React.FC = () => {
 
   const openLink = (url: string) => window.open(url, '_blank', 'noopener');
   const { cache, lastSync } = lib;
+  const busySync = lib.syncing || lib.uploading;
+  const own = lib.localFixtures.filter((f) => !isLibraryFixture(f)).map((f) => uploadStatus(f, lib.uploads));
+  const ownSummary = {
+    n: own.length,
+    up: own.filter((s) => ['created', 'edit-proposed', 'pending-updated', 'approved', 'in-sync'].includes(s)).length,
+    missing: own.filter((s) => s === 'needs-source').length,
+    bad: own.filter((s) => s === 'blocked' || s === 'error').length,
+  };
   const when = cache.syncedAt ? new Date(cache.syncedAt).toLocaleString(language) : null;
 
   return (
@@ -122,6 +126,14 @@ const DeviceLibrarySettings: React.FC = () => {
             <p className="devlib-error" role="alert">{t('devlib.cacheNotSaved', 'The synced profiles could not be stored on this computer; they are gone after a restart.')}</p>
           )}
           {lib.syncError && <DeviceLibraryError code={lib.syncError} />}
+          {lib.uploadError && <DeviceLibraryError code={lib.uploadError} />}
+          <label className="devlib-toggle">
+            <input type="checkbox" checked={lib.autoUpload} onChange={(e) => lib.setAutoUpload(e.target.checked)} />
+            {t('devlib.autoUpload', 'Upload own fixtures automatically')}
+          </label>
+          <p className="settings-hint">
+            {format(t('devlib.ownState', 'Own fixtures in this project: {n} · in the library or awaiting moderation: {up} · without datasheet link: {missing} · rejected or failed: {bad}.'), ownSummary)}
+          </p>
           {cache.invalid.length > 0 && (
             <details className="devlib-invalid">
               <summary>{t('devlib.invalidList', 'Show entries that failed the check')}</summary>
@@ -133,10 +145,10 @@ const DeviceLibrarySettings: React.FC = () => {
             </details>
           )}
           <div className="settings-chips">
-            <button type="button" className="tb-chip" disabled={lib.syncing} onClick={() => void lib.syncNow()}>
-              {lib.syncing ? t('devlib.syncing', 'Syncing…') : t('devlib.sync', 'Sync now')}
+            <button type="button" className="tb-chip" disabled={busySync} onClick={() => void lib.syncAll()}>
+              {busySync ? t('devlib.syncing', 'Syncing…') : t('devlib.sync', 'Sync now')}
             </button>
-            <button type="button" className="tb-chip" disabled={lib.syncing} onClick={() => void lib.syncNow(true)}>
+            <button type="button" className="tb-chip" disabled={busySync} onClick={() => void lib.syncAll(true)}>
               {t('devlib.syncFull', 'Reload everything')}
             </button>
             <button type="button" className="tb-chip" onClick={() => void lib.signOut()}>

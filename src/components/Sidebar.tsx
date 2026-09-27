@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Icon from './Icon';
 import type { Fixture, FixtureCategory } from '../types';
 import { fixtureLibrary } from '../core/fixtureLibrary';
@@ -6,8 +6,9 @@ import FixtureEditor from './FixtureEditor';
 import { format, useTranslation, translate } from '../i18n';
 import { useDeviceLibrary } from '../store/deviceLibraryStore';
 import { deviceUrl } from '../core/deviceLibraryClient';
-import DeviceLibraryProposeDialog from './DeviceLibraryProposeDialog';
-import { libraryStatusText } from './deviceLibraryText';
+import DeviceLibraryUploadDialog from './DeviceLibraryUploadDialog';
+import { libraryStatusText, uploadStateText } from './deviceLibraryText';
+import { uploadStatus } from '../core/deviceLibrary';
 
 interface Props {
   customFixtures: Fixture[];
@@ -78,12 +79,10 @@ const Sidebar: React.FC<Props> = ({
   const [showEditor, setShowEditor] = useState(false);
   const [showPropose, setShowPropose] = useState(false);
   const [libOpen, setLibOpen] = useState(false);
-  const libInit = useDeviceLibrary((s) => s.init);
   const libEntries = useDeviceLibrary((s) => s.cache.entries);
   const libServer = useDeviceLibrary((s) => s.server);
-  useEffect(() => {
-    void libInit();
-  }, [libInit]);
+  const uploads = useDeviceLibrary((s) => s.uploads);
+  const ownIds = new Set(customFixtures.map((f) => f.id));
 
   const matches = (f: Fixture) =>
     !search ||
@@ -212,6 +211,9 @@ const Sidebar: React.FC<Props> = ({
                         : 'RGBW'}
                       · {f.weight}kg
                     </div>
+                    {ownIds.has(f.id) && (
+                      <div className="fixture-item-info">{uploadStateText(t, uploadStatus(f, uploads))}</div>
+                    )}
                     {f.compatibleAttachments && f.compatibleAttachments.length > 0 && (
                       <div className="fixture-item-info attachment-hint">
                         <Icon name="group" size={11} /> {f.compatibleAttachments.length}{' '}
@@ -232,12 +234,16 @@ const Sidebar: React.FC<Props> = ({
           {t('sidebar.addCustom', '+ Add custom fixture')}
         </button>
         <button className="add-fixture-btn devlib-propose-btn" onClick={() => setShowPropose(true)}>
-          {t('devlib.propose.button', 'Submit to device library…')}
+          {t('devlib.upload.button', 'Upload to device library…')}
         </button>
       </div>
 
       {showPropose && (
-        <DeviceLibraryProposeDialog fixtures={customFixtures} onClose={() => setShowPropose(false)} />
+        <DeviceLibraryUploadDialog
+          fixtures={customFixtures}
+          onSaveFixture={onAddCustomFixture}
+          onClose={() => setShowPropose(false)}
+        />
       )}
 
       {showEditor && (

@@ -1,0 +1,49 @@
+name: Katalog in die Geraetebibliothek
+
+# Eigentuemer-Vorgabe 2026-09-27: alle Daten aus allen Planern stehen auch auf
+# devices.zumpelars.de. Der eingebaute Leuchtenkatalog geht hier mit einem
+# API-Schluessel der Bibliothek hoch (Secret DEVICE_LIBRARY_KEY, dlk_…;
+# optional Variable DEVICE_LIBRARY_URL). Ohne Secret: Hinweis im
+# Lauf-Protokoll und Erfolg — ein Lauf, der fuer ein fehlendes Secret rot
+# bleibt, erzieht dazu, Rot zu ignorieren. Was ohne Datenblatt-Link nicht
+# hochgeht, steht in jedem Lauf in der Zusammenfassung.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/core/fixtureLibrary.ts'
+      - 'src/core/deviceLibrary.ts'
+      - 'src/core/deviceLibraryClient.ts'
+      - 'src/core/fixtureProfile.ts'
+      - 'scripts/library-publish.ts'
+      - '.github/workflows/library-publish.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: library-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Katalog hochladen
+        env:
+          DEVICE_LIBRARY_KEY: ${{ secrets.DEVICE_LIBRARY_KEY }}
+          DEVICE_LIBRARY_URL: ${{ vars.DEVICE_LIBRARY_URL }}
+        run: |
+          if [ -z "$DEVICE_LIBRARY_KEY" ]; then
+            echo "::notice::Secret DEVICE_LIBRARY_KEY ist nicht gesetzt — Katalog wird nur geprueft, nicht hochgeladen."
+          fi
+          npm run --silent library:publish | tee -a "$GITHUB_STEP_SUMMARY"
+          exit "${PIPESTATUS[0]}"

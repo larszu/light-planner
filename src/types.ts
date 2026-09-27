@@ -189,6 +189,13 @@ export interface Fixture {
    * auf die neue Zahl zu beziehen.
    */
   specSource?: Record<string, { value: string; source: string }>;
+  /**
+   * Link auf das Herstellerdatenblatt. Die Geraetebibliothek nimmt ohne ihn
+   * nichts an (ein Beleg, den niemand oeffnen kann, ist keiner) — deshalb
+   * steht er am Profil selbst und nicht erst im Upload-Dialog: sonst waere er
+   * beim naechsten automatischen Hochladen wieder weg.
+   */
+  datasheetUrl?: string;
 }
 
 /** Ein Beleg, dessen Wert nicht mehr zum Feld passt — der Nutzer hat es geaendert. */
