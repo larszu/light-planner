@@ -54,6 +54,41 @@ for (const f of fixtureLibrary) {
 }
 ok(`alle ${fixtureLibrary.length} Katalog-Eintraege bestehen die Profilpruefung`);
 
+// Datenblatt-Links im Katalog (2026-09-27 recherchiert, jeder Link abgerufen
+// und das Modell darauf gelesen). Die Bibliothek nimmt einen Link als Beleg;
+// ein Haendler- oder Spiegel-Link waere einer, der morgen auf ein anderes
+// Produkt zeigt. Deshalb: nur Domains des Herstellers.
+const HERSTELLER_DOMAINS: Record<string, string[]> = {
+  'ETC': ['etcconnect.com'],
+  'Robert Juliat': ['robertjuliat.com'],
+  'ARRI': ['arri.com'],
+  'Mole-Richardson': ['mole.com'],
+  'Philips / ColorKinetics': ['colorkinetics.com'],
+  'Robe': ['robe.cz'],
+  'Martin / Harman': ['martin.com'],
+  'Clay Paky': ['claypaky.it'],
+  'GLP': ['glp.de'],
+  'SGM': ['sgmlighting.com'],
+  'Ayrton': ['ayrton.eu'],
+  'Chauvet Professional': ['chauvetprofessional.com'],
+  'Astera': ['astera-led.com'],
+  'Elation': ['elationlighting.com'],
+  'ADJ': ['adj.com'],
+  'Cameo': ['cameolight.com'],
+  'Aputure': ['aputure.com'],
+};
+let belegt = 0;
+for (const f of fixtureLibrary) {
+  if (!f.datasheetUrl) continue;
+  belegt++;
+  assert.ok(isDatasheetLink(f.datasheetUrl) && f.datasheetUrl.startsWith('https://'), `${f.id}: kein https-Link`);
+  const host = new URL(f.datasheetUrl).hostname;
+  const erlaubt = HERSTELLER_DOMAINS[f.manufacturer] ?? [];
+  assert.ok(erlaubt.some((d) => host === d || host.endsWith(`.${d}`)), `${f.id}: ${host} ist keine Domain von ${f.manufacturer}`);
+}
+assert.ok(belegt >= 69, `nur ${belegt} Katalog-Profile mit Datenblatt-Link — ist ein Beleg verloren gegangen?`);
+ok(`${belegt} Katalog-Profile mit Datenblatt-Link, alle auf der Domain ihres Herstellers`);
+
 const MUSTER: Fixture = {
   id: 'custom-1727000000000',
   name: 'MegaPointe',
