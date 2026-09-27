@@ -315,6 +315,22 @@ assert.equal(planUpload([geaendert], log).items.length, 0, 'blocked mit gleichem
 log = applyUploadResults(log, planUpload([geaendert], log, true), [], jetzt);
 assert.equal(log.items['custom-1'].state, 'error', 'ein Eintrag ohne Ergebnis ist ein Fehler, kein Erfolg');
 assert.equal(planUpload([geaendert], log).items.length, 1, 'nach einem Fehler wird es erneut versucht');
+// Moderationsstand: unveraendert, aber `pending` geht beim automatischen
+// Lauf mit; sobald `approved` gemeldet ist, nicht mehr.
+{
+  let m = emptyUploadLog(S);
+  const p0 = planUpload([eigen], m);
+  m = applyUploadResults(m, p0, [{ localId: 'custom-1', state: 'created', moderation: 'pending', slug: 's' }], jetzt);
+  assert.equal(uploadStatus(eigen, m), 'awaiting');
+  const p1 = planUpload([eigen], m);
+  assert.equal(p1.items.length, 1, 'pending muss beim naechsten Lauf mitgehen, sonst erfaehrt der Planer die Freigabe nie');
+  m = applyUploadResults(m, p1, [{ localId: 'custom-1', state: 'in-sync', moderation: 'approved', slug: 's' }], jetzt);
+  assert.equal(uploadStatus(eigen, m), 'approved');
+  assert.equal(planUpload([eigen], m).items.length, 0, 'approved und unveraendert geht nicht erneut');
+  m = applyUploadResults(m, planUpload([eigen], m, true), [{ localId: 'custom-1', state: 'blocked', findings: [] }], jetzt);
+  assert.equal(uploadStatus(eigen, m), 'blocked', 'blocked darf nicht als live erscheinen');
+}
+ok('Moderation: pending geht erneut mit, approved nicht; Anzeige folgt dem Moderationsstand');
 assert.ok(readUploadLog(JSON.parse(JSON.stringify(log)), S));
 assert.equal(readUploadLog(JSON.parse(JSON.stringify(log)), 'https://andere.example'), null);
 ok('Hochladen: nur eigene Profile mit Datenblatt-Link, Fingerabdruck unabhaengig von der Feldreihenfolge, unveraendert/blocked nicht wiederholt, Fehler erneut, Protokoll je Server');

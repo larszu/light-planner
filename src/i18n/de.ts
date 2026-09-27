@@ -85,6 +85,7 @@ export const de: Record<string, string> = {
   'devlib.syncing': 'Gleiche ab …',
   'devlib.tokenVolatile': 'Auf diesem System gibt es keinen sicheren Speicher; die Anmeldung gilt deshalb nur, bis die App beendet wird.',
   'devlib.up.approved': 'Live in der Bibliothek',
+  'devlib.up.awaiting': 'In der Bibliothek, wartet auf Moderation',
   'devlib.up.blocked': 'Von den Prüfungen der Bibliothek abgelehnt',
   'devlib.up.changed': 'Seit dem letzten Hochladen geändert',
   'devlib.up.created': 'Hochgeladen — wartet auf Moderation',

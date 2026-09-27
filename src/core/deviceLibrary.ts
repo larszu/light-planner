@@ -280,6 +280,8 @@ export type LocalUploadState = UploadState | 'needs-source';
 export interface UploadRecord {
   hash: string;
   state: LocalUploadState;
+  /** Stand in der Moderation, wie der Server ihn meldet — auch bei `in-sync`. */
+  moderation?: 'pending' | 'approved';
   slug?: string;
   at: string;
   error?: string;
@@ -354,7 +356,11 @@ export function planUpload(fixtures: Fixture[], log: UploadLog, force = false): 
       continue;
     }
     const prev = log.items[f.id];
-    if (!force && prev && prev.hash === uploadHash(item) && ERLEDIGT.has(prev.state)) continue;
+    // Unveraendert, aber noch in der Moderation: mitschicken — der Server
+    // antwortet `in-sync` und sagt dabei, ob es inzwischen freigegeben ist.
+    // Anders erfuehre der Planer nie, dass aus „wartet" „live" geworden ist.
+    const wartet = prev?.moderation === 'pending';
+    if (!force && !wartet && prev && prev.hash === uploadHash(item) && ERLEDIGT.has(prev.state)) continue;
     items.push(item);
   }
   return { items, needsSource };
@@ -384,6 +390,7 @@ export function applyUploadResults(
           state: r.state,
           at,
           ...(r.slug ? { slug: r.slug } : items[item.localId]?.slug ? { slug: items[item.localId].slug } : {}),
+          ...(r.moderation ? { moderation: r.moderation } : {}),
           ...(r.error ? { error: r.error } : {}),
           ...(r.findings !== undefined ? { findings: befundText(r.findings) } : {}),
         }
@@ -393,10 +400,19 @@ export function applyUploadResults(
 }
 
 /** Wie ein Profil gerade dasteht — inklusive „seit dem letzten Hochladen geaendert". */
-export function uploadStatus(f: Fixture, log: UploadLog): LocalUploadState | 'changed' | 'new' {
+export type DisplayUploadState = LocalUploadState | 'changed' | 'new' | 'awaiting';
+
+export function uploadStatus(f: Fixture, log: UploadLog): DisplayUploadState {
   const item = fixtureToUploadItem(f);
   if (!item) return 'needs-source';
   const prev = log.items[f.id];
   if (!prev || prev.state === 'needs-source') return 'new';
-  return prev.hash === uploadHash(item) ? prev.state : 'changed';
+  if (prev.hash !== uploadHash(item)) return 'changed';
+  // Der Moderationsstand geht vor dem Upload-Ergebnis: ein `in-sync` kann
+  // „wartet noch" oder „ist live" heissen, und nur das zweite sieht jemand.
+  if (prev.state !== 'blocked' && prev.state !== 'error') {
+    if (prev.moderation === 'approved') return 'approved';
+    if (prev.moderation === 'pending') return 'awaiting';
+  }
+  return prev.state;
 }

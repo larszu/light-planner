@@ -1,5 +1,5 @@
 import type { LibraryErrorCode, SyncDevice } from '../core/deviceLibraryClient';
-import type { LocalUploadState } from '../core/deviceLibrary';
+import type { DisplayUploadState } from '../core/deviceLibrary';
 
 type T = (key: string, en: string) => string;
 
@@ -28,7 +28,7 @@ export const libraryStatusText = (t: T, status: SyncDevice['status']): string =>
 };
 
 /** Zustand eines eigenen Profils gegenueber der Bibliothek. */
-export const uploadStateText = (t: T, state: LocalUploadState | 'changed' | 'new'): string => {
+export const uploadStateText = (t: T, state: DisplayUploadState): string => {
   switch (state) {
     case 'created': return t('devlib.up.created', 'Uploaded — awaiting moderation');
     case 'edit-proposed': return t('devlib.up.editProposed', 'Uploaded as the next version — awaiting moderation');
@@ -40,5 +40,6 @@ export const uploadStateText = (t: T, state: LocalUploadState | 'changed' | 'new
     case 'needs-source': return t('devlib.up.needsSource', 'Needs a datasheet link before it can be uploaded');
     case 'changed': return t('devlib.up.changed', 'Changed since the last upload');
     case 'new': return t('devlib.up.new', 'Not uploaded yet');
+    case 'awaiting': return t('devlib.up.awaiting', 'In the library, awaiting moderation');
   }
 };

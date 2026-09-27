@@ -74,7 +74,7 @@ const DeviceLibrarySettings: React.FC = () => {
   const own = lib.localFixtures.filter((f) => !isLibraryFixture(f)).map((f) => uploadStatus(f, lib.uploads));
   const ownSummary = {
     n: own.length,
-    up: own.filter((s) => ['created', 'edit-proposed', 'pending-updated', 'approved', 'in-sync'].includes(s)).length,
+    up: own.filter((s) => ['created', 'edit-proposed', 'pending-updated', 'approved', 'in-sync', 'awaiting'].includes(s)).length,
     missing: own.filter((s) => s === 'needs-source').length,
     bad: own.filter((s) => s === 'blocked' || s === 'error').length,
   };
