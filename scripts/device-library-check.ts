@@ -54,6 +54,41 @@ for (const f of fixtureLibrary) {
 }
 ok(`alle ${fixtureLibrary.length} Katalog-Eintraege bestehen die Profilpruefung`);
 
+// Datenblatt-Links im Katalog (2026-09-27 recherchiert, jeder Link abgerufen
+// und das Modell darauf gelesen). Die Bibliothek nimmt einen Link als Beleg;
+// ein Haendler- oder Spiegel-Link waere einer, der morgen auf ein anderes
+// Produkt zeigt. Deshalb: nur Domains des Herstellers.
+const HERSTELLER_DOMAINS: Record<string, string[]> = {
+  'ETC': ['etcconnect.com'],
+  'Robert Juliat': ['robertjuliat.com'],
+  'ARRI': ['arri.com'],
+  'Mole-Richardson': ['mole.com'],
+  'Philips / ColorKinetics': ['colorkinetics.com'],
+  'Robe': ['robe.cz'],
+  'Martin / Harman': ['martin.com'],
+  'Clay Paky': ['claypaky.it'],
+  'GLP': ['glp.de'],
+  'SGM': ['sgmlighting.com'],
+  'Ayrton': ['ayrton.eu'],
+  'Chauvet Professional': ['chauvetprofessional.com'],
+  'Astera': ['astera-led.com'],
+  'Elation': ['elationlighting.com'],
+  'ADJ': ['adj.com'],
+  'Cameo': ['cameolight.com'],
+  'Aputure': ['aputure.com'],
+};
+let belegt = 0;
+for (const f of fixtureLibrary) {
+  if (!f.datasheetUrl) continue;
+  belegt++;
+  assert.ok(isDatasheetLink(f.datasheetUrl) && f.datasheetUrl.startsWith('https://'), `${f.id}: kein https-Link`);
+  const host = new URL(f.datasheetUrl).hostname;
+  const erlaubt = HERSTELLER_DOMAINS[f.manufacturer] ?? [];
+  assert.ok(erlaubt.some((d) => host === d || host.endsWith(`.${d}`)), `${f.id}: ${host} ist keine Domain von ${f.manufacturer}`);
+}
+assert.ok(belegt >= 69, `nur ${belegt} Katalog-Profile mit Datenblatt-Link — ist ein Beleg verloren gegangen?`);
+ok(`${belegt} Katalog-Profile mit Datenblatt-Link, alle auf der Domain ihres Herstellers`);
+
 const MUSTER: Fixture = {
   id: 'custom-1727000000000',
   name: 'MegaPointe',
@@ -280,6 +315,22 @@ assert.equal(planUpload([geaendert], log).items.length, 0, 'blocked mit gleichem
 log = applyUploadResults(log, planUpload([geaendert], log, true), [], jetzt);
 assert.equal(log.items['custom-1'].state, 'error', 'ein Eintrag ohne Ergebnis ist ein Fehler, kein Erfolg');
 assert.equal(planUpload([geaendert], log).items.length, 1, 'nach einem Fehler wird es erneut versucht');
+// Moderationsstand: unveraendert, aber `pending` geht beim automatischen
+// Lauf mit; sobald `approved` gemeldet ist, nicht mehr.
+{
+  let m = emptyUploadLog(S);
+  const p0 = planUpload([eigen], m);
+  m = applyUploadResults(m, p0, [{ localId: 'custom-1', state: 'created', moderation: 'pending', slug: 's' }], jetzt);
+  assert.equal(uploadStatus(eigen, m), 'awaiting');
+  const p1 = planUpload([eigen], m);
+  assert.equal(p1.items.length, 1, 'pending muss beim naechsten Lauf mitgehen, sonst erfaehrt der Planer die Freigabe nie');
+  m = applyUploadResults(m, p1, [{ localId: 'custom-1', state: 'in-sync', moderation: 'approved', slug: 's' }], jetzt);
+  assert.equal(uploadStatus(eigen, m), 'approved');
+  assert.equal(planUpload([eigen], m).items.length, 0, 'approved und unveraendert geht nicht erneut');
+  m = applyUploadResults(m, planUpload([eigen], m, true), [{ localId: 'custom-1', state: 'blocked', findings: [] }], jetzt);
+  assert.equal(uploadStatus(eigen, m), 'blocked', 'blocked darf nicht als live erscheinen');
+}
+ok('Moderation: pending geht erneut mit, approved nicht; Anzeige folgt dem Moderationsstand');
 assert.ok(readUploadLog(JSON.parse(JSON.stringify(log)), S));
 assert.equal(readUploadLog(JSON.parse(JSON.stringify(log)), 'https://andere.example'), null);
 ok('Hochladen: nur eigene Profile mit Datenblatt-Link, Fingerabdruck unabhaengig von der Feldreihenfolge, unveraendert/blocked nicht wiederholt, Fehler erneut, Protokoll je Server');
