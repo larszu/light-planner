@@ -3,6 +3,14 @@
 This document describes how the lighting planner is structured for embedding in
 a host app (Cable-Planner) and exactly what is done vs. what remains.
 
+> **The merge into cable-planner is not the path.** Since ADR-006 (av-planner-suite,
+> 2026-09-07) the planners stay separate repos, and the suite shell embeds this app
+> as an **iframe module** with its own store, CSS and IPC bridge; theme, language and
+> settings arrive over the `@avplan/ui/embed` postMessage bus. The seams below
+> (core, `HostAdapter`, `projectStore`, `fixturesToEquipment`, `deviceLibraryToken`)
+> still hold and are what a host uses. The cable-planner merge steps at the end are
+> kept as analysis, not as work to do.
+
 ## Verified against cable-planner (larszu/cable-planner @ v8.0.10)
 
 Checked against the real source, not the diagram:
@@ -14,7 +22,8 @@ Checked against the real source, not the diagram:
 - **React `^19`** — light-planner is now bumped to React 19 to match (runs clean).
 - **Canvas** is `reactflow ^11` (schematic) — keep the spatial `PlanCanvas`/`Scene3D`
   as a separate view, don't force it into ReactFlow.
-- **i18n**: same `t(key, 'Deutsche Form')` model, `Language = 'de'|'en'` in the
+- **i18n**: same `t(key, 'English fallback')` model (English is the source language
+  of every suite repo since E-28, checked by `lang:check`), `Language = 'de'|'en'` in the
   uiStore. NB cable-planner defaults to `language: 'en'`; point the planner's
   `useTranslation` at the host uiStore on mount (the `t` signature is identical).
 - Cable-planner is **already lighting-aware**: `ProjectMetadata.defaultLightingControl:
@@ -72,7 +81,7 @@ src/store/        zustand
                   uiStore.ts        view/display settings + language
                   projectStore.ts   live LightingDocument (host-subscribable)
                   lightingDocument.ts  LightingDocument type + serialize/parse
-src/i18n/         t('key','Deutsch') (German = source) + useTranslation()
+src/i18n/         t('key','English') (English = source, de.ts translates) + useTranslation()
 ```
 
 The lighting **core** has no platform dependencies. Everything platform-bound
@@ -113,17 +122,20 @@ a **projectStore** a host can read/subscribe to.
 | 1. UI-free core (`src/core`) | ✅ |
 | 2. Fixture↔Equipment mapping + HostAdapter seam | ✅ |
 | 3. zustand uiStore (view) + projectStore (live doc) + serializer | ✅ |
-| 4. i18n scaffold (`t(key,'Deutsch')`, de/en, language toggle) | ✅ chrome wrapped |
+| 4. i18n (`t(key,'English')`, de/en, language toggle) | ✅ whole UI — `i18n:check`, `lang:check` |
 
-## Remaining mechanical steps (no architectural risk)
+## Cable-planner merge steps (not pursued, see ADR-006)
+
+Written for the merge into cable-planner. The iframe embedding in the suite needs
+none of them: the planner keeps its own store, bundle and `three`, so there is
+nothing to dedupe, move or hand to a host dispatcher. They would only matter if a
+host ever mounted the planner's components directly.
 
 - **projectStore as single source of truth.** Today `App.tsx` still owns the
   document via `useState` and *publishes* it to `projectStore`. Moving the
   ~50 editor mutations into store actions/slices (and undo/redo into a
   transactional `projectHistory`) makes the store authoritative — the host then
   edits through it. The `LightingDocument` shape already defines the slice.
-- **Finish i18n wrapping.** Wrap the remaining strings (PropertyPanel, dialogs,
-  panels) with `t('key','Deutsch')` and add English keys to `src/i18n`.
 - **Three.js dedupe.** Pin one `three` version shared with Cable-Planner's
   react-three-fiber (avoid two `three` instances). `Scene3D` can stay raw three
   or be ported to r3f later. Bundle `public/models/person.glb` + the pdf worker
