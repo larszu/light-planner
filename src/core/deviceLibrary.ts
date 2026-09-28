@@ -33,7 +33,10 @@
 //      Rundlauf ist geprueft.
 // ───────────────────────────────────────────────────────────────────────────
 import type { Fixture } from '../types';
-import type { LibraryPlanner, ProposalCore, SyncDevice, SyncResponse, UploadItem, UploadResult, UploadState } from './deviceLibraryClient';
+import { LibraryError } from './deviceLibraryClient';
+import type {
+  LibraryErrorCode, LibraryPlanner, ProposalCore, SyncDevice, SyncResponse, SyncResult, UploadItem, UploadResult, UploadState,
+} from './deviceLibraryClient';
 import { validateFixtureProfile } from './fixtureProfile';
 
 export const PLANNER: LibraryPlanner = 'light';
@@ -102,10 +105,10 @@ export interface InvalidEntry {
 }
 
 /**
- * Der lokale Bestand. Er gehoert zu EINEM Server: wechselt die Adresse,
- * beginnt er leer (`emptyCache`) — Eintraege zweier Bibliotheken mit
+ * Der lokale Bestand EINES Servers. Eintraege zweier Bibliotheken mit
  * derselben Folgenummer zu mischen hiesse, beim naechsten Abgleich die
- * Haelfte zu ueberspringen.
+ * Haelfte zu ueberspringen — deshalb hat jeder Server seinen eigenen Platz in
+ * der `CacheAblage` (siehe dort).
  */
 export interface LibraryCache {
   format: 'light-planner-device-library-cache';
@@ -138,6 +141,67 @@ export function readCache(raw: unknown, server: string): LibraryCache | null {
   const entries = c.entries.filter((e) => e && typeof e.slug === 'string' && validateFixtureProfile(e.fixture).ok);
   return { ...(c as LibraryCache), entries };
 }
+
+/**
+ * Die Bestaende ALLER Server, unter einem Schluessel.
+ *
+ * Frueher lag hier genau ein Bestand, und eine andere Adresse hiess: leer
+ * anfangen und den alten Bestand ueberschreiben. Wer auf einen Ersatzserver
+ * umstellte, weil devices.zumpelars.de gerade nicht lief, und zurueckwechselte,
+ * hatte danach eine leere Bibliothek. Jetzt hat jeder Server seinen Platz
+ * (Vertrag Punkt 2 in `syncFrom`, `deviceLibraryClient.ts`). Ein alter
+ * Einzelbestand wird beim Lesen als Platz seines Servers verstanden — keine
+ * Migration, die etwas verlieren koennte.
+ */
+export interface CacheAblage {
+  format: 'light-planner-device-library-caches';
+  version: 1;
+  byServer: Record<string, LibraryCache>;
+}
+
+export const leereAblage = (): CacheAblage => ({ format: 'light-planner-device-library-caches', version: 1, byServer: {} });
+
+/** Gelesene Ablage; kaputte Plaetze fallen weg, der Rest bleibt. */
+export function readCacheAblage(raw: unknown): CacheAblage {
+  if (!raw || typeof raw !== 'object') return leereAblage();
+  const alt = raw as Partial<LibraryCache>;
+  if (alt.format === 'light-planner-device-library-cache' && typeof alt.server === 'string') {
+    const c = readCache(raw, alt.server);
+    return c ? { ...leereAblage(), byServer: { [c.server]: c } } : leereAblage();
+  }
+  const a = raw as Partial<CacheAblage>;
+  if (a.format !== 'light-planner-device-library-caches' || a.version !== 1 || !a.byServer || typeof a.byServer !== 'object') {
+    return leereAblage();
+  }
+  const byServer: Record<string, LibraryCache> = {};
+  for (const [server, c] of Object.entries(a.byServer)) {
+    const gelesen = readCache(c, server);
+    if (gelesen) byServer[server] = gelesen;
+  }
+  return { ...leereAblage(), byServer };
+}
+
+/** Der Bestand fuer DIESEN Server — leer, wenn er noch keinen hat. */
+export const cacheFor = (ablage: CacheAblage, server: string): LibraryCache => ablage.byServer[server] ?? emptyCache(server);
+
+/** Legt einen Bestand auf seinen Platz; die Plaetze der anderen Server bleiben unberuehrt. */
+export const withCache = (ablage: CacheAblage, cache: LibraryCache): CacheAblage => ({
+  ...ablage,
+  byServer: { ...ablage.byServer, [cache.server]: cache },
+});
+
+/**
+ * Fehler, wie die Oberflaeche sie unterscheidet: die Codes des Clients, dazu
+ * `server-empty` — ein neu aufgesetzter Server ohne Geraete. Der Client meldet
+ * ihn als `server` mit dieser Nachricht; fuer den Nutzer ist es aber eine
+ * andere Lage (der eigene Bestand ist unberuehrt), also ein eigener Text.
+ */
+export type LibraryErrorKind = LibraryErrorCode | 'server-empty';
+
+export const errorKind = (e: unknown): LibraryErrorKind => {
+  if (!(e instanceof LibraryError)) return 'server';
+  return e.code === 'server' && e.message === 'server-empty' ? 'server-empty' : e.code;
+};
 
 export interface SyncOutcome {
   cache: LibraryCache;
@@ -209,6 +273,23 @@ export function applySync(cache: LibraryCache, res: SyncResponse, after: number,
     removed,
     invalid: invalid.size,
   };
+}
+
+/**
+ * Schreibt das Ergebnis von `syncFrom` fort: `reset` ersetzt den Bestand,
+ * sonst ist die Antwort ein Delta ab `after`.
+ *
+ * Auch der ausdrueckliche Vollabgleich (`after === 0`, „Alles neu laden")
+ * ersetzt den Bestand. Kommt dabei KEIN Geraet zurueck, obwohl lokal welche
+ * liegen, gilt dieselbe Regel wie in `syncFrom`: das ist ein leerer Server,
+ * kein neuer Stand — Fehler, der Bestand bleibt.
+ */
+export function applySyncResult(cache: LibraryCache, result: SyncResult, after: number, now: Date): SyncOutcome {
+  const ersetzt = result.reset || after === 0;
+  if (ersetzt && cache.entries.length > 0 && !result.response.devices.some((d) => !d.removed)) {
+    throw new LibraryError('server', 200, 'server-empty');
+  }
+  return applySync(cache, result.response, ersetzt ? 0 : after, now);
 }
 
 // ─── Die Server-Adresse ────────────────────────────────────────────────────

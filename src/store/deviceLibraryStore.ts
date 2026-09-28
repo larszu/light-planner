@@ -6,7 +6,11 @@
 //     (Einstellungen, keine Geheimnisse)
 //   · der Bestand (Cache) — localStorage, getrennt vom Projekt: eine Leuchte
 //     aus der Bibliothek gelangt erst ins Projekt, wenn sie gesetzt wird, und
-//     dann als Kopie (wie jede andere auch), damit der Plan offline lesbar bleibt
+//     dann als Kopie (wie jede andere auch), damit der Plan offline lesbar bleibt.
+//     Ein Platz je Server-Adresse (`CacheAblage`); geaendert wird er NUR durch
+//     eine erfolgreiche Antwort — offline, Zeitueberschreitung, Serverfehler,
+//     abgelaufene Anmeldung, Abmelden und Adresswechsel lassen ihn stehen
+//     (Vertrag in `syncFrom`, `deviceLibraryClient.ts`).
 //   · das Upload-Protokoll (Fingerabdruck + Zustand je eigenem Profil) —
 //     localStorage, je Server
 //   · das Token — beim Host, wenn er einen Schluesselbund durchreicht
@@ -20,27 +24,29 @@
 import { create } from 'zustand';
 import {
   DEFAULT_DEVICE_LIBRARY_URL,
-  LibraryError,
   currentUser,
   signIn as signInRemote,
   signOut as signOutRemote,
-  sync as syncRemote,
+  syncFrom,
   upload as uploadRemote,
   verifySecondFactor,
-  type LibraryErrorCode,
   type LibraryUser,
   type SignInResult,
 } from '../core/deviceLibraryClient';
 import {
   PLANNER,
-  applySync,
+  applySyncResult,
   applyUploadResults,
-  emptyCache,
+  cacheFor,
   emptyUploadLog,
+  errorKind,
+  leereAblage,
   planUpload,
-  readCache,
+  readCacheAblage,
   readUploadLog,
+  withCache,
   type LibraryCache,
+  type LibraryErrorKind,
   type SyncOutcome,
   type UploadLog,
 } from '../core/deviceLibrary';
@@ -130,6 +136,11 @@ const schreib = (key: string, value: unknown): boolean => {
   }
 };
 
+/** Liest die Ablage frisch und legt `cache` auf seinen Platz — die Plaetze
+ *  der anderen Server bleiben, wie sie sind. */
+const schreibCache = (cache: LibraryCache): boolean =>
+  schreib(CACHE_KEY, withCache(lies(CACHE_KEY, readCacheAblage, leereAblage()), cache));
+
 const readServer = (): string => {
   try {
     return localStorage.getItem(SERVER_KEY) || DEFAULT_DEVICE_LIBRARY_URL;
@@ -159,14 +170,14 @@ interface DeviceLibraryState {
   cacheSaved: boolean;
   syncing: boolean;
   lastSync: SyncOutcome | null;
-  syncError: LibraryErrorCode | null;
+  syncError: LibraryErrorKind | null;
 
   autoUpload: boolean;
   /** Die eigenen Profile des offenen Projekts — der Planer meldet sie hierher. */
   localFixtures: Fixture[];
   uploads: UploadLog;
   uploading: boolean;
-  uploadError: LibraryErrorCode | null;
+  uploadError: LibraryErrorKind | null;
 
   init: (hostVault?: DeviceLibraryTokenVault) => Promise<void>;
   setServer: (url: string) => Promise<void>;
@@ -192,8 +203,8 @@ export const useDeviceLibrary = create<DeviceLibraryState>((set, get) => {
     set({ session: 'signed-out', user: null, tokenVolatile: false });
   };
 
-  const handleError = async (e: unknown): Promise<LibraryErrorCode> => {
-    const code: LibraryErrorCode = e instanceof LibraryError ? e.code : 'server';
+  const handleError = async (e: unknown): Promise<LibraryErrorKind> => {
+    const code = errorKind(e);
     if (code === 'not-signed-in' || code === 'wrong-credentials') await forgetSession();
     return code;
   };
@@ -217,7 +228,7 @@ export const useDeviceLibrary = create<DeviceLibraryState>((set, get) => {
     session: 'unknown',
     user: null,
     tokenVolatile: false,
-    cache: lies(CACHE_KEY, (raw) => readCache(raw, server), emptyCache(server)),
+    cache: cacheFor(lies(CACHE_KEY, readCacheAblage, leereAblage()), server),
     cacheSaved: true,
     syncing: false,
     lastSync: null,
@@ -265,11 +276,14 @@ export const useDeviceLibrary = create<DeviceLibraryState>((set, get) => {
       } catch {
         // Die Adresse gilt dann bis zum Neuladen.
       }
-      const cache = emptyCache(url);
+      // Der Bestand des alten Servers bleibt auf seinem Platz; wer
+      // zurueckwechselt, hat ihn wieder. Der neue Server bringt seinen
+      // eigenen mit, sofern er schon einmal abgeglichen wurde.
+      const cache = cacheFor(lies(CACHE_KEY, readCacheAblage, leereAblage()), url);
       const uploads = emptyUploadLog(url);
       set({
         server: url, cache, uploads, lastSync: null, syncError: null, uploadError: null,
-        cacheSaved: schreib(CACHE_KEY, cache) && schreib(UPLOADS_KEY, uploads),
+        cacheSaved: schreib(UPLOADS_KEY, uploads),
       });
     },
 
@@ -287,11 +301,14 @@ export const useDeviceLibrary = create<DeviceLibraryState>((set, get) => {
       const after = full ? 0 : cache.latestSeq;
       set({ syncing: true, syncError: null });
       try {
-        const res = await syncRemote(server, token, PLANNER, after);
+        // Ob der Server noch derselbe ist (kleinerer `latestSeq`), entscheidet
+        // `syncFrom` — dieselbe Regel in jedem Planner. Scheitert irgendetwas,
+        // bleibt der Bestand unberuehrt: geschrieben wird erst unten.
+        const res = await syncFrom(server, token, PLANNER, after);
         // Adresse waehrend des Laufs gewechselt: die Antwort gehoert nicht mehr hierher.
         if (get().server !== server) return;
-        const out = applySync(get().cache, res, after, new Date());
-        set({ cache: out.cache, cacheSaved: schreib(CACHE_KEY, out.cache), lastSync: out });
+        const out = applySyncResult(get().cache, res, after, new Date());
+        set({ cache: out.cache, cacheSaved: schreibCache(out.cache), lastSync: out });
       } catch (e) {
         set({ syncError: await handleError(e) });
       } finally {

@@ -2,11 +2,11 @@
 // der Weg gleich daneben: annehmen kann man sie nur auf der Website.
 import React from 'react';
 import { useTranslation } from '../i18n';
-import type { LibraryErrorCode } from '../core/deviceLibraryClient';
+import type { LibraryErrorKind } from '../core/deviceLibrary';
 import { useDeviceLibrary } from '../store/deviceLibraryStore';
 import { libraryErrorText } from './deviceLibraryText';
 
-const DeviceLibraryError: React.FC<{ code: LibraryErrorCode }> = ({ code }) => {
+const DeviceLibraryError: React.FC<{ code: LibraryErrorKind }> = ({ code }) => {
   const { t } = useTranslation();
   const server = useDeviceLibrary((s) => s.server);
   return (
