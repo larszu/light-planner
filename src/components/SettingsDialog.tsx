@@ -31,7 +31,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from '../i18n';
-import { APP_VERSION } from '../version';
+import { APP_NAME, APP_VERSION } from '../version';
 import { liesThema, setzeThema, type Thema } from '../lib/thema';
 import DeviceLibrarySettings from './DeviceLibrarySettings';
 
@@ -121,7 +121,7 @@ const SettingsDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <DeviceLibrarySettings />
 
         <h4 className="settings-h">{t('settings.about', 'About')}</h4>
-        <p className="settings-hint">LightPlanner v{APP_VERSION}</p>
+        <p className="settings-hint">{APP_NAME} v{APP_VERSION}</p>
 
         <div className="settings-foot">
           <button type="button" className="tb-btn" onClick={onClose}>

@@ -1,4 +1,6 @@
-<h1 align="center">💡 LightPlanner</h1>
+<p align="center"><img src="build/icon.svg" width="96" alt="" /></p>
+
+<h1 align="center">LZ Light Planner</h1>
 
 <p align="center">
   A quick lighting sketch — without paper
@@ -14,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="LightPlanner – 2D-Plan mit Leuchten-Bibliothek und Eigenschaften-Panel" />
+  <img src="docs/screenshot.png" alt="LZ Light Planner – 2D-Plan mit Leuchten-Bibliothek und Eigenschaften-Panel" />
 </p>
 
 ---
@@ -36,7 +38,7 @@ Measured 2026-09-09: **published** — the `deploy` job ran and succeeded.
 ---
 ## ✨ What it is
 
-**LightPlanner** is a small desktop app for quickly sketching out a lighting setup.
+**LZ Light Planner** is a small desktop app for quickly sketching out a lighting setup.
 The kind of plan you'd otherwise scribble on the back of a call sheet — just on a 2D canvas with a little 3D preview on top.
 
 It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach for when you just want to think through where the lights go before you start rigging.
@@ -174,6 +176,19 @@ register it in `src/i18n/index.ts`, done. `npm run lang:check` measures the
 fallbacks, fails on any line in the other language, and separately counts
 visible text that was never wrapped at all. The machine-readable copy of this
 declaration sits in `package.json` under `avplan.sourceLanguage`.
+
+**App icon and logo.** `build/icon.svg` (1024, navy square with pictogram and
+signet) and `public/favicon.svg` (pictogram only, for sizes below 48 px) are the
+masters; `npm i --no-save sharp png-to-ico && node scripts/make-icon.mjs`
+rasterises every PNG and `build/icon.ico` from them. The company logo files
+under `public/brand/` are the outlines from the Brand Kit 2.0 — never retyped.
+The header shows the signet without its tally dot, because the Save button
+already carries the one red of that view.
+
+**Data folder.** Release files are named `LZ-Light-Planner-*`. The packaged
+app stores projects, stock and settings in the folder `Light Planner` under the
+system's app-data directory; `electron/main.cjs` pins it independently of the
+product name.
 
 ---
 

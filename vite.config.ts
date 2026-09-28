@@ -18,6 +18,6 @@ export default defineConfig({
   // Genau das stille Weiterruecken ist der Defekt; ein Startfehler mit
   // Portnummer ist die bessere Meldung.
   server: { port: 4183, strictPort: true },
-  // Single source of truth for the app version (shown in "Über Light Planner").
+  // Single source of truth for the app version (shown in "Über LZ Light Planner").
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
 });

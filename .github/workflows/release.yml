@@ -63,7 +63,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # No paid signing certificate available. The macOS config requests an
           # ad-hoc signature ("identity": "-") so Apple Silicon Gatekeeper
-          # accepts the binary instead of rejecting it with "Light Planner is
+          # accepts the binary instead of rejecting it with "LZ Light Planner is
           # damaged and can't be opened". We deliberately do NOT set
           # CSC_IDENTITY_AUTO_DISCOVERY=false here: in electron-builder 26 that
           # flag short-circuits the explicit ad-hoc identity and falls back to a
@@ -96,7 +96,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: Light Planner ${{ github.event.inputs.tag || github.ref_name }}
+          name: LZ Light Planner ${{ github.event.inputs.tag || github.ref_name }}
           draft: false
           prerelease: false
           generate_release_notes: true

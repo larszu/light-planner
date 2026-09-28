@@ -147,7 +147,7 @@ export function buildMenus(p: MenuBarProps, t: Uebersetzen): MenuGroup[] {
       { label: t('menu.focusNotes', 'Focus notes (plan)'), checked: p.showFocusNotes, onClick: p.onToggleFocusNotes },
     ] },
     { id: 'help', label: t('menu.help', 'Help'), items: [
-      { label: t('menu.about', 'About Light Planner…'), onClick: p.onAbout },
+      { label: t('menu.about', 'About LZ Light Planner…'), onClick: p.onAbout },
       { label: '', separator: true },
       // Die Sprache steht im Einstellungen-Dialog. Der Eintrag hier fuehrt
       // dorthin, statt sie ein zweites Mal umzuschalten.

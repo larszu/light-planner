@@ -4,6 +4,12 @@ const dgram = require('dgram');
 const os = require('os');
 const fs = require('fs');
 
+// Electron leitet userData aus dem productName ab. Seit der Umbenennung in
+// „LZ Light Planner" laege das Token der Geraetebibliothek und der
+// localStorage des Renderers (Projekte, Lager, Einstellungen) sonst in einem
+// leeren Ordner. Nur im Paket: `electron .` nutzt den npm-Namen.
+if (app.isPackaged) app.setPath('userData', path.join(app.getPath('appData'), 'Light Planner'));
+
 let mainWindow;
 
 // ── Token der Geraetebibliothek ────────────────────────────────────────────
@@ -157,7 +163,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'Light Planner',
+    title: 'LZ Light Planner',
     icon: windowIcon(),
     webPreferences: {
       nodeIntegration: false,

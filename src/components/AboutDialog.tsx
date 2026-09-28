@@ -4,15 +4,19 @@ import { useTranslation, format } from '../i18n';
 
 interface Props { onClose: () => void }
 
-// "Über Light Planner" – app name, current version and a short summary.
+// "Über LZ Light Planner" – app name, current version and a short summary.
 const AboutDialog: React.FC<Props> = ({ onClose }) => {
   const { t } = useTranslation();
   return (
   <div className="modal-backdrop" onClick={onClose}>
     <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
-      <img className="about-logo" src={`${import.meta.env.BASE_URL}logo.svg`} alt="" width={76} height={76} />
+      <div className="about-logo" role="img" aria-label="Lars Zumpe Medienproduktion">
+        <img className="lzm-auf-dunkel" src={`${import.meta.env.BASE_URL}brand/lzm_hauptlogo_offwhite.svg`} alt="" />
+        <img className="lzm-auf-hell" src={`${import.meta.env.BASE_URL}brand/lzm_hauptlogo_navy.svg`} alt="" />
+      </div>
       <h2 className="about-name">{APP_NAME}</h2>
       <div className="about-version">{t('about.version', 'Version')} {APP_VERSION}</div>
+      <div className="about-company">Lars Zumpe Medienproduktion</div>
       <p className="about-desc">
         {t(
           'about.description',
