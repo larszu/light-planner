@@ -1470,7 +1470,9 @@ const App: React.FC = () => {
     try {
       const raw = JSON.parse(res.text);
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Keine gültige Projektdatei.');
-      if ('__proto__' in raw || 'constructor' in raw) throw new Error('Ungültige Projektdatei (unerlaubte Schlüssel).');
+      // Nur EIGENE Schluessel: `'constructor' in raw` ist fuer jedes Objekt
+      // wahr (Prototypkette) — damit scheiterte jede Projektdatei.
+      if (Object.prototype.hasOwnProperty.call(raw, '__proto__') || Object.prototype.hasOwnProperty.call(raw, 'constructor')) throw new Error('Ungültige Projektdatei (unerlaubte Schlüssel).');
       if (!Array.isArray(raw.fixtures)) throw new Error('Keine gültige Projektdatei (fixtures fehlen).');
       if (!raw.meta || typeof raw.meta.name !== 'string') throw new Error('Keine gültige Projektdatei (meta fehlt).');
       const data = raw as ProjectData;
