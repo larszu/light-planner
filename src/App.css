@@ -3565,3 +3565,8 @@ summary,
   :root:not([data-theme='dark']) .lzm-auf-dunkel { display: none; }
   :root:not([data-theme='dark']) .lzm-auf-hell { display: block; }
 }
+
+/* Unter 640 px schiebt das Signet die Menues aus dem Bild (mobil:check in cable-planner). */
+@media (max-width: 639px) {
+  .brand-logo { display: none !important; }
+}
