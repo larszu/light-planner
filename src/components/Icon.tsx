@@ -5,7 +5,7 @@ import React from 'react';
 export type IconName =
   | 'select' | 'pan' | 'marquee' | 'rect' | 'line' | 'measure' | 'person' | 'podium' | 'stage'
   | 'truss' | 'wall' | 'camera' | 'fixture' | 'plan2d' | 'cube3d' | 'photo' | 'grid'
-  | 'heatmap' | 'settings' | 'import' | 'schedule' | 'export' | 'save' | 'open'
+  | 'heatmap' | 'settings' | 'sliders' | 'import' | 'schedule' | 'export' | 'save' | 'open'
   | 'undo' | 'redo' | 'search' | 'chevronRight' | 'chevronLeft' | 'chevronDown' | 'eye' | 'eyeOff'
   | 'lock' | 'unlock' | 'plus' | 'minus' | 'snap' | 'ruler' | 'tag' | 'menu' | 'beam'
   | 'scene' | 'layers' | 'library' | 'lamp' | 'autolight' | 'distribute' | 'align'
@@ -34,7 +34,11 @@ const P: Record<IconName, React.ReactNode> = {
   grid: <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />,
   ceiling: <path d="M3 6h18M7 6v5M12 6v8M17 6v5" />,
   heatmap: <path d="M12 3c3 4 5 6 5 9a5 5 0 0 1-10 0c0-3 2-5 5-9Z" />,
-  settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L15 3.5H9l-.4 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4L2.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1L9 20.5h6l.4-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4Z" /></>,
+  // Acht Zaehne, aus Winkeln berechnet und punktsymmetrisch um (12,12). Die
+  // alte Form setzte die Zaehne relativ (`l2 1.5`) und lief schief ueber den
+  // Rand der Zeichenflaeche — das Zahnrad sah zerbrochen aus.
+  settings: <><circle cx="12" cy="12" r="3" /><path d="M10.23 4.61 10.67 2.09h2.66l.44 2.52 2.2.91 2.1-1.47 1.88 1.88-1.47 2.1.91 2.2 2.52.44v2.66l-2.52.44-.91 2.2 1.47 2.1-1.88 1.88-2.1-1.47-2.2.91-.44 2.52h-2.66l-.44-2.52-2.2-.91-2.1 1.47-1.88-1.88 1.47-2.1-.91-2.2-2.52-.44v-2.66l2.52-.44.91-2.2-1.47-2.1 1.88-1.88 2.1 1.47Z" /></>,
+  sliders: <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4" />,
   import: <path d="M12 3v10m0 0 3.5-3.5M12 13 8.5 9.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" />,
   schedule: <><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 7h6M9 11h6M9 15h4" /></>,
   export: <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />,

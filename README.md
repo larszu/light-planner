@@ -61,10 +61,13 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 - Nudge it into place, dial the opacity down, and lock it so you don't move it by accident
 - Now everything you draw on top is to scale
 
-### 🧊 3D preview
-- A simple Three.js view of the room with the cones drawn in
-- Useful to sanity-check angles and heights
-- Screenshot button for sharing
+### 🧊 3D preview & Render
+- A Three.js view of the room with the cones drawn in — useful to sanity-check angles and heights
+- **Render** view: real spotlights with shadows, volumetric beams in haze, AgX tone mapping and 4× multisampling (edges stay smooth with bloom on)
+- **Backgrounds**: hall (default), black box, studio and daylight — a gradient dome the floor fades into, with the ambient fill matched to it (almost none in the black box, plenty in daylight)
+- **Floors**: stage floor (default for new plans), concrete, parquet, floorboards, tiles, carpet or plain, each tintable
+- The camera stays above the floor; screenshot button for sharing
+- All of it sits under **Display** at the top right: display toggles (heat-map, snap, focus notes), render (background, floor, exposure, ambience, haze, beams — double-click a slider to reset it, *Reset* for all) and sun/daylight. The render settings can be adjusted from any view; *Open Render* switches over
 
 ### 🔆 Lux heatmap
 - A rough lux estimate on the floor based on the fixtures' photometric data

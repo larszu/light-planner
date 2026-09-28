@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from './Icon';
-import type { FloorMaterial, FloorPresetId, SunSettings } from '../types';
+import type { FloorMaterial, SunSettings } from '../types';
 import { buildMenus } from './menuModel';
 import TopMenu from './TopMenu';
 import CommandPalette from './CommandPalette';
 import SettingsDialog from './SettingsDialog';
-import { FLOOR_PRESETS, floorPreset } from '../core/surfaceTextures';
+import type { BackdropId } from '../core/surfaceTextures';
+import ViewPanel from './ViewPanel';
 import { useTranslation } from '../i18n';
 
 type Mode = '2d' | '3d' | 'photo';
@@ -20,6 +21,7 @@ interface Props {
   showBeams: boolean;
   ambience: number;
   floor: FloorMaterial;
+  backdrop: BackdropId;
   sun: SunSettings;
   sunInfo: { altitudeDeg: number; azimuthDeg: number } | null;
   heatMapScale: number;
@@ -34,6 +36,8 @@ interface Props {
   onToggleBeams: () => void;
   onAmbienceChange: (v: number) => void;
   onFloorChange: (f: FloorMaterial) => void;
+  onBackdropChange: (b: BackdropId) => void;
+  onResetRender: () => void;
   onSunChange: (s: SunSettings) => void;
   onHeatMapScaleChange: (v: number) => void;
   onHeatMapTargetChange: (v: number) => void;
@@ -79,10 +83,11 @@ const TopBar: React.FC<Props> = (p) => {
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(null); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(null); };
     window.addEventListener('mousedown', h);
-    return () => window.removeEventListener('mousedown', h);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('mousedown', h); window.removeEventListener('keydown', esc); };
   }, []);
-  const run = (fn: () => void) => () => { fn(); setOpen(null); };
   const m = mode(p);
 
   // Die EINE Liste. Menueleiste und Kommandopalette lesen sie beide; wer
@@ -168,82 +173,49 @@ const TopBar: React.FC<Props> = (p) => {
 
       {/* ── right: display toggles, render settings, actions ── */}
       <div className="topbar-right">
-        <button className={`tb-icon ${p.showHeatMap ? 'on' : ''}`} title={t('top.heatmap', 'Heat-map (colour by illuminance)')} onClick={p.onToggleHeatMap}><Icon name="heatmap" /></button>
+        <button className={`tb-icon ${p.showHeatMap ? 'on' : ''}`} aria-pressed={p.showHeatMap}
+          title={t('top.heatmap', 'Heat-map (colour by illuminance)')} aria-label={t('top.heatmap', 'Heat-map (colour by illuminance)')}
+          onClick={p.onToggleHeatMap}><Icon name="heatmap" /></button>
 
         <div className="tb-menuwrap">
-          {/* Regler statt Zahnrad: zwei Zahnraeder nebeneinander, von denen
-              eines die App einstellt und das andere das Bild, sind ein Raten. */}
-          <button className={`tb-icon ${open === 'render' ? 'on' : ''}`} title={t('top.displaySettings', 'Display & render settings')}
-            onClick={() => setOpen(open === 'render' ? null : 'render')}><Icon name="photo" /></button>
+          {/* Beschriftet und mit Regler-Symbol: das Kamera-Symbol, das hier
+              stand, war dasselbe wie am Render-Reiter daneben. */}
+          <button className={`tb-btn tb-view ${open === 'render' ? 'on' : ''}`} aria-expanded={open === 'render'}
+            title={t('top.displaySettings', 'Display & render settings')} aria-label={t('top.displaySettings', 'Display & render settings')}
+            onClick={() => setOpen(open === 'render' ? null : 'render')}>
+            <Icon name="sliders" size={15} />{t('top.displayShort', 'Display')}<Icon name="chevronDown" size={13} />
+          </button>
           {open === 'render' && (
-            <div className="tb-dropdown tb-render">
-              {(p.viewMode === '3d' && p.photoMode) ? (
-                <>
-                  <div className="tb-dd-sec">{t('top.render', 'Render')}</div>
-                  <label className="tb-slider"><span>{t('top.exposure', 'Exposure')}</span>
-                    <input type="range" min={0.2} max={3} step={0.05} value={p.exposure} onChange={(e) => p.onExposureChange(+e.target.value)} />
-                    <em>{p.exposure.toFixed(2)}</em></label>
-                  <label className="tb-slider"><span>{t('top.ambience', 'Ambience')}</span>
-                    <input type="range" min={0} max={1.5} step={0.05} value={p.ambience} onChange={(e) => p.onAmbienceChange(+e.target.value)} />
-                    <em>{Math.round(p.ambience * 100)}%</em></label>
-                  <label className="tb-slider"><span>{t('top.haze', 'Haze')}</span>
-                    <input type="range" min={0} max={1} step={0.02} value={p.haze} onChange={(e) => p.onHazeChange(+e.target.value)} />
-                    <em>{Math.round(p.haze * 100)}%</em></label>
-                  <button className="tb-dd-item" onClick={p.onToggleBeams}><Icon name="beam" size={15} />{t('top.beams', 'Beams')}<span className={`tb-check ${p.showBeams ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
-                  <div className="tb-dd-sec">{t('top.floor', 'Floor')}</div>
-                  <div className="tb-chips">
-                    {FLOOR_PRESETS.map((fp) => (
-                      <button key={fp.id} className={`tb-chip ${p.floor.preset === fp.id ? 'on' : ''}`}
-                        onClick={() => p.onFloorChange({ preset: fp.id as FloorPresetId, color: fp.defaultColor })}>{fp.label}</button>
-                    ))}
-                  </div>
-                  <label className="tb-slider"><span>{t('top.floorColor', 'Floor colour')}</span>
-                    <input type="color" value={p.floor.color} onChange={(e) => p.onFloorChange({ ...p.floor, color: e.target.value })} />
-                    <em>{floorPreset(p.floor.preset).label}</em></label>
-                </>
-              ) : (
-                <div className="tb-hint">{t('top.renderOnlyHint', 'Exposure, floor and beams appear in Render mode only.')}</div>
-              )}
-              {p.showHeatMap && (
-                <>
-                  <div className="tb-dd-sec">{t('top.heatmapSection', 'Heat-map')}</div>
-                  <label className="tb-slider"><span>{t('top.scaleMax', 'Scale max')}</span>
-                    <input type="number" min={10} max={100000} step={10} value={p.heatMapScale} onChange={(e) => p.onHeatMapScaleChange(+e.target.value)} />
-                    <em>lx</em></label>
-                  <label className="tb-slider"><span>{t('top.target', 'Target')}</span>
-                    <input type="number" min={0} max={100000} step={10} value={p.heatMapTarget} onChange={(e) => p.onHeatMapTargetChange(+e.target.value)} />
-                    <em>lx</em></label>
-                </>
-              )}
-              <div className="tb-dd-sec">{t('top.sun', 'Sun / daylight')}</div>
-              <button className="tb-dd-item" onClick={() => p.onSunChange({ ...p.sun, enabled: !p.sun.enabled })} title={t('top.sunHint', 'Real sun: daylight & shadows from location, date and time – falls through windows into the room.')}>
-                <span className="tb-glyph"><Icon name="heatmap" size={13} /></span>{t('top.sunOn', 'Sun active')}<span className={`tb-check ${p.sun.enabled ? 'on' : ''}`}><Icon name="check" size={13} /></span>
-              </button>
-              {p.sun.enabled && (
-                <>
-                  <label className="tb-slider"><span>{t('top.date', 'Date')}</span>
-                    <input type="date" value={p.sun.date} onChange={(e) => p.onSunChange({ ...p.sun, date: e.target.value })} /></label>
-                  <label className="tb-slider"><span>{t('top.time', 'Time')}</span>
-                    <input type="time" value={p.sun.time} onChange={(e) => p.onSunChange({ ...p.sun, time: e.target.value })} /></label>
-                  <label className="tb-slider"><span>{t('top.latitude', 'Latitude')}</span>
-                    <input type="number" min={-90} max={90} step={0.5} value={p.sun.latitude} onChange={(e) => p.onSunChange({ ...p.sun, latitude: +e.target.value })} /><em>°</em></label>
-                  <label className="tb-slider"><span>{t('top.longitude', 'Longitude')}</span>
-                    <input type="number" min={-180} max={180} step={0.5} value={p.sun.longitude} onChange={(e) => p.onSunChange({ ...p.sun, longitude: +e.target.value })} /><em>°</em></label>
-                  <label className="tb-slider"><span>{t('top.north', 'North ↻')}</span>
-                    <input type="range" min={0} max={359} step={1} value={p.sun.northDeg} onChange={(e) => p.onSunChange({ ...p.sun, northDeg: +e.target.value })} /><em>{Math.round(p.sun.northDeg)}°</em></label>
-                  <label className="tb-slider"><span>{t('top.intensity', 'Intensity')}</span>
-                    <input type="number" min={0} max={120000} step={1000} value={p.sun.intensity} onChange={(e) => p.onSunChange({ ...p.sun, intensity: +e.target.value })} /><em>lx</em></label>
-                  <div className="tb-hint">{p.sunInfo
-                    ? t('top.sunPos', 'Sun position: {alt}° above the horizon · azimuth {az}° (0 = N). Falls through windows into the room.')
-                        .replace('{alt}', p.sunInfo.altitudeDeg.toFixed(0))
-                        .replace('{az}', p.sunInfo.azimuthDeg.toFixed(0))
-                    : t('top.sunBelow', 'The sun is below the horizon – no direct daylight.')}</div>
-                </>
-              )}
-              <div className="tb-dd-div" />
-              <button className="tb-dd-item" onClick={p.onToggleSnap}><Icon name="snap" size={15} />{t('top.snap', 'Snap')}<span className={`tb-check ${p.snapStep > 0 ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
-              <button className="tb-dd-item" onClick={p.onToggleFocusNotes} title={t('top.focusNotesHint', 'Show per-fixture focus notes in the 2D plan')}><Icon name="tag" size={15} />{t('top.focusNotes', 'Focus notes (plan)')}<span className={`tb-check ${p.showFocusNotes ? 'on' : ''}`}><Icon name="check" size={13} /></span></button>
-            </div>
+            <ViewPanel
+              isRender={m === 'photo'}
+              onGoRender={() => p.onSetMode('photo')}
+              showHeatMap={p.showHeatMap}
+              heatMapScale={p.heatMapScale}
+              heatMapTarget={p.heatMapTarget}
+              snapOn={p.snapStep > 0}
+              showFocusNotes={p.showFocusNotes}
+              exposure={p.exposure}
+              ambience={p.ambience}
+              haze={p.haze}
+              showBeams={p.showBeams}
+              backdrop={p.backdrop}
+              floor={p.floor}
+              sun={p.sun}
+              sunInfo={p.sunInfo}
+              onToggleHeatMap={p.onToggleHeatMap}
+              onHeatMapScaleChange={p.onHeatMapScaleChange}
+              onHeatMapTargetChange={p.onHeatMapTargetChange}
+              onToggleSnap={p.onToggleSnap}
+              onToggleFocusNotes={p.onToggleFocusNotes}
+              onExposureChange={p.onExposureChange}
+              onAmbienceChange={p.onAmbienceChange}
+              onHazeChange={p.onHazeChange}
+              onToggleBeams={p.onToggleBeams}
+              onBackdropChange={p.onBackdropChange}
+              onFloorChange={p.onFloorChange}
+              onSunChange={p.onSunChange}
+              onResetRender={p.onResetRender}
+            />
           )}
         </div>
 

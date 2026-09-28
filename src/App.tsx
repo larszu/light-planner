@@ -205,6 +205,9 @@ const App: React.FC = () => {
   const toggleBeams = useUiStore((s) => s.toggleBeams);
   const ambience = useUiStore((s) => s.ambience);
   const setAmbience = useUiStore((s) => s.setAmbience);
+  const backdrop = useUiStore((s) => s.backdrop);
+  const setBackdrop = useUiStore((s) => s.setBackdrop);
+  const resetRender = useUiStore((s) => s.resetRender);
   const [layers, setLayers] = useState<Layers>(DEFAULT_LAYERS);
   const [cameras, setCameras] = useState<CameraView[]>([]);
   const [floorPlan, setFloorPlan] = useState<FloorPlan | null>(null);
@@ -1716,6 +1719,9 @@ const App: React.FC = () => {
         onHazeChange={setHaze}
         onToggleBeams={toggleBeams}
         onAmbienceChange={setAmbience}
+        backdrop={backdrop}
+        onBackdropChange={setBackdrop}
+        onResetRender={resetRender}
         onFloorChange={setFloor}
         onSunChange={setSun}
         onHeatMapScaleChange={setHeatMapScale}
@@ -1850,6 +1856,7 @@ const App: React.FC = () => {
             <Suspense fallback={<div className="loading-3d">{t('app.loading3d', 'Loading the 3D view…')}</div>}>
               <Scene3D
                 ref={scene3DRef}
+                backdrop={backdrop}
                 fixtures={shownFixtures}
                 persons={persons}
                 stageElements={stageElements}
