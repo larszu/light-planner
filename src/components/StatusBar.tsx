@@ -12,11 +12,13 @@ interface Props {
   exposure: number;
   activeSceneName: string | null;
   hiddenCount: number;
+  /** DMX-Eingang an: wie viele Leuchten er gerade faehrt; `null` = aus. */
+  dmxDriven: number | null;
 }
 
 // Persistent bottom status bar — the live feedback (lux, selection, snap, render
 // settings, active scene) that used to be scattered across the UI.
-const StatusBar: React.FC<Props> = ({ viewMode, photoMode, cursorLux, selectionCount, snapStep, haze, exposure, activeSceneName, hiddenCount }) => {
+const StatusBar: React.FC<Props> = ({ viewMode, photoMode, cursorLux, selectionCount, snapStep, haze, exposure, activeSceneName, hiddenCount, dmxDriven }) => {
   const { t, language } = useTranslation();
   // Die Zahl folgt der Oberflaechensprache, nicht dem Betriebssystem: die
   // Leiste stand mit hartem 'de-DE' da, und in der englischen Fassung waere
@@ -34,6 +36,7 @@ const StatusBar: React.FC<Props> = ({ viewMode, photoMode, cursorLux, selectionC
       )}
       <span className="sb-item"><b>{selectionCount}</b> {t('status.selected', 'selected')}</span>
       {hiddenCount > 0 && <span className="sb-item">{hiddenCount} {t('status.muted', 'muted')}</span>}
+      {dmxDriven !== null && <span className="sb-item sb-scene">DMX <b>{dmxDriven}</b> {t('status.dmxLive', 'live')}</span>}
       <span className="sb-spacer" />
       {photoMode && <span className="sb-item">{t('status.exposure', 'Exposure')} <b>{exposure.toFixed(2)}</b></span>}
       {photoMode && <span className="sb-item">{t('status.haze', 'Haze')} <b>{Math.round(haze * 100)}%</b></span>}

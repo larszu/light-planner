@@ -4,6 +4,8 @@ import type { Fixture, FixtureCategory, BeamShape, LensType, MountType, DmxMode,
 import { extractFixtureSpecs, AI_MODELS, type ExtractedFields, type VerificationItem } from '../utils/aiExtract';
 import { useHost } from '../integration/hostContext';
 import { useTranslation } from '../i18n';
+import { DmxLayoutEditor, GdtfImportButton } from './DmxLayoutEditor';
+import type { GdtfImport } from '../core/gdtf';
 
 interface Props {
   onSave: (fixture: Fixture) => void;
@@ -104,6 +106,28 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  // GDTF traegt Modi samt Belegung und die Lichtdaten der ersten Beam-
+  // Geometrie. Uebernommen wird nur, was in der Datei steht.
+  const applyGdtf = (g: GdtfImport) => {
+    if (g.modes.length) {
+      setDmxModes(g.modes);
+      setDmxChannels(g.modes[0].channels);
+    }
+    if (!name.trim() && g.name) setName(g.name);
+    if (!manufacturer.trim() && g.manufacturer) setManufacturer(g.manufacturer);
+    if (g.beam.beamAngle) setBeamAngle(g.beam.beamAngle);
+    if (g.beam.fieldAngle) setFieldAngle(g.beam.fieldAngle);
+    if (g.beam.lumens) setLumens(g.beam.lumens);
+    if (g.beam.wattage) setWattage(g.beam.wattage);
+    if (g.beam.colorTemp) setColorTemp(g.beam.colorTemp);
+    if (g.weight) setWeight(g.weight);
+    const chan = (attr: string) => g.modes.flatMap((m) => m.layout ?? []).find((c) => c.attribute === attr && c.range);
+    const zoom = chan('zoom')?.range;
+    if (zoom) { setHasZoom(true); setZoomMin(Math.min(...zoom)); setZoomMax(Math.max(...zoom)); }
+    const cct = chan('cct')?.range;
+    if (cct) { setHasColorTempRange(true); setColorTempMin(Math.round(Math.min(...cct))); setColorTempMax(Math.round(Math.max(...cct))); }
   };
 
   const handleSave = () => {
@@ -311,6 +335,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
                 }])}
               >{t('fx.dmxModeAdd', '+ Mode')}</button>
             </div>
+            <GdtfImportButton onImport={applyGdtf} />
             {dmxModes.length === 0 && (
               <p className="fx-modes-hint">
                 {t('fx.dmxModesEmpty', 'No mode stated: the channel count above then counts as a single mode of unrecorded origin. Enter one line per operating mode for anything that has more than one.')}
@@ -345,6 +370,7 @@ const FixtureEditor: React.FC<Props> = ({ onSave, onCancel, initial }) => {
                   onChange={(e) => setDmxModes(dmxModes.map((x, j) => (j === i ? { ...x, evidence: e.target.value || undefined } : x)))}
                 />
                 <button type="button" onClick={() => setDmxModes(dmxModes.filter((_, j) => j !== i))}>x</button>
+                <DmxLayoutEditor mode={m} onChange={(nm) => setDmxModes(dmxModes.map((x, j) => (j === i ? nm : x)))} />
               </div>
             ))}
           </div>

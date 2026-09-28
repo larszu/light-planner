@@ -69,6 +69,7 @@ export interface MenuBarProps {
   /** Lager/Bestand — seit #124 ein Menuepunkt statt eines Knopfes auf der
    *  Flaeche. */
   onOpenInventory: () => void;
+  onOpenDmxIn: () => void;
 }
 
 export interface MenuItem {
@@ -134,6 +135,7 @@ export function buildMenus(p: MenuBarProps, t: Uebersetzen): MenuGroup[] {
       // `zIndex: 150` — er lag ueber der Zeichenflaeche, ueber dem Dock und
       // ueber allem, was dort sonst haette stehen koennen.
       { label: t('menu.inventory', 'Inventory / stock…'), onClick: p.onOpenInventory },
+      { label: t('menu.dmxIn', 'DMX input (Art-Net / sACN)…'), onClick: p.onOpenDmxIn },
       { label: t('menu.floorPlan', 'Import floor plan (JPG/PNG/PDF)…'), onClick: p.onUploadFloorPlan },
     ] },
     { id: 'view', label: t('menu.view', 'View'), items: [
