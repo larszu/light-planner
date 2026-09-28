@@ -15,7 +15,12 @@
 //      abweisen — sonst ist sie strenger als der Planer.
 //   3. Der Abgleich. Inkrementell ueber `latestSeq`, `removed` entfernt,
 //      Ungueltige werden gezaehlt statt still verworfen.
-//   4. Das Token. Es darf in keinem State, keinem Projekt und keiner
+//   4. Der Offline-Vertrag (2026-09-28, `syncFrom` im gemeinsamen Client):
+//      der Bestand aendert sich nur durch eine erfolgreiche Antwort, jeder
+//      Server hat seinen eigenen Platz, Abmelden und Adresswechsel leeren
+//      nichts, ein leerer neuer Server loescht nichts. Das wird am echten
+//      Store gefahren, nicht am Quelltext gelesen.
+//   5. Das Token. Es darf in keinem State, keinem Projekt und keiner
 //      Log-Zeile stehen, und die Content-Security-Policy muss den Werks-Server
 //      zulassen — sonst meldet der Release-Build „offline", obwohl er online ist.
 //
@@ -30,13 +35,14 @@ import { readFileSync } from 'node:fs';
 import { fixtureLibrary } from '../src/core/fixtureLibrary.ts';
 import { validateFixtureProfile } from '../src/core/fixtureProfile.ts';
 import {
-  CORE_CATEGORY, LIBRARY_ID_PREFIX, applySync, applyUploadResults, connectSrcAllows, deviceToFixture, emptyCache,
-  emptyUploadLog, fixtureToProposal, fixtureToUploadItem, isDatasheetLink, normalizeServerUrl, planUpload, readCache,
-  readUploadLog, uploadHash, uploadStatus,
+  CORE_CATEGORY, LIBRARY_ID_PREFIX, applySync, applySyncResult, applyUploadResults, cacheFor, connectSrcAllows,
+  deviceToFixture, emptyCache, emptyUploadLog, errorKind, fixtureToProposal, fixtureToUploadItem, isDatasheetLink,
+  leereAblage, normalizeServerUrl, planUpload, readCache, readCacheAblage, readUploadLog, uploadHash, uploadStatus,
+  withCache, type LibraryErrorKind,
 } from '../src/core/deviceLibrary.ts';
 import { spawnSync } from 'node:child_process';
 import {
-  DEFAULT_DEVICE_LIBRARY_URL, LibraryError, UPLOAD_BATCH, propose, signIn, sync, upload, verifySecondFactor,
+  DEFAULT_DEVICE_LIBRARY_URL, LibraryError, UPLOAD_BATCH, propose, signIn, sync, syncFrom, upload, verifySecondFactor,
   type LibraryErrorCode, type SyncDevice, type SyncResponse,
 } from '../src/core/deviceLibraryClient.ts';
 import { libraryErrorText } from '../src/components/deviceLibraryText.ts';
@@ -203,6 +209,36 @@ assert.equal(readCache(JSON.parse(JSON.stringify(voll.cache)), 'https://andere.e
 assert.equal(readCache({ format: 'x' }, S), null);
 ok('Cache gehoert zu genau einem Server');
 
+// ── 3b. Ein Platz je Server, Ergebnis von syncFrom ──────────────────────────
+const A = 'https://andere.example';
+const altBestand = JSON.parse(JSON.stringify(voll.cache));
+let ablage = readCacheAblage(altBestand);
+assert.deepEqual(Object.keys(ablage.byServer), [S], 'alter Einzelbestand wird zum Platz seines Servers');
+assert.deepEqual(cacheFor(ablage, S).entries.map((e) => e.slug), ['c']);
+assert.equal(cacheFor(ablage, A).entries.length, 0);
+ablage = withCache(ablage, applySync(emptyCache(A), antwort(1, [geraet('x', 1)]), 0, jetzt).cache);
+assert.deepEqual(cacheFor(ablage, S).entries.map((e) => e.slug), ['c'], 'ein anderer Server ueberschreibt den Platz nicht');
+const gelesen = readCacheAblage(JSON.parse(JSON.stringify(ablage)));
+assert.deepEqual(Object.keys(gelesen.byServer).sort(), [S, A].sort());
+// Ein Platz unter falschem Schluessel oder kaputt faellt weg, die anderen bleiben.
+const gemischt = { ...gelesen, byServer: { ...gelesen.byServer, 'https://falsch.example': gelesen.byServer[S], [A]: { format: 'x' } } };
+assert.deepEqual(Object.keys(readCacheAblage(JSON.parse(JSON.stringify(gemischt))).byServer), [S]);
+assert.deepEqual(readCacheAblage(null), leereAblage());
+ok('Bestand: ein Platz je Server, alter Einzelbestand migriert ohne Verlust, kaputte Plaetze fallen einzeln weg');
+
+const bestand = voll.cache; // ['c'], latestSeq 7
+const ersetzt = applySyncResult(bestand, { reset: true, response: antwort(3, [geraet('d', 3)]) }, 7, jetzt);
+assert.deepEqual(ersetzt.cache.entries.map((e) => e.slug), ['d'], 'reset ersetzt den Bestand');
+assert.equal(ersetzt.cache.latestSeq, 3, 'nach reset gilt der latestSeq des neuen Servers');
+const delta = applySyncResult(bestand, { reset: false, response: antwort(8, [geraet('d', 8)]) }, 7, jetzt);
+assert.deepEqual(delta.cache.entries.map((e) => e.slug).sort(), ['c', 'd'], 'ohne reset ist die Antwort ein Delta');
+const leerVoll = () => applySyncResult(bestand, { reset: false, response: antwort(0, []) }, 0, jetzt);
+assert.throws(leerVoll, (e) => errorKind(e) === 'server-empty', 'ein leerer Vollabgleich darf den Bestand nicht leeren');
+assert.equal(applySyncResult(emptyCache(S), { reset: false, response: antwort(0, []) }, 0, jetzt).cache.entries.length, 0);
+assert.equal(errorKind(new LibraryError('offline')), 'offline');
+assert.equal(errorKind(new Error('x')), 'server');
+ok('syncFrom-Ergebnis: reset ersetzt, sonst Delta; leerer Vollabgleich bei vorhandenem Bestand ist server-empty');
+
 // ── 4. Server-Adresse und Content-Security-Policy ───────────────────────────
 assert.equal(DEFAULT_DEVICE_LIBRARY_URL, 'https://devices.zumpelars.de');
 assert.deepEqual(normalizeServerUrl(' https://devices.zumpelars.de/ '), { ok: true, url: 'https://devices.zumpelars.de' });
@@ -246,6 +282,23 @@ assert.equal(aufrufe[2].url, `${S}/api/sync?planner=light&after=5`);
 assert.equal((aufrufe[2].init.headers as Record<string, string>).authorization, 'Bearer tok-1');
 ok('Client: 2FA ueber x-auth-challenge, ohne Cookies, Abgleich mit planner=light&after=<seq>');
 
+aufrufe.length = 0;
+antworten.push(new Response(JSON.stringify(antwort(9, [geraet('a', 9)])), { status: 200 }));
+assert.equal((await syncFrom(S, 'tok-1', 'light', 5)).reset, false);
+antworten.push(
+  new Response(JSON.stringify(antwort(2, [])), { status: 200 }),
+  new Response(JSON.stringify(antwort(2, [geraet('a', 1), geraet('b', 2)])), { status: 200 }),
+);
+const neu = await syncFrom(S, 'tok-1', 'light', 5);
+assert.ok(neu.reset && neu.response.devices.length === 2);
+assert.ok(aufrufe[2].url.endsWith('after=0'), 'kleinerer latestSeq: alles neu holen');
+antworten.push(
+  new Response(JSON.stringify(antwort(0, [])), { status: 200 }),
+  new Response(JSON.stringify(antwort(0, [])), { status: 200 }),
+);
+await assert.rejects(syncFrom(S, 'tok-1', 'light', 5), (e) => errorKind(e) === 'server-empty');
+ok('Client: syncFrom holt bei kleinerem latestSeq alles neu (reset) und meldet einen leeren Server als Fehler');
+
 // Die Bibliotheks-Routen antworten mit klein geschriebenen Codes (Better Auth
 // mit grossen). Jeder Fall muss beim richtigen Code ankommen — ein
 // `guidelines-outdated` als „wrong-credentials" gelesen, und der Planer
@@ -264,12 +317,14 @@ assert.equal(await fehlerCode(409, { error: 'exists' }), 'exists');
 assert.equal(await fehlerCode(403, { error: 'guidelines-outdated' }), 'guidelines-outdated');
 assert.equal(await fehlerCode(403, { error: 'email-not-verified' }), 'email-not-verified');
 assert.equal(await fehlerCode(401, { error: 'not-signed-in' }), 'not-signed-in');
-const alleCodes: LibraryErrorCode[] = [
+const alleCodes: LibraryErrorKind[] = [
   'wrong-credentials', 'email-not-verified', 'guidelines-outdated', 'exists', 'wrong-code',
-  'rate-limited', 'not-signed-in', 'offline', 'server',
+  'rate-limited', 'not-signed-in', 'offline', 'server', 'server-empty',
 ];
 const texte = alleCodes.map((c) => libraryErrorText((_k, en) => en, c));
 assert.equal(new Set(texte).size, alleCodes.length, 'jeder Fehlercode braucht einen eigenen Text');
+assert.ok(/last sync stay available/.test(libraryErrorText((_k, en) => en, 'offline')), 'offline: der letzte Stand bleibt nutzbar');
+assert.ok(/were kept/.test(libraryErrorText((_k, en) => en, 'server-empty')), 'server-empty: die eigenen Geraete wurden behalten');
 assert.ok(/\/guidelines`/.test(lies('src/components/DeviceLibraryError.tsx')), 'guidelines-outdated ohne Link auf <server>/guidelines');
 const store0 = lies('src/store/deviceLibraryStore.ts');
 assert.ok(!/guidelines-outdated'\)\s*await forgetSession/.test(store0), 'geaenderte Richtlinien sind kein Grund zum Abmelden');
@@ -395,5 +450,96 @@ assert.ok(/safeStorage\.encryptString/.test(main) && /preload\.cjs/.test(main), 
 const preload = code(lies('electron/preload.cjs'));
 assert.ok(!/exposeInMainWorld\([^)]*ipcRenderer\s*[,)]/.test(preload), 'ipcRenderer selbst darf nicht in den Renderer');
 ok('Token: nicht im State, nicht im Projekt, nicht im Log; Electron verschluesselt mit safeStorage');
+
+// ── 7. Der Offline-Vertrag am echten Store ─────────────────────────────────
+//
+// Nicht am Quelltext gelesen, sondern gefahren: ein Speicher im Arbeitsspeicher,
+// ein nachgebautes `fetch`, und dann jede Lage, in der ein Planner frueher
+// seinen Bestand verlor.
+{
+  const speicher = new Map<string, string>();
+  (globalThis as { localStorage?: Storage }).localStorage = {
+    getItem: (k: string) => speicher.get(k) ?? null,
+    setItem: (k: string, v: string) => { speicher.set(k, String(v)); },
+    removeItem: (k: string) => { speicher.delete(k); },
+    clear: () => speicher.clear(),
+    key: () => null,
+    get length() { return speicher.size; },
+  } as Storage;
+  const CACHE_KEY = 'light-planner:device-library-cache';
+  // Der Stand vor dieser Aenderung: ein einzelner Bestand, kein Platz je Server.
+  speicher.set(CACHE_KEY, JSON.stringify(voll.cache));
+
+  let aufSync: (url: string) => Response = () => { throw new TypeError('offline'); };
+  globalThis.fetch = (async (url: string) => {
+    if (url.includes('/api/sync')) return aufSync(url);
+    if (url.includes('/api/auth/sign-in')) {
+      return new Response(JSON.stringify({ user: { id: 'u1', email: 'l@x.de', username: 'lars', emailVerified: true } }), { status: 200, headers: { 'set-auth-token': 'tok-s' } });
+    }
+    return new Response('{}', { status: 200 });
+  }) as typeof fetch;
+
+  const { useDeviceLibrary } = await import('../src/store/deviceLibraryStore.ts');
+  const st = () => useDeviceLibrary.getState();
+  const slugs = () => st().cache.entries.map((e) => e.slug).sort();
+  const ruhe = () => new Promise((res) => setTimeout(res, 20));
+  const platz = (server: string) => readCacheAblage(JSON.parse(speicher.get(CACHE_KEY) ?? 'null')).byServer[server];
+
+  assert.deepEqual(slugs(), ['c'], 'alter Einzelbestand muss nach dem Update noch da sein');
+  ok('Store: alter Einzelbestand wird beim Start als Platz seines Servers gelesen');
+
+  // Anmelden stoesst einen Abgleich an — offline.
+  await st().signIn('lars', 'pw');
+  await ruhe();
+  assert.equal(st().syncError, 'offline');
+  assert.deepEqual(slugs(), ['c'], 'offline: der Bestand bleibt');
+
+  aufSync = () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 });
+  await st().syncNow();
+  assert.equal(st().syncError, 'server');
+  assert.deepEqual(slugs(), ['c'], 'Serverfehler: der Bestand bleibt');
+
+  aufSync = () => new Response(JSON.stringify(antwort(0, [])), { status: 200 });
+  await st().syncNow();
+  assert.equal(st().syncError, 'server-empty');
+  assert.deepEqual(slugs(), ['c'], 'leerer neuer Server: der Bestand bleibt');
+  await st().syncNow(true);
+  assert.equal(st().syncError, 'server-empty', 'auch „Alles neu laden" leert nicht an einem leeren Server');
+  assert.deepEqual(slugs(), ['c']);
+  ok('Store: offline, Serverfehler und leerer Server lassen den Bestand stehen');
+
+  aufSync = (url) => new Response(JSON.stringify(url.endsWith('after=0') ? antwort(3, [geraet('d', 3)]) : antwort(3, [])), { status: 200 });
+  await st().syncNow();
+  assert.equal(st().syncError, null);
+  assert.deepEqual(slugs(), ['d'], 'reset ersetzt den Bestand');
+  assert.equal(st().cache.latestSeq, 3);
+  assert.deepEqual(platz(S)?.entries.map((e) => e.slug), ['d']);
+  ok('Store: kleinerer latestSeq -> reset ersetzt den Bestand und speichert ihn');
+
+  aufSync = () => new Response(JSON.stringify({ error: 'not-signed-in' }), { status: 401 });
+  await st().syncNow();
+  assert.equal(st().session, 'signed-out');
+  assert.deepEqual(slugs(), ['d'], 'abgelaufene Anmeldung: der Bestand bleibt');
+  await st().signIn('lars', 'pw');
+  await ruhe();
+  await st().signOut();
+  assert.equal(st().session, 'signed-out');
+  assert.deepEqual(slugs(), ['d'], 'Abmelden leert den Bestand nicht');
+  assert.deepEqual(platz(S)?.entries.map((e) => e.slug), ['d']);
+  ok('Store: abgelaufene Anmeldung und Abmelden lassen den Bestand stehen');
+
+  await st().setServer(A);
+  assert.equal(st().cache.entries.length, 0, 'ein neuer Server beginnt mit seinem eigenen (leeren) Platz');
+  assert.deepEqual(platz(S)?.entries.map((e) => e.slug), ['d'], 'der Platz des alten Servers bleibt');
+  aufSync = () => new Response(JSON.stringify(antwort(1, [geraet('x', 1)])), { status: 200 });
+  await st().signIn('lars', 'pw');
+  await ruhe();
+  assert.deepEqual(slugs(), ['x']);
+  await st().setServer(S);
+  assert.deepEqual(slugs(), ['d'], 'zurueckgewechselt: der alte Bestand ist wieder da');
+  await st().setServer(A);
+  assert.deepEqual(slugs(), ['x'], 'und der des anderen Servers auch');
+  ok('Store: Adresswechsel loescht keinen Bestand, Zurueckwechseln stellt ihn wieder her');
+}
 
 console.log(`\nGeraetebibliothek: ${n} Zusagen gehalten.`);
