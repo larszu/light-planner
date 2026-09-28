@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from '../i18n';
+import { planAblage, ziehtDateien } from '../avplan/floorplan';
 import type { PlacedFixture, Shape, Tool, ViewTransform, FloorPlan, Fixture, Person, StageElement, Truss, Wall, Ceiling, Layers, CameraView } from '../types';
 import type { PlanMode } from '../App';
 import { computeHeatMap, luxToColor, luxToColorTarget, totalLux, effectiveFieldAngleDeg, precomputeSurfaceSamples } from '../core/lightCalc';
@@ -55,6 +56,11 @@ interface Props {
   onCursorLux: (lux: number | null) => void;
   onToolChange: (tool: Tool) => void;
   onDropFixture: (fixture: Fixture, x: number, y: number) => void;
+  /** An image or PDF dropped onto the plan — loaded as the floor plan,
+   *  exactly like the upload in the menu. */
+  onDropFloorPlanFile?: (file: File) => void;
+  /** Files were dropped, but none can be a floor plan. */
+  onUnsuitableFloorPlanFiles?: (files: File[]) => void;
   onMoveAim: (id: string, aimX: number, aimY: number) => void;
   onUpdateFloorPlan: (updates: Partial<FloorPlan>) => void;
   onCalibrateSegment: (x1: number, y1: number, x2: number, y2: number) => void;
@@ -121,6 +127,8 @@ const PlanCanvas: React.FC<Props> = ({
   onCursorLux,
   onToolChange,
   onDropFixture,
+  onDropFloorPlanFile,
+  onUnsuitableFloorPlanFiles,
   onMoveAim,
   onUpdateFloorPlan,
   onCalibrateSegment,
@@ -1166,8 +1174,21 @@ const PlanCanvas: React.FC<Props> = ({
     stagePathRef.current = []; stageCursorRef.current = null;
   };
 
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; };
+  // Zwei Dinge landen auf dem Plan: eine Leuchte aus der Bibliothek
+  // (`application/fixture`) und — seit ADR-015 — eine Datei als Grundriss.
+  // Unterschieden wird am Typ `Files`: nur dann uebernimmt `planAblage`, die
+  // Leuchten-Ablage bleibt Zeile fuer Zeile, wie sie war.
+  const [planDropAktiv, setPlanDropAktiv] = useState(false);
+  const planDrop = onDropFloorPlanFile
+    ? planAblage({ onDatei: onDropFloorPlanFile, onUngeeignet: onUnsuitableFloorPlanFiles, onAktiv: setPlanDropAktiv, pdf: true })
+    : null;
+  const handleDragOver = (e: React.DragEvent) => {
+    if (planDrop && ziehtDateien(e.dataTransfer)) { planDrop.onDragOver(e); return; }
+    e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+  };
+  const handleDragLeave = () => { if (planDropAktiv) planDrop?.onDragLeave(); };
   const handleDrop = (e: React.DragEvent) => {
+    if (planDrop && ziehtDateien(e.dataTransfer)) { planDrop.onDrop(e); return; }
     e.preventDefault();
     const data = e.dataTransfer.getData('application/fixture');
     if (!data) return;
@@ -1768,12 +1789,17 @@ const PlanCanvas: React.FC<Props> = ({
     : 'default';
 
   return (
-    <div ref={containerRef} className="plan-canvas-container">
+    <div ref={containerRef} className={`plan-canvas-container${planDropAktiv ? ' plan-drop-aktiv' : ''}`}>
       <canvas ref={canvasRef} className="plan-canvas"
         onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
         onDoubleClick={handleDoubleClick}
-        onDragOver={handleDragOver} onDrop={handleDrop}
+        onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
         onContextMenu={(e) => e.preventDefault()} style={{ cursor }} />
+      {planDropAktiv && (
+        <div className="plan-drop-hinweis" aria-live="polite">
+          {t('canvas.dropFloorPlan', 'Drop to load as floor plan (image or PDF)')}
+        </div>
+      )}
     </div>
   );
 };

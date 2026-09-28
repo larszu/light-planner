@@ -90,7 +90,12 @@ const HARMLOS = new Set(
 );
 
 /** Kennungen: Dateinamen von Ausgaben und Alias-Eintraege fremder Formate. */
-const KENNUNGEN = new Set(['geraeteliste.csv', 'geraeteliste.pdf', 'rueckweg-pult.csv', 'geraetetyp']);
+//
+// 2026-09-28: `pdf-nicht-verfuegbar` ist ein Fehler-CODE aus
+// `@avplan/floorplan` (ADR-015, Kopie unter `src/avplan/floorplan`, dort nicht
+// aenderbar), kein Anzeigetext: App.tsx uebersetzt ihn in einen Satz. Er
+// steht als Literal im Paket und im `switch` darauf.
+const KENNUNGEN = new Set(['geraeteliste.csv', 'geraeteliste.pdf', 'rueckweg-pult.csv', 'geraetetyp', 'pdf-nicht-verfuegbar']);
 
 const istHex = (wort: string) => /^[0-9a-f]+$/i.test(wort);
 

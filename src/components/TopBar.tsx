@@ -9,6 +9,7 @@ import type { BackdropId } from '../core/surfaceTextures';
 import ViewPanel from './ViewPanel';
 import { useTranslation } from '../i18n';
 import { APP_NAME } from '../version';
+import { planAccept } from '../avplan/floorplan';
 
 type Mode = '2d' | '3d' | 'photo';
 
@@ -237,7 +238,7 @@ const TopBar: React.FC<Props> = (p) => {
             „Speichern" bleibt als einziger Knopf stehen. Es ist der einzige
             Griff dieser Leiste, den man mehrmals je Sitzung braucht, und ihn
             in ein Menue zu legen hiesse, ihn zweimal zu klicken. */}
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+        <input ref={fileRef} type="file" accept={planAccept({ pdf: true })} style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) p.onUploadFloorPlan(f); e.target.value = ''; }} />
 
         <span className="tb-div" />

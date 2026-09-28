@@ -493,6 +493,30 @@ body {
   height: 100%;
 }
 
+/* ADR-015 — eine Datei wird auf den Plan (oder das Grundriss-Panel) gezogen.
+   Die Umrandung zeigt, dass losgelassen werden kann; der Hinweis sagt, was
+   dann passiert. `pointer-events: none`, sonst waere der Hinweis selbst das
+   Ziel, die Zeichenflaeche bekaeme `dragleave`, und die Markierung flackerte. */
+.plan-canvas-container {
+  position: relative;
+}
+.plan-drop-aktiv {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
+.plan-drop-hinweis {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px 20px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 13px;
+  pointer-events: none;
+}
+
 .plan-canvas {
   display: block;
   /* Die Pinch-Geste gehoert dem Plan, nicht dem Browser.

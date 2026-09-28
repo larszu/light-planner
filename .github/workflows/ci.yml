@@ -40,6 +40,12 @@ jobs:
         run: npm run avplan:check
       - name: Wire-Contract — Venue-Austausch
         run: npm run venue:check
+      # ADR-015 — gemeinsamer Code (heute `@avplan/floorplan`) liegt als
+      # zeichengleiche Kopie unter `src/**/avplan/<name>/`. Der Lauf rechnet
+      # jede Datei gegen ihr MANIFEST.json: eine Aenderung an der Kopie gehoert
+      # in die Suite, sonst laufen die Planer wieder auseinander.
+      - name: Paket-Kopien sind zeichengleich (ADR-015)
+        run: npm run kopien:check
       - name: Projekt-Identitaet (Versionen, Geraete-Liste)
         run: npm run identity:check
       # B-21: „Keine Unterschiede zum aktuellen Stand" darf nicht mehr
