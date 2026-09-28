@@ -93,7 +93,7 @@
   },
   "build": {
     "appId": "com.larszumpe.lightplanner",
-    "productName": "Light Planner",
+    "productName": "LZ Light Planner",
     "directories": {
       "output": "release"
     },
@@ -106,10 +106,10 @@
         "nsis",
         "portable"
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.ico"
     },
     "portable": {
-      "artifactName": "Light-Planner-Portable-${version}.${ext}"
+      "artifactName": "LZ-Light-Planner-Portable-${version}.${ext}"
     },
     "mac": {
       "target": [
@@ -124,7 +124,7 @@
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.graphics-design",
-      "artifactName": "Light-Planner-${version}-${arch}.${ext}",
+      "artifactName": "LZ-Light-Planner-${version}-${arch}.${ext}",
       "identity": "-",
       "hardenedRuntime": false,
       "gatekeeperAssess": false
@@ -134,7 +134,7 @@
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "Light-Planner-Setup-${version}.${ext}"
+      "artifactName": "LZ-Light-Planner-Setup-${version}.${ext}"
     }
   },
   "license": "UNLICENSED"

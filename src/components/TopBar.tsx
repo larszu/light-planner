@@ -8,6 +8,7 @@ import SettingsDialog from './SettingsDialog';
 import type { BackdropId } from '../core/surfaceTextures';
 import ViewPanel from './ViewPanel';
 import { useTranslation } from '../i18n';
+import { APP_NAME } from '../version';
 import { planAccept } from '../avplan/floorplan';
 
 type Mode = '2d' | '3d' | 'photo';
@@ -137,8 +138,12 @@ const TopBar: React.FC<Props> = (p) => {
     <header className="topbar" ref={ref}>
       {/* ── left: brand + menu ── */}
       <div className="topbar-left">
-        <div className="brand-logo"><img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" draggable={false} /></div>
-        <b className="brand-name">LightPlanner</b>
+        {/* Signet ohne Tally-Punkt: der Speichern-Knopf traegt schon das eine Rot der Kopfzeile. */}
+        <div className="brand-logo" aria-hidden="true">
+          <img className="lzm-auf-dunkel" src={`${import.meta.env.BASE_URL}brand/lzm_signet_offwhite.svg`} alt="" draggable={false} />
+          <img className="lzm-auf-hell" src={`${import.meta.env.BASE_URL}brand/lzm_signet_navy.svg`} alt="" draggable={false} />
+        </div>
+        <b className="brand-name">{APP_NAME}</b>
         <span className="brand-proj">{p.projectName || t('top.untitled', 'Untitled')}</span>
 
         {/* ─────────────────────────────────────────────────────────────
