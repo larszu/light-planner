@@ -122,6 +122,7 @@ export const de: Record<string, string> = {
   'app.wallPath': 'Wand-Pfad',
   'app.wallPathAngle': '= 15°-Winkel · Doppelklick/',
   'app.wallPathHint': ': Punkte nacheinander klicken · Startpunkt klicken schließt den Raum ·',
+  'canvas.dropFloorPlan': 'Loslassen, um als Grundriss zu laden (Bild oder PDF)',
   'canvas.align': 'Ausrichten',
   'canvas.alignX': 'Horizontal ausrichten (X)',
   'canvas.alignY': 'Vertikal ausrichten (Y)',
@@ -1139,6 +1140,15 @@ export const de: Record<string, string> = {
   // deutsche Literale im `window.alert`/`confirm` — die Form, die der
   // Sprachmix-Zaehler ohne den Backtick-Zweig uebersehen haette (multicam#119).
   'app.floorPlanFailed': 'Grundriss konnte nicht geladen werden:',
+  // ADR-015 — der Lader aus `@avplan/floorplan` wirft Codes; App.tsx sagt sie.
+  'app.floorPlanUnsupported':
+    'Dieser Dateityp taugt nicht als Grundriss. Bitte ein Bild (JPG, PNG, WebP, GIF, BMP, AVIF) oder ein PDF verwenden.',
+  'app.floorPlanTooLarge': 'Die Datei ist zu groß (Bilder bis {image} MB, PDFs bis {pdf} MB).',
+  'app.floorPlanReadFailed': 'Die Datei ließ sich nicht lesen.',
+  'app.floorPlanImageFailed': 'Das Bild ließ sich nicht dekodieren.',
+  'app.floorPlanPdfFailed': 'Das PDF ließ sich nicht darstellen: {reason}',
+  'app.floorPlanDropUnsuitable':
+    '{names} taugt nicht als Grundriss. Bitte ein Bild (JPG, PNG, WebP, GIF, BMP, AVIF) oder ein PDF ablegen.',
   'app.newConfirm':
     'Neues Projekt anlegen? Nicht gespeicherte Änderungen am aktuellen Projekt gehen verloren.',
   'app.openFailed': 'Projektdatei konnte nicht geladen werden:',

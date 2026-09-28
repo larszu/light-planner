@@ -33,7 +33,8 @@ import { generate3PointLighting, generateAreaLighting } from './core/autoLightin
 import type { ThreePointConfig, AreaLightConfig, LightArea } from './core/autoLighting';
 import AreaLightDialog from './components/AreaLightDialog';
 import type { Scene3DHandle } from './components/Scene3D';
-import { loadFloorPlanFile, renderPdfPage } from './utils/floorPlanLoader';
+import { loadFloorPlanFile, renderPdfPage, type PdfPlanSource } from './utils/floorPlanLoader';
+import { PlanDateiFehler, PLAN_BILD_MAX_BYTES, PLAN_PDF_MAX_BYTES } from './avplan/floorplan';
 import { jpegToPdfBlob, dataUrlToBytes } from './utils/pdfExport';
 import { seitenLayout } from './utils/plotPage';
 import { composePlot } from './utils/plotExport';
@@ -48,7 +49,6 @@ import { foreignCamerasFrom, type ForeignCamera } from './core/foreignView';
 import { APP_VERSION } from './version';
 import { useUiStore } from './store/uiStore';
 import { useProjectStore } from './store/projectStore';
-import type * as pdfjsLib from 'pdfjs-dist';
 import './App.css';
 import { canParent, moveItem } from './core/runningOrder';
 import { erfassen, type Griff } from './core/actuals';
@@ -56,6 +56,31 @@ import { useTranslation, format } from './i18n';
 import { useDeviceLibrary } from './store/deviceLibraryStore';
 
 export type PlanMode = 'none' | 'calibrate' | 'move';
+
+// Der Lader (`@avplan/floorplan`) wirft Codes statt Saetzen, damit jeder
+// Planer sie in seiner Sprache sagt. Ohne diese Uebersetzung stuende im
+// Hinweis nur „typ" oder „zu-gross".
+function planFehlerText(err: unknown, t: (key: string, en: string) => string): string {
+  if (err instanceof PlanDateiFehler) {
+    switch (err.code) {
+      case 'typ':
+      case 'pdf-nicht-verfuegbar':
+        return t('app.floorPlanUnsupported', 'This file type cannot be used as a floor plan. Use an image (JPG, PNG, WebP, GIF, BMP, AVIF) or a PDF.');
+      case 'zu-gross':
+        return format(t('app.floorPlanTooLarge', 'The file is too large (images up to {image} MB, PDFs up to {pdf} MB).'), {
+          image: String(PLAN_BILD_MAX_BYTES / 1024 / 1024),
+          pdf: String(PLAN_PDF_MAX_BYTES / 1024 / 1024),
+        });
+      case 'lesen':
+        return t('app.floorPlanReadFailed', 'The file could not be read.');
+      case 'bild':
+        return t('app.floorPlanImageFailed', 'The image could not be decoded.');
+      case 'pdf':
+        return format(t('app.floorPlanPdfFailed', 'The PDF could not be rendered: {reason}'), { reason: err.message });
+    }
+  }
+  return err instanceof Error ? err.message : String(err);
+}
 
 const Scene3D = lazy(() => import('./components/Scene3D'));
 
@@ -253,7 +278,7 @@ const App: React.FC = () => {
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   // Look present just before a scene was switched on, so it can be switched off.
   const preSceneRef = useRef<Record<string, SceneFixtureState> | null>(null);
-  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const pdfDocRef = useRef<PdfPlanSource | null>(null);
   const clipboardRef = useRef<PlacedFixture[]>([]);
   const scene3DRef = useRef<Scene3DHandle>(null);
   const exportCounterRef = useRef(1);
@@ -1155,9 +1180,20 @@ const App: React.FC = () => {
         setPlanMode('none');
       })
       .catch((err) => {
-        window.alert(`${t('app.floorPlanFailed', 'Could not load the floor plan:')}\n${err?.message ?? err}`);
+        window.alert(`${t('app.floorPlanFailed', 'Could not load the floor plan:')}\n${planFehlerText(err, t)}`);
       });
   }, []);
+
+  // Drag & Drop auf den Plan: Dateien, die kein Grundriss sein koennen,
+  // werden genannt statt still verworfen — sonst sieht es aus, als habe die
+  // Ablage nicht funktioniert.
+  const handleUnsuitableFloorPlanFiles = useCallback((files: File[]) => {
+    const names = files.map((f) => f.name).join(', ');
+    window.alert(format(
+      t('app.floorPlanDropUnsuitable', 'Cannot use {names} as a floor plan. Drop an image (JPG, PNG, WebP, GIF, BMP, AVIF) or a PDF.'),
+      { names: names || '?' },
+    ));
+  }, [t]);
 
   const handleUpdateFloorPlan = useCallback((updates: Partial<FloorPlan>) => {
     setFloorPlan((prev) => (prev ? { ...prev, ...updates } : prev));
@@ -1846,6 +1882,8 @@ const App: React.FC = () => {
               onCursorLux={setCursorLux}
               onToolChange={handleToolChange}
               onDropFixture={handleDropFixture}
+              onDropFloorPlanFile={handleUploadFloorPlan}
+              onUnsuitableFloorPlanFiles={handleUnsuitableFloorPlanFiles}
               onMoveAim={handleMoveAim}
               planMode={planMode}
               onUpdateFloorPlan={handleUpdateFloorPlan}
@@ -1940,6 +1978,8 @@ const App: React.FC = () => {
               onSetPage={handleSetFloorPlanPage}
               onUpdate={handleUpdateFloorPlan}
               onRemove={handleRemoveFloorPlan}
+              onDropFile={handleUploadFloorPlan}
+              onUnsuitableFiles={handleUnsuitableFloorPlanFiles}
             />
           )}
         </div>

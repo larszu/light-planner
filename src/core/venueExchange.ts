@@ -11,44 +11,35 @@
 // headless testbar (scripts/venue-exchange-check.ts).
 // ───────────────────────────────────────────────────────────────────────────
 import type { Person, Wall, StageElement, FloorPlan } from '../types';
+// ADR-015 — das Schema (Typen, Konstanten, Grund-Parser) kommt aus dem
+// gemeinsamen Paket `@avplan/floorplan` (Kopie unter `src/avplan/floorplan`,
+// dort NICHT aendern). Vorher stand es hier als dritte Parallelfassung neben
+// multicam und cable. Hier bleibt nur, was light-spezifisch ist: die
+// Umrechnung in light-Typen und die strengere Bedeutungspruefung.
+//
+// Direkt auf die Datei (mit `.ts`), nicht auf den Paket-Index: die
+// Check-Skripte laufen mit `node --experimental-strip-types` ohne
+// Aufloesungs-Hook, und `venueExchange.ts` des Pakets importiert nichts.
+import {
+  VENUE_EXCHANGE_KIND,
+  VENUE_EXCHANGE_VERSION,
+  parseVenueExchange as parseVenueExchangeSchema,
+  type VenueExchange,
+  type VenueExchangeFloorPlan,
+  type VenueExchangePerson,
+} from '../avplan/floorplan/venueExchange.ts';
 
-export const VENUE_EXCHANGE_KIND = 'venue-exchange' as const;
-export const VENUE_EXCHANGE_VERSION = 1 as const;
-
-export interface VenueExchangePerson {
-  id: string; x: number; y: number; height: number; label: string;
-  width?: number; objectType?: string; pose?: 'standing' | 'sitting'; facing?: number; color?: string;
-}
-export interface VenueExchangeWall {
-  id: string; x1: number; y1: number; x2: number; y2: number; height: number;
-  label?: string; cx?: number; cy?: number; reflectance?: number; color?: string;
-}
-export interface VenueExchangeStageObject {
-  id: string; x: number; y: number; width: number; height: number;
-  depth?: number; height2?: number; rotation?: number; points?: { x: number; y: number }[]; label?: string;
-}
-export interface VenueExchangeFloorPlan {
-  src: string; name?: string; naturalWidth: number; naturalHeight: number;
-  widthMeters: number; heightMeters: number;
-  offsetX: number; offsetY: number; opacity: number;
-  locked?: boolean; kind?: 'image' | 'pdf'; pageCount?: number; pageIndex?: number;
-}
-export interface VenueExchange {
-  kind: typeof VENUE_EXCHANGE_KIND;
-  formatVersion: typeof VENUE_EXCHANGE_VERSION;
-  app: string;
-  appVersion: string;
-  exportedAt: string;
-  venue: {
-    name: string;
-    widthM?: number;
-    heightM?: number;
-    persons: VenueExchangePerson[];
-    walls: VenueExchangeWall[];
-    stageObjects: VenueExchangeStageObject[];
-    floorPlan?: VenueExchangeFloorPlan;
-  };
-}
+export {
+  VENUE_EXCHANGE_KIND,
+  VENUE_EXCHANGE_VERSION,
+};
+export type {
+  VenueExchange,
+  VenueExchangeFloorPlan,
+  VenueExchangePerson,
+  VenueExchangeWall,
+  VenueExchangeStageObject,
+} from '../avplan/floorplan/venueExchange.ts';
 
 export type LightFloorPlan = Omit<FloorPlan, 'image'>;
 
@@ -272,18 +263,19 @@ const liste = (roh: unknown, wo: string): unknown[] => {
   return roh;
 };
 
-/** Parst + validiert eine Austauschdatei. Wirft bei falschem Format. */
+/**
+ * Parst + validiert eine Austauschdatei. Wirft bei falschem Format.
+ *
+ * Kopf (`kind`, `formatVersion`, `venue` vorhanden) prueft das Paket; die
+ * Bedeutungspruefung darueber (`pruefeVenue`) hat das Paket noch nicht —
+ * sie bleibt hier, bis sie in `av-planner-suite/packages/floorplan`
+ * angekommen ist. Ohne sie waere die Uebernahme ein Rueckschritt: `venue: 42`
+ * und Personen ohne Koordinaten kaemen wieder durch.
+ */
 export function parseVenueExchange(text_: string): VenueExchange {
-  const data = JSON.parse(text_) as Partial<VenueExchange>;
-  if (!data || data.kind !== VENUE_EXCHANGE_KIND) {
-    throw new Error('Keine gültige Venue-Austauschdatei (kind != venue-exchange).');
-  }
-  if (data.formatVersion !== VENUE_EXCHANGE_VERSION) {
-    throw new Error(`Nicht unterstützte Venue-Austausch-Version: ${data.formatVersion}`);
-  }
-  if (!data.venue) throw new Error('Venue-Austauschdatei ohne venue-Block.');
+  const data = parseVenueExchangeSchema(text_);
   pruefeVenue(data.venue);
-  return data as VenueExchange;
+  return data;
 }
 
 /**

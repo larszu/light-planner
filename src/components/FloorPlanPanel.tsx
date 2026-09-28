@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Icon from './Icon';
 import { useTranslation } from '../i18n';
+import { planAblage } from '../avplan/floorplan';
 import type { FloorPlan } from '../types';
 import type { PlanMode } from '../App';
 
@@ -12,6 +13,9 @@ interface Props {
   onSetPage: (pageIndex: number) => void;
   onUpdate: (updates: Partial<FloorPlan>) => void;
   onRemove: () => void;
+  /** Replace the plan by dropping an image or PDF onto the panel. */
+  onDropFile?: (file: File) => void;
+  onUnsuitableFiles?: (files: File[]) => void;
 }
 
 // Floating control panel for an imported building plan: scale calibration,
@@ -24,10 +28,18 @@ const FloorPlanPanel: React.FC<Props> = ({
   onSetPage,
   onUpdate,
   onRemove,
+  onDropFile,
+  onUnsuitableFiles,
 }) => {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const [widthDraft, setWidthDraft] = useState(String(floorPlan.widthMeters));
+  // Eine neue Datei auf das Panel gezogen ersetzt den Plan — derselbe Weg
+  // wie auf der Zeichenflaeche und im Menue.
+  const [dropAktiv, setDropAktiv] = useState(false);
+  const ablage = onDropFile
+    ? planAblage({ onDatei: onDropFile, onUngeeignet: onUnsuitableFiles, onAktiv: setDropAktiv, pdf: true })
+    : undefined;
 
   // Keep the local width field in sync when calibration changes it elsewhere.
   React.useEffect(() => { setWidthDraft(String(floorPlan.widthMeters)); }, [floorPlan.widthMeters]);
@@ -38,7 +50,12 @@ const FloorPlanPanel: React.FC<Props> = ({
   const pxPerM = floorPlan.naturalWidth / floorPlan.widthMeters;
 
   return (
-    <div className={`floorplan-panel ${collapsed ? 'collapsed' : ''}`}>
+    <div
+      className={`floorplan-panel ${collapsed ? 'collapsed' : ''}${dropAktiv ? ' plan-drop-aktiv' : ''}`}
+      onDragOver={ablage?.onDragOver}
+      onDragLeave={ablage?.onDragLeave}
+      onDrop={ablage?.onDrop}
+    >
       <div className="fp-header">
         <span className="fp-title" title={floorPlan.name}>
           <Icon name="plan2d" size={14} />
