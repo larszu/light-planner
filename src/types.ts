@@ -449,7 +449,7 @@ export interface Shape {
 
 // ── Surface materials (floor & walls) – standard, tileable texture templates
 //    tinted around a chosen base colour, used by the realistic (Render) view. ──
-export type FloorPresetId = 'solid' | 'parquet' | 'planks' | 'concrete' | 'tiles' | 'carpet';
+export type FloorPresetId = 'stage' | 'solid' | 'parquet' | 'planks' | 'concrete' | 'tiles' | 'carpet';
 export type WallPresetId = 'solid' | 'plaster' | 'woodchip' | 'concrete' | 'brick';
 
 // The room's floor finish (global). 'color' tints the chosen template.

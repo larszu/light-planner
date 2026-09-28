@@ -60,22 +60,52 @@ function wrapDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
 }
 
 // ── floor patterns ──────────────────────────────────────────────────────────
-function drawConcrete(ctx: CanvasRenderingContext2D, size: number, base: RGB, blobs = 1100, crackN = 4) {
+function drawConcrete(ctx: CanvasRenderingContext2D, size: number, base: RGB, blobs = 260, crackN = 2) {
   fillBase(ctx, size, base);
   const r = mulberry(11);
+  // Grosse, weiche Wolken statt Koernung: bei 3 m je Kachel wirkte der alte
+  // Punktteppich aus der Kamerahoehe wie Rauschen und schluckte die Lichtkegel.
+  const k = size / 256;
   for (let i = 0; i < blobs; i++) {
-    const x = r() * size, y = r() * size, rad = 2 + r() * 9;
+    const x = r() * size, y = r() * size, rad = (10 + r() * 34) * k;
     const up = r() > 0.5;
-    wrapDot(ctx, x, y, rad, size, up ? `rgba(255,255,255,${0.025 + r() * 0.04})` : `rgba(0,0,0,${0.03 + r() * 0.05})`);
+    wrapDot(ctx, x, y, rad, size, up ? `rgba(255,255,255,${0.012 + r() * 0.018})` : `rgba(0,0,0,${0.015 + r() * 0.022})`);
+  }
+  for (let i = 0; i < blobs * 2; i++) {
+    const x = r() * size, y = r() * size, rad = (1 + r() * 2) * k;
+    wrapDot(ctx, x, y, rad, size, r() > 0.5 ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.035)');
   }
   // a few hairline cracks
-  ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = k;
   for (let i = 0; i < crackN; i++) {
     let x = r() * size, y = r() * size; ctx.beginPath(); ctx.moveTo(x, y);
     const steps = 6 + (r() * 8 | 0);
-    for (let s = 0; s < steps; s++) { x += (r() - 0.5) * 40; y += (r() - 0.5) * 40; ctx.lineTo(x, y); }
+    for (let s = 0; s < steps; s++) { x += (r() - 0.5) * 40 * k; y += (r() - 0.5) * 40 * k; ctx.lineTo(x, y); }
     ctx.stroke();
   }
+}
+
+// Buehnenboden / Tanzteppich: satinierte, fast schwarze Bahnen mit Stoss
+// zwischen den Rollen. Der Boden, auf dem Licht am ehrlichsten aussieht —
+// er schluckt nichts weg und haellt die Pools nicht auf.
+function drawStage(ctx: CanvasRenderingContext2D, size: number, base: RGB) {
+  fillBase(ctx, size, base);
+  const r = mulberry(27);
+  const k = size / 256;
+  // Laengsstreifen: Walzspuren entlang der Bahn
+  for (let i = 0; i < 90; i++) {
+    const x = r() * size, w = (0.6 + r() * 2.5) * k;
+    ctx.fillStyle = r() > 0.5 ? `rgba(255,255,255,${0.008 + r() * 0.014})` : `rgba(0,0,0,${0.01 + r() * 0.02})`;
+    ctx.fillRect(x, 0, w, size);
+  }
+  // Abnutzung: wenige weiche Flecken
+  for (let i = 0; i < 60; i++) {
+    wrapDot(ctx, r() * size, r() * size, (8 + r() * 26) * k, size, `rgba(255,255,255,${0.006 + r() * 0.012})`);
+  }
+  // Stoss zwischen zwei Rollen (Kachel = zwei Bahnen)
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.fillRect(0, 0, Math.max(1, 1.2 * k), size);
+  ctx.fillRect(size / 2, 0, Math.max(1, 1.2 * k), size);
 }
 
 function woodPlank(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, base: RGB, rnd: () => number) {
@@ -211,7 +241,8 @@ function drawBrick(ctx: CanvasRenderingContext2D, size: number, base: RGB) {
 
 // ── preset tables ───────────────────────────────────────────────────────────
 export const FLOOR_PRESETS: SurfacePreset<FloorPresetId>[] = [
-  { id: 'concrete', label: 'Beton', defaultColor: '#74787e', roughness: 0.9, tileMeters: 3, draw: (c, s, b) => drawConcrete(c, s, b) },
+  { id: 'stage', label: 'Bühnenboden', defaultColor: '#27282c', roughness: 0.42, tileMeters: 4, draw: drawStage },
+  { id: 'concrete', label: 'Beton', defaultColor: '#5f6368', roughness: 0.82, tileMeters: 3, draw: (c, s, b) => drawConcrete(c, s, b) },
   { id: 'parquet', label: 'Parkett', defaultColor: '#8a5a2f', roughness: 0.55, tileMeters: 1.6, draw: drawParquet },
   { id: 'planks', label: 'Dielen', defaultColor: '#9a6b3c', roughness: 0.5, tileMeters: 2.2, draw: drawPlanks },
   { id: 'tiles', label: 'Fliesen', defaultColor: '#c9ccce', roughness: 0.25, tileMeters: 0.8, draw: drawTiles },
@@ -227,7 +258,7 @@ export const WALL_PRESETS: SurfacePreset<WallPresetId>[] = [
   { id: 'solid', label: 'Einfarbig', defaultColor: '#8a8f99', roughness: 0.85, tileMeters: 1, draw: null },
 ];
 
-export const DEFAULT_FLOOR = { preset: 'concrete' as FloorPresetId, color: '#74787e' };
+export const DEFAULT_FLOOR = { preset: 'stage' as FloorPresetId, color: '#27282c' };
 export const DEFAULT_WALL_MATERIAL: WallPresetId = 'plaster';
 
 export const floorPreset = (id: FloorPresetId | undefined): SurfacePreset<FloorPresetId> =>
@@ -237,7 +268,7 @@ export const wallPreset = (id: WallPresetId | undefined): SurfacePreset<WallPres
 
 // Render a preset to a fresh canvas tinted to `color`. Returns null for the
 // flat ("solid") presets, which need no map.
-export function surfaceCanvas<Id extends string>(preset: SurfacePreset<Id>, color: string, size = 256): HTMLCanvasElement | null {
+export function surfaceCanvas<Id extends string>(preset: SurfacePreset<Id>, color: string, size = 512): HTMLCanvasElement | null {
   if (!preset.draw) return null;
   const cv = document.createElement('canvas');
   cv.width = cv.height = size;
@@ -246,3 +277,38 @@ export function surfaceCanvas<Id extends string>(preset: SurfacePreset<Id>, colo
   preset.draw(ctx, size, hexToRgb(color));
   return cv;
 }
+
+// ── Hintergruende (Render- und 3D-Ansicht) ─────────────────────────────────
+// Ein Verlauf von oben nach unten auf einer Kuppel um die Kamera. Der Nebel
+// nimmt die Horizontfarbe an, damit der Boden in den Hintergrund auslaeuft
+// statt an einer Kante zu enden. `fill` skaliert das Umgebungslicht: in der
+// Blackbox kommt Licht nur aus den Scheinwerfern, bei Tageslicht aus dem Himmel.
+export type BackdropId = 'venue' | 'blackbox' | 'studio' | 'daylight';
+
+export interface Backdrop {
+  id: BackdropId;
+  label: string;
+  top: string;
+  horizon: string;
+  bottom: string;
+  fill: number;
+  fogNear: number;
+  fogFar: number;
+}
+
+export const BACKDROPS: readonly Backdrop[] = [
+  { id: 'venue', label: 'Saal', top: '#07080c', horizon: '#1b1d25', bottom: '#0d0e12', fill: 0.7, fogNear: 30, fogFar: 110 },
+  { id: 'blackbox', label: 'Blackbox', top: '#000000', horizon: '#050506', bottom: '#000000', fill: 0.25, fogNear: 18, fogFar: 70 },
+  { id: 'studio', label: 'Studio', top: '#4a4d54', horizon: '#6d7078', bottom: '#3a3c42', fill: 1.2, fogNear: 25, fogFar: 90 },
+  { id: 'daylight', label: 'Tageslicht', top: '#3f6ea8', horizon: '#b9cde0', bottom: '#8a9098', fill: 1.6, fogNear: 60, fogFar: 180 },
+];
+
+export const DEFAULT_BACKDROP: BackdropId = 'venue';
+
+export const backdrop = (id: BackdropId | undefined): Backdrop =>
+  BACKDROPS.find((b) => b.id === id) ?? BACKDROPS[0];
+
+/** Der Hintergrund der technischen 3D-Ansicht: ruhig, dunkel, mit Raster lesbar. */
+export const TECH_BACKDROP: Backdrop = {
+  id: 'venue', label: '3D', top: '#10121c', horizon: '#252a3d', bottom: '#151827', fill: 1, fogNear: 45, fogFar: 130,
+};

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ViewMode } from '../core';
+import { DEFAULT_BACKDROP, type BackdropId } from '../core/surfaceTextures';
 
 export type Language = 'de' | 'en';
 
@@ -16,6 +17,7 @@ interface UiState {
   haze: number;
   showBeams: boolean; // global on/off for the volumetric light shafts (photo view)
   ambience: number;   // global fill / ambient light level in the render view (0..1)
+  backdrop: BackdropId; // Hintergrund der Render-Ansicht; je Rechner gemerkt, nicht im Projekt
   snapStep: number; // 0 = off, else grid step (m)
   showFocusNotes: boolean; // overlay focus notes on fixtures in the 2D plan
   language: Language;
@@ -30,6 +32,9 @@ interface UiState {
   setHaze: (v: number) => void;
   toggleBeams: () => void;
   setAmbience: (v: number) => void;
+  setBackdrop: (b: BackdropId) => void;
+  /** Belichtung, Dunst, Umgebung und Strahlen auf die Vorgabe. */
+  resetRender: () => void;
   toggleSnap: () => void;
   toggleFocusNotes: () => void;
   setLanguage: (l: Language) => void;
@@ -45,6 +50,9 @@ export const useUiStore = create<UiState>((set) => ({
   haze: 0.15,
   showBeams: true,
   ambience: 0.55,
+  backdrop: (() => {
+    try { return (localStorage.getItem('lp-backdrop') as BackdropId | null) ?? DEFAULT_BACKDROP; } catch { return DEFAULT_BACKDROP; }
+  })(),
   snapStep: 0,
   showFocusNotes: false,
   /**
@@ -74,6 +82,8 @@ export const useUiStore = create<UiState>((set) => ({
   setHaze: (haze) => set({ haze }),
   toggleBeams: () => set((s) => ({ showBeams: !s.showBeams })),
   setAmbience: (ambience) => set({ ambience }),
+  setBackdrop: (backdrop) => { try { localStorage.setItem('lp-backdrop', backdrop); } catch { /* nur Komfort */ } set({ backdrop }); },
+  resetRender: () => set({ exposure: 1.2, haze: 0.15, ambience: 0.55, showBeams: true }),
   toggleSnap: () => set((s) => ({ snapStep: s.snapStep > 0 ? 0 : 0.5 })),
   toggleFocusNotes: () => set((s) => ({ showFocusNotes: !s.showFocusNotes })),
   setLanguage: (language) => { try { localStorage.setItem('lp-lang', language); } catch { /* ignore */ } set({ language }); },

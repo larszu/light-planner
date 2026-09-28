@@ -12,13 +12,46 @@ import type { PlacedFixture, Person, StageElement, Truss, Wall, Ceiling, FloorPl
 import { computeHeatMap, surfaceLux, luxToColor, luxToColorTarget, effectiveFieldAngleDeg, peakCandela } from '../core/lightCalc';
 import { getBeamColorHex } from '../core/colorTemp';
 import { sampleWall, isCurved, pointInPolygon, wallSegments, normalizedWindows, type NormWindow } from '../core/geometry';
-import { floorPreset, wallPreset, surfaceCanvas, DEFAULT_FLOOR, type SurfacePreset } from '../core/surfaceTextures';
+import { floorPreset, wallPreset, surfaceCanvas, DEFAULT_FLOOR, backdrop as backdropOf, TECH_BACKDROP, type Backdrop, type BackdropId, type SurfacePreset } from '../core/surfaceTextures';
 import type { ResolvedSun } from '../core/sun';
 import { useTranslation } from '../i18n';
 
 // Candela → three.js spotlight intensity. Keeps relative brightness physical
 // (ratios + 1/r² falloff); the exposure control handles absolute calibration.
 const LIGHT_K = 0.0032;
+
+// ── Hintergrund-Kuppel ──────────────────────────────────────────────────────
+// Ein Verlauf oben → Horizont → unten auf einer Kugel, die der Kamera folgt.
+// Vorher war der Hintergrund eine flache Farbe, und der 400-m-Boden endete
+// an einer sichtbaren Kante; jetzt laeuft er ueber den Nebel in die
+// Horizontfarbe aus.
+const DOME_VERT = /* glsl */`
+  varying vec3 vDir;
+  void main() {
+    vDir = normalize(position);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }`;
+const DOME_FRAG = /* glsl */`
+  varying vec3 vDir;
+  uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uBottom;
+  void main() {
+    float h = vDir.y;
+    vec3 c = h > 0.0
+      ? mix(uHorizon, uTop, pow(smoothstep(0.0, 0.85, h), 0.7))
+      : mix(uHorizon, uBottom, smoothstep(0.0, 0.25, -h));
+    gl_FragColor = vec4(c, 1.0);
+    #include <colorspace_fragment>
+  }`;
+
+function applyBackdrop(dome: THREE.Mesh, scene: THREE.Scene, b: Backdrop) {
+  const u = (dome.material as THREE.ShaderMaterial).uniforms;
+  u.uTop.value.set(b.top);
+  u.uHorizon.value.set(b.horizon);
+  u.uBottom.value.set(b.bottom);
+  const fog = scene.fog as THREE.Fog | null;
+  if (fog) { fog.color.set(b.horizon); fog.near = b.fogNear; fog.far = b.fogFar; }
+  scene.background = new THREE.Color(b.horizon);
+}
 
 // ── Volumetric haze-beam shader (photo view, raymarched) ─────────────────────
 // A real beam in haze is light scattered through the beam *volume*, so the eye
@@ -241,7 +274,7 @@ function surfaceTexture<Id extends string>(preset: SurfacePreset<Id>, color: str
 function applyFloorMaterial(ground: THREE.Mesh, floor: FloorMaterial, photo: boolean) {
   const m = ground.material as THREE.MeshStandardMaterial;
   if (!photo) {
-    m.map = null; m.color.set('#222238'); m.roughness = 0.92;
+    m.map = null; m.color.set('#1c2030'); m.roughness = 0.92;
   } else {
     const preset = floorPreset(floor.preset);
     const tex = surfaceTexture(preset, floor.color, 400 / preset.tileMeters); // plane is 400 m across
@@ -256,6 +289,8 @@ function applyFloorMaterial(ground: THREE.Mesh, floor: FloorMaterial, photo: boo
 }
 
 interface Props {
+  /** Hintergrund der Render-Ansicht; die technische 3D-Ansicht hat ihren eigenen. */
+  backdrop?: BackdropId;
   fixtures: PlacedFixture[];
   persons: Person[];
   stageElements: StageElement[];
@@ -280,7 +315,7 @@ interface Props {
   onHoverLux?: (lux: number | null) => void;
 }
 
-const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, floor, sun, onSelect, onHoverLux }, ref) => {
+const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElements, trusses, walls, ceilings, floorPlan, layers, cameras, selectedIds, showHeatMap, heatMapScale, heatMapTarget, photoMode, exposure, haze, showBeams, ambience, floor, sun, onSelect, onHoverLux, backdrop = 'venue' }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
   // Warum die Ansicht leer ist — falls sie leer ist. Siehe die Begruendung am
@@ -302,6 +337,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     ground: THREE.Mesh;
     env: THREE.Texture;
     pmrem: THREE.PMREMGenerator;
+    dome: THREE.Mesh;
   } | null>(null);
   // Whether the camera has been framed to the content yet (once per mount).
   const framedRef = useRef(false);
@@ -330,10 +366,21 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     framedRef.current = false; // a fresh scene/camera needs framing again
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#1a1a2e');
-    scene.fog = new THREE.Fog('#1a1a2e', 50, 120);
+    scene.fog = new THREE.Fog(TECH_BACKDROP.horizon, TECH_BACKDROP.fogNear, TECH_BACKDROP.fogFar);
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(150, 48, 24),
+      new THREE.ShaderMaterial({
+        uniforms: { uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uBottom: { value: new THREE.Color() } },
+        vertexShader: DOME_VERT, fragmentShader: DOME_FRAG,
+        side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: false,
+      }),
+    );
+    dome.renderOrder = -1;
+    dome.userData = { noPick: true };
+    scene.add(dome);
+    applyBackdrop(dome, scene, TECH_BACKDROP);
 
-    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 400);
     camera.position.set(15, 15, 15);
     camera.lookAt(0, 0, 0);
 
@@ -369,14 +416,17 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.target.set(10, 0, 10);
+    // Nicht unter den Boden: von unten ist er unsichtbar, und die Szene
+    // schwebt dann ohne Halt im Hintergrund.
+    controls.maxPolarAngle = Math.PI * 0.495;
 
     // Ground grid (hidden in the photo view)
-    const grid = new THREE.GridHelper(60, 60, '#3a3a50', '#2a2a3c');
+    const grid = new THREE.GridHelper(60, 60, '#4a5270', '#2c3146');
     scene.add(grid);
 
     // Ground plane – large so it always reads as a real floor; receives shadows.
     const groundGeo = new THREE.PlaneGeometry(400, 400);
-    const groundMat = new THREE.MeshStandardMaterial({ color: photoModeRef.current ? '#4a4d57' : '#222238', roughness: 0.92, metalness: 0 });
+    const groundMat = new THREE.MeshStandardMaterial({ color: '#1c2030', roughness: 0.92, metalness: 0 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -422,7 +472,14 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     scene.add(sunLight.target);
 
     // ── Post-processing chain for the photo view (bloom around bright sources) ──
-    const composer = new EffectComposer(renderer);
+    // Eigenes Ziel MIT Multisampling: der Composer rendert sonst in ein Ziel
+    // ohne Kantenglaettung, und `antialias: true` am Renderer wirkt nur auf den
+    // direkten Weg (3D). Die Render-Ansicht hatte deshalb Treppenkanten.
+    const composerTarget = new THREE.WebGLRenderTarget(container.clientWidth, container.clientHeight, {
+      type: THREE.HalfFloatType,
+      samples: 4,
+    });
+    const composer = new EffectComposer(renderer, composerTarget);
     composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     composer.setSize(container.clientWidth, container.clientHeight);
     composer.addPass(new RenderPass(scene, camera));
@@ -435,11 +492,11 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
 
-    renderer.toneMapping = photoModeRef.current ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+    renderer.toneMapping = photoModeRef.current ? THREE.AgXToneMapping : THREE.NoToneMapping;
     renderer.toneMappingExposure = exposureRef.current;
 
     const animId = 0;
-    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, sun: sunLight, grid, ground, env, pmrem };
+    sceneRef.current = { scene, camera, renderer, controls, animId, composer, bloom, ambient, hemi, dir: dirLight, sun: sunLight, grid, ground, env, pmrem, dome };
 
     // ── WASD keyboard movement ──
     const keys: Record<string, boolean> = {};
@@ -487,6 +544,7 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       sceneRef.current!.animId = requestAnimationFrame(animate);
       applyWASD();
       controls.update();
+      dome.position.copy(camera.position);
       if (photoModeRef.current) {
         renderer.toneMappingExposure = exposureRef.current;
         composer.render();
@@ -583,6 +641,9 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
       window.removeEventListener('keyup', handleKeyUp);
       obs.disconnect();
       composer.dispose();
+      composerTarget.dispose();
+      dome.geometry.dispose();
+      (dome.material as THREE.Material).dispose();
       env.dispose();
       pmrem.dispose();
       renderer.dispose();
@@ -598,12 +659,22 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     exposureRef.current = exposure;
     const s = sceneRef.current;
     if (!s) return;
-    s.renderer.toneMapping = photoMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
+    // AgX statt ACES: ACES kippt warmes Kunstlicht ins Orange und reisst
+    // gesaettigte LED-Farben auf; AgX laesst Farbe und Helligkeit getrennter.
+    s.renderer.toneMapping = photoMode ? THREE.AgXToneMapping : THREE.NoToneMapping;
     s.renderer.toneMappingExposure = exposure;
-    s.ambient.intensity = photoMode ? ambience * 0.18 : 0.5;
-    s.hemi.intensity = photoMode ? ambience * 1.0 : 0.0;
-    s.dir.intensity = photoMode ? ambience * 0.18 : 0.3;
-    s.scene.environmentIntensity = photoMode ? ambience * 0.45 : 0;
+    // Das Fuelllicht folgt dem Hintergrund: in der Blackbox kaum, bei
+    // Tageslicht viel. Vorher hellte es den Boden so weit auf, dass die
+    // Lichtpools der Scheinwerfer darauf kaum noch zu sehen waren.
+    const bd = photoMode ? backdropOf(backdrop) : TECH_BACKDROP;
+    const fill = ambience * bd.fill;
+    s.ambient.intensity = photoMode ? fill * 0.1 : 0.5;
+    s.hemi.intensity = photoMode ? fill * 0.45 : 0.0;
+    s.hemi.color.set(photoMode ? bd.top : '#7d8aa0');
+    s.hemi.color.lerp(new THREE.Color('#ffffff'), 0.6);
+    s.dir.intensity = photoMode ? fill * 0.12 : 0.3;
+    s.scene.environmentIntensity = photoMode ? fill * 0.3 : 0;
+    applyBackdrop(s.dome, s.scene, bd);
     // Global sun (issue #28): place the directional sun light from the resolved
     // sun position. The light comes from the sun's direction toward the room.
     if (sun) {
@@ -620,15 +691,12 @@ const Scene3D = forwardRef<Scene3DHandle, Props>(({ fixtures, persons, stageElem
     }
     s.grid.visible = !photoMode;
     applyFloorMaterial(s.ground, floor, photoMode);
-    const bg = photoMode ? '#15151c' : '#1a1a2e';
-    s.scene.background = new THREE.Color(bg);
-    if (s.scene.fog) (s.scene.fog as THREE.Fog).color.set(bg);
     // Tone-mapping change requires existing materials to recompile.
     s.scene.traverse((o) => {
       const m = (o as THREE.Mesh).material;
       if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => { mm.needsUpdate = true; });
     });
-  }, [photoMode, exposure, ambience, floor, sun]);
+  }, [photoMode, exposure, ambience, floor, sun, backdrop]);
 
   // Update scene objects when data changes
   useEffect(() => {
