@@ -56,7 +56,7 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 - Stick a stage, a podium or a person on the floor for reference
 
 ### 📐 Import a building plan
-- Drop in a floor plan as **JPG, PNG or PDF** (multi-page PDFs let you flip between pages)
+- Load a floor plan as **JPG, PNG, WebP or PDF** (multi-page PDFs let you flip between pages) — from the menu, or **drag the file straight onto the plan** (or onto the floor-plan panel to replace it). Files that cannot be a plan are named, not silently dropped. Images with a long edge over 3000 px are scaled down so the project file stays small
 - **Calibrate the scale**: drag a line along something you know the length of (a wall, a scale bar), type the real distance, and the whole plan snaps to the right size
 - Nudge it into place, dial the opacity down, and lock it so you don't move it by accident
 - Now everything you draw on top is to scale
@@ -174,6 +174,15 @@ register it in `src/i18n/index.ts`, done. `npm run lang:check` measures the
 fallbacks, fails on any line in the other language, and separately counts
 visible text that was never wrapped at all. The machine-readable copy of this
 declaration sits in `package.json` under `avplan.sourceLanguage`.
+
+**Shared packages (ADR-015).** Code shared across the AV planners lives in
+`av-planner-suite/packages/<name>` and arrives here as a character-identical
+copy under `src/avplan/<name>/` with a `MANIFEST.json` (SHA-256 per file).
+Today that is `@avplan/floorplan`: the floor-plan loader (images, PDF via
+pdf.js passed in, drag & drop) and the venue-exchange schema. **Do not edit
+the copy** — change the package in the suite and run `npm run pakete:verteilen`
+there. `npm run kopien:check` recomputes every hash and fails on a changed or
+unlisted file.
 
 ---
 

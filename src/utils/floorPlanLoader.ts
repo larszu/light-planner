@@ -1,10 +1,22 @@
 // ── Floor-plan import: load JPG / PNG / PDF into a bitmap ──────────────
 //
-// Images are read straight into an <img>. PDFs are rendered to a canvas with
-// pdf.js and turned into a PNG data-URL so the rest of the app only ever deals
-// with a single bitmap, regardless of the original file type.
+// The loading itself lives in the shared package `@avplan/floorplan`
+// (vendored under `src/avplan/floorplan`, ADR-015 — never edit that copy;
+// changes go to av-planner-suite/packages/floorplan). This module keeps
+// light's own surface on top of it:
+//
+//   - the pdf.js worker setup (the package takes pdf.js as a parameter and
+//     never imports it, so the worker is still ours to configure),
+//   - `LoadedPlan` with a decoded `HTMLImageElement`, which the canvas and
+//     the 3D view draw directly,
+//   - `renderPdfPage` for page switching in the floor-plan panel.
+//
+// Behaviour change vs. the old light loader, intended: raster images with a
+// long edge over 3000 px are downscaled (JPEG 0.9). A 12-megapixel photo
+// otherwise bloated the project file and the browser's recovery copy.
 
 import * as pdfjsLib from 'pdfjs-dist';
+import { ladePlanDatei, pdfjsRenderer, type PdfjsModul } from '../avplan/floorplan';
 
 // Vite resolves this to the bundled worker asset in both dev and production
 // (and to a same-origin file:// URL inside Electron).
@@ -12,6 +24,18 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,
 ).toString();
+
+// The package describes only the slice of pdf.js it calls, without importing
+// its types. pdf.js' own `render()` wants a `PageViewport` where the slice
+// says `unknown` (the renderer passes back exactly the viewport it got from
+// `getViewport`), so the structural match needs this one cast.
+const pdfRenderer = pdfjsRenderer(pdfjsLib as unknown as PdfjsModul);
+
+/** What is needed to render another page of a loaded PDF. The package
+ *  renders from the file's bytes, so the file itself is the handle. */
+export interface PdfPlanSource {
+  file: File;
+}
 
 export interface LoadedPlan {
   src: string;            // PNG / image data-URL
@@ -21,79 +45,42 @@ export interface LoadedPlan {
   kind: 'image' | 'pdf';
   pageCount: number;
   pageIndex: number;
-  // Kept around so other pages of a PDF can be rendered without re-parsing.
-  pdf?: pdfjsLib.PDFDocumentProxy;
+  // Kept around so other pages of a PDF can be rendered.
+  pdf?: PdfPlanSource;
 }
-
-// Render a PDF at a target resolution that stays crisp when zoomed in but does
-// not explode memory. We aim for ~2000 px on the long edge.
-const PDF_TARGET_LONG_EDGE = 2000;
 
 function loadImageEl(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Bild konnte nicht geladen werden'));
+    img.onerror = () => reject(new Error('Image could not be decoded'));
     img.src = src;
   });
 }
 
 export async function renderPdfPage(
-  pdf: pdfjsLib.PDFDocumentProxy,
+  pdf: PdfPlanSource,
   pageIndex: number,
 ): Promise<{ src: string; image: HTMLImageElement; naturalWidth: number; naturalHeight: number }> {
-  const page = await pdf.getPage(pageIndex + 1); // pdf.js pages are 1-based
-  const base = page.getViewport({ scale: 1 });
-  const longEdge = Math.max(base.width, base.height);
-  const scale = PDF_TARGET_LONG_EDGE / longEdge;
-  const viewport = page.getViewport({ scale });
-
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(viewport.width);
-  canvas.height = Math.round(viewport.height);
-  const ctx = canvas.getContext('2d')!;
-  // White backing so transparent PDFs are legible on the dark canvas.
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-  const src = canvas.toDataURL('image/png');
-  const image = await loadImageEl(src);
-  return { src, image, naturalWidth: canvas.width, naturalHeight: canvas.height };
+  const plan = await ladePlanDatei(pdf.file, { pdf: pdfRenderer, seite: pageIndex });
+  const image = await loadImageEl(plan.src);
+  return { src: plan.src, image, naturalWidth: plan.naturalWidth, naturalHeight: plan.naturalHeight };
 }
 
+/** Throws `PlanDateiFehler` (from the package) with a `code` the caller can
+ *  turn into a message. */
 export async function loadFloorPlanFile(file: File): Promise<LoadedPlan> {
-  const isPdf =
-    file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-
-  if (isPdf) {
-    const data = new Uint8Array(await file.arrayBuffer());
-    const pdf = await pdfjsLib.getDocument({ data }).promise;
-    const rendered = await renderPdfPage(pdf, 0);
-    return {
-      ...rendered,
-      kind: 'pdf',
-      pageCount: pdf.numPages,
-      pageIndex: 0,
-      pdf,
-    };
-  }
-
-  // Raster image (JPG / PNG / etc.)
-  const src: string = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Datei konnte nicht gelesen werden'));
-    reader.readAsDataURL(file);
-  });
-  const image = await loadImageEl(src);
+  const plan = await ladePlanDatei(file, { pdf: pdfRenderer });
+  const image = await loadImageEl(plan.src);
+  const isPdf = plan.art === 'pdf';
   return {
-    src,
+    src: plan.src,
     image,
-    naturalWidth: image.naturalWidth,
-    naturalHeight: image.naturalHeight,
-    kind: 'image',
-    pageCount: 1,
-    pageIndex: 0,
+    naturalWidth: plan.naturalWidth,
+    naturalHeight: plan.naturalHeight,
+    kind: isPdf ? 'pdf' : 'image',
+    pageCount: plan.seiten,
+    pageIndex: plan.seite,
+    pdf: isPdf ? { file } : undefined,
   };
 }
