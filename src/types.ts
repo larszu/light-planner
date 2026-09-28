@@ -196,6 +196,31 @@ export interface Fixture {
    * beim naechsten automatischen Hochladen wieder weg.
    */
   datasheetUrl?: string;
+  /**
+   * Die PRODUKTSEITE des Herstellers — neben `datasheetUrl`, nicht statt.
+   *
+   * ─── ZWEI FELDER, ZWEI VERSCHIEDENE DINGE ────────────────────────────────
+   *
+   * `datasheetUrl` zeigt auf das Blatt, aus dem die Zahlen kommen: das PDF mit
+   * der Tabelle. Das ist der staerkere Beleg, und wo es ihn gibt, gilt er.
+   *
+   * `manufacturerUrl` zeigt auf die Produktseite. Sie ist kein Ersatz — eine
+   * Produktseite nennt selten alle Werte und aendert sich, wenn das Marketing
+   * die Seite umbaut. Sie ist aber das, was ein Mensch aufmacht, wenn er
+   * wissen will, ob es das Geraet noch gibt und was der Hersteller heute dazu
+   * sagt. Und sie ist der Beleg, den der Kabel-Planer unter genau diesem Namen
+   * fuehrt: ein Geraet, das dorthin wandert, verliert ihn an der Grenze nicht.
+   *
+   * BEIDE STEHEN NEBENEINANDER und nicht in einem Feld. Ein Feld, das mal ein
+   * PDF und mal eine Produktseite enthaelt, sagt dem Leser nicht, was er
+   * bekommt — und eine Auswertung, die „Beleg vorhanden" zaehlt, zaehlt dann
+   * zweierlei als dasselbe.
+   *
+   * Fehlen beide, ist das eine AUSSAGE und keine Nachlaessigkeit: die
+   * `Generic`-Bauformen (1-kW-Stufenlinse, PAR64) nennen keinen Hersteller und
+   * koennen deshalb keines von beidem haben.
+   */
+  manufacturerUrl?: string;
 }
 
 /** Ein Beleg, dessen Wert nicht mehr zum Feld passt — der Nutzer hat es geaendert. */

@@ -95,6 +95,82 @@ for (const f of fixtureLibrary) {
 assert.ok(belegt >= 74, `nur ${belegt} Katalog-Profile mit Datenblatt-Link — ist ein Beleg verloren gegangen?`);
 ok(`${belegt} Katalog-Profile mit Datenblatt-Link, alle auf der Domain ihres Herstellers`);
 
+// ─── DIE PRODUKTSEITE, NEBEN DEM DATENBLATT (2026-09-28) ────────────────────
+//
+// `manufacturerUrl` ist kein zweiter Versuch fuer dieselbe Sache. Das
+// Datenblatt ist das PDF mit der Tabelle — daraus kommen die Zahlen. Die
+// Produktseite ist das, was ein Mensch aufmacht, um zu sehen, ob es das Geraet
+// noch gibt; und sie ist der Name, unter dem der KABEL-PLANER Belege fuehrt,
+// damit ein Geraet ihn an der Grenze nicht verliert.
+//
+// GEPRUEFT WIRD DIESELBE REGEL WIE OBEN: die Adresse muss auf der Domain ihres
+// Herstellers liegen. Ein Haendlerlink waere hier genauso wenig ein Beleg.
+let seiten = 0;
+for (const f of fixtureLibrary) {
+  if (!f.manufacturerUrl) continue;
+  seiten++;
+  assert.ok(f.manufacturerUrl.startsWith('https://'), `${f.id}: kein https-Link`);
+  const host = new URL(f.manufacturerUrl).hostname;
+  const erlaubt = HERSTELLER_DOMAINS[f.manufacturer] ?? [];
+  assert.ok(
+    erlaubt.some((d) => host === d || host.endsWith(`.${d}`)),
+    `${f.id}: ${host} ist keine Domain von ${f.manufacturer}`,
+  );
+}
+assert.ok(seiten >= 48, `nur ${seiten} Katalog-Profile mit Produktseite — ist ein Beleg verloren gegangen?`);
+ok(`${seiten} Katalog-Profile mit Produktseite, alle auf der Domain ihres Herstellers`);
+
+// ─── WER GAR NICHTS TRAEGT, UND WARUM ──────────────────────────────────────
+//
+// Die Zahl allein saehe aus wie Nachlaessigkeit. Sie ist keine: sieben
+// Eintraege sind generische Bauformen ohne Hersteller, drei sind Geraete,
+// deren Produktseite es nicht mehr gibt. Nachgesehen am 2026-09-28, jede
+// einzeln aufgerufen:
+//
+//   Cameo OPUS H5          cameolight.com fuehrt nur noch das Zubehoer
+//                          (Einsatz, Case, Leuchtmittel); die Seite des
+//                          Geraets gibt 404.
+//   Clay Paky Mythos 2     weder im Produktkatalog noch in der Download-Liste;
+//                          abgekuendigt.
+//   Chauvet Rogue R2 Spot  `/products/rogue-r2-spot/` leitet auf eine
+//                          VIDEO-Seite um. Chauvet fuehrt „R2E Spot" und
+//                          „R2X Spot" — der Katalogname ist falsch, und DAS
+//                          ist der eigentliche Befund.
+//
+// Ein Verweis auf eine Videoseite oder auf das Handbuch eines anderen Modells
+// waere ein Beleg, der keiner ist.
+const OHNE_BELEG = [
+  'cameo-opus-h5',
+  'chauvet-rogue-r2-spot',
+  'claypaky-mythos2',
+  'fresnel-1kw',
+  'fresnel-2kw',
+  'generic-led-par-54x3',
+  'par56-mfl',
+  'par64-cp60-wfl',
+  'par64-cp61-mfl',
+  'par64-cp62-nsp',
+];
+const ohne = fixtureLibrary
+  .filter((f) => !f.datasheetUrl && !f.manufacturerUrl)
+  .map((f) => f.id)
+  .sort();
+assert.deepEqual(
+  ohne,
+  [...OHNE_BELEG].sort(),
+  `Die Liste der Eintraege ohne jeden Beleg hat sich geaendert: ${ohne.join(', ')}. ` +
+    'Wer einen nachtraegt, streicht ihn oben; wer einen neuen anlegt, schreibt dazu, warum er keinen hat.',
+);
+ok(`${ohne.length} Eintraege ohne jeden Beleg — sieben generische Bauformen, drei ohne Produktseite`);
+
+// Eine LEERE Adresse zaehlt in jeder Auswertung als „vorhanden" und ist doch
+// keine. Lieber gar kein Feld.
+for (const f of fixtureLibrary) {
+  if (f.datasheetUrl !== undefined) assert.ok(f.datasheetUrl.trim().length > 0, `${f.id}: leerer datasheetUrl`);
+  if (f.manufacturerUrl !== undefined) assert.ok(f.manufacturerUrl.trim().length > 0, `${f.id}: leerer manufacturerUrl`);
+}
+ok('keine leere Adresse');
+
 const MUSTER: Fixture = {
   id: 'custom-1727000000000',
   name: 'MegaPointe',

@@ -10,6 +10,7 @@
 
 import type { PlacedFixture } from '../core';
 import { footprint, footprintOrNull, modeOf, modesOf } from '../core/patch';
+import { geraetetypIdVon } from '../core/geraetetypIds';
 
 // Subset of Cable-Planner's ConnectorType that lighting fixtures use. The host
 // union is a superset, so these string literals are assignable to it.
@@ -30,6 +31,27 @@ export interface CpPort {
 // Mirrors Cable-Planner EquipmentItem (the fields a fixture fills in).
 export interface CpEquipmentItem {
   id: string;
+  /**
+   * Stable device-type identity (GUID, GDTF/DIN-SPEC-15800 analogue).
+   *
+   * ─── WARUM ES DAS SEIT 2026-09-24 GIBT ──────────────────────────────────
+   *
+   * `core/shopOrder.ts` haelt den Befund fest, aus dem dieses Feld kommt:
+   *
+   *   > Ob der Source Four im Plan DERSELBE Artikel ist wie der im Lager, ist
+   *   > eine Behauptung — und zwar eine, die dieses Modell nicht beweisen
+   *   > kann: eine `Fixture` traegt keine geraetetyp-weite Kennung. Es bleibt
+   *   > der Vergleich von Hersteller und Modellname, und der ist ein
+   *   > VERGLEICH VON ZEICHENKETTEN.
+   *
+   * Jetzt traegt sie eine. Der Kabel-Planer loest damit AUTORITATIV auf
+   * seinen Katalog-Eintrag auf, statt ueber den Namen zu raten — und ein
+   * umbenanntes Geraet verliert seine Herkunft nicht mehr.
+   *
+   * Fehlt das Feld, ist das eine Auskunft: zu dieser Leuchte gibt es keinen
+   * Katalog-Eintrag. Eine Id zu erfinden waere schlimmer als die Luecke.
+   */
+  deviceTypeId?: string;
   name: string;
   subtitle?: string;
   category: string;             // host category — 'Licht'
@@ -127,8 +149,10 @@ export function fixtureToEquipment(pf: PlacedFixture): CpEquipmentItem {
   if (pf.channel != null) categoryProps['Kanal'] = pf.channel;
   if (f.colorTemp) categoryProps['CCT (K)'] = f.colorTemp;
 
+  const geraetetypId = geraetetypIdVon('fixture', f.id);
   return {
     id: pf.id,
+    ...(geraetetypId ? { deviceTypeId: geraetetypId } : {}),
     name: pf.unitNumber ? `${pf.unitNumber} · ${f.name}` : f.name,
     subtitle: f.manufacturer,
     category: 'Licht',

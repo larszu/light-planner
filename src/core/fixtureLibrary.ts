@@ -91,6 +91,7 @@ export const fixtureLibrary: Fixture[] = [
   // ═══════════════════════════════════════════════════════════
   {
     id: 'etc-s4-19', name: 'Source Four 19°', manufacturer: 'ETC', category: 'profile',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Source-Four/',
     datasheetUrl: 'https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460415',
     wattage: 750, lumens: 17800, beamAngle: 19, fieldAngle: 30,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
@@ -100,6 +101,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'etc-s4-26', name: 'Source Four 26°', manufacturer: 'ETC', category: 'profile',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Source-Four/',
     datasheetUrl: 'https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460435',
     wattage: 750, lumens: 17800, beamAngle: 26, fieldAngle: 38,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
@@ -108,6 +110,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'etc-s4-36', name: 'Source Four 36°', manufacturer: 'ETC', category: 'profile',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Source-Four/',
     datasheetUrl: 'https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460423',
     wattage: 750, lumens: 17800, beamAngle: 36, fieldAngle: 52,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
@@ -116,6 +119,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'etc-s4-50', name: 'Source Four 50°', manufacturer: 'ETC', category: 'profile',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Source-Four/',
     datasheetUrl: 'https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460305',
     wattage: 750, lumens: 17800, beamAngle: 50, fieldAngle: 70,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
@@ -124,6 +128,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'etc-s4-zoom-15-30', name: 'Source Four Zoom 15–30°', manufacturer: 'ETC', category: 'profile',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Source-Four/',
     datasheetUrl: 'https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460417',
     wattage: 750, lumens: 17800, beamAngle: 22, fieldAngle: 35,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [15, 30],
@@ -132,6 +137,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'etc-s4-zoom-25-50', name: 'Source Four Zoom 25–50°', manufacturer: 'ETC', category: 'profile',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Source-Four/',
     datasheetUrl: 'https://www.etcconnect.com/WorkArea/DownloadAsset.aspx?id=10737460396',
     wattage: 750, lumens: 17800, beamAngle: 37, fieldAngle: 55,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [25, 50],
@@ -140,6 +146,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'etc-s4led-s3', name: 'Source Four LED S3', manufacturer: 'ETC', category: 'profile',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Lighting-Fixtures/Source-Four-LED-Series-3/Features.aspx',
     datasheetUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Source-Four-LED-Series-3/Features.aspx',
     wattage: 171, lumens: 8667, beamAngle: 26, fieldAngle: 38,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
@@ -183,6 +190,7 @@ export const fixtureLibrary: Fixture[] = [
     // 13° direct (76,845 cd at 5600 K), 6.24 kg, powerCON TRUE1, 9 DMX profiles (p. 6).
     // CCT range and CRI are not in the datasheet and stay as they were.
     id: 'etc-cs-fresnel', name: 'ColorSource Fresnel V', manufacturer: 'ETC', category: 'fresnel',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Lighting-Fixtures/ColorSource/Fixtures.aspx',
     datasheetUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/ColorSource-Fresnel-V/Features.aspx',
     wattage: 149, lumens: 5330, beamAngle: 13, fieldAngle: 22.8,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'fresnel', zoomRange: [13, 44],
@@ -275,6 +283,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'etc-cs-par', name: 'ColorSource PAR', manufacturer: 'ETC', category: 'wash',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/ColorSource-PAR/Features.aspx',
     datasheetUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/ColorSource-PAR/Features.aspx',
     wattage: 90, lumens: 3250, beamAngle: 25, fieldAngle: 50,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
@@ -294,6 +303,7 @@ export const fixtureLibrary: Fixture[] = [
   // ═══════════════════════════════════════════════════════════
   {
     id: 'martin-mac-aura-xb', name: 'MAC Aura XB', manufacturer: 'Martin / Harman', category: 'moving-wash',
+    manufacturerUrl: 'https://www.martin.com/en-US/products/mac-aura-xb',
     datasheetUrl: 'https://www.martin.com/en/products/mac-aura-xb',
     wattage: 270, lumens: 6000, beamAngle: 11, fieldAngle: 58,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [11, 58],
@@ -301,6 +311,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'robe-robin-600-ledwash', name: 'Robin 600 LEDWash', manufacturer: 'Robe', category: 'moving-wash',
+    manufacturerUrl: 'https://www.robe.cz/ledwash-600',
     datasheetUrl: 'https://cdn.aws.robe.cz/print/en_product_513.pdf',
     wattage: 270, lumens: 9500, beamAngle: 15, fieldAngle: 60,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [15, 60],
@@ -308,6 +319,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'robe-robin-ledbeam-150', name: 'Robin LEDBeam 150', manufacturer: 'Robe', category: 'moving-wash',
+    manufacturerUrl: 'https://www.robe.cz/ledbeam-150',
     datasheetUrl: 'https://www.robe.cz/ledbeam-150',
     wattage: 220, lumens: 2842, beamAngle: 3.8, fieldAngle: 60,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [3.8, 60],
@@ -315,6 +327,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'chauvet-rogue-r2-wash', name: 'Rogue R2 Wash', manufacturer: 'Chauvet Professional', category: 'moving-wash',
+    manufacturerUrl: 'https://chauvetprofessional.com/product/rogue-r2-wash/',
     datasheetUrl: 'https://www.chauvetprofessional.com/products/rogue-r2-wash/',
     wattage: 270, lumens: 8200, beamAngle: 12, fieldAngle: 49,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [12, 49],
@@ -322,6 +335,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'martin-mac-aura-pxl', name: 'MAC Aura PXL', manufacturer: 'Martin / Harman', category: 'moving-wash',
+    manufacturerUrl: 'https://www.martin.com/en-US/products/mac-aura-pxl',
     datasheetUrl: 'https://www.martin.com/en/products/mac-aura-pxl',
     wattage: 560, lumens: 10500, beamAngle: 6, fieldAngle: 59,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [6, 59],
@@ -336,6 +350,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'robe-robin-spiider', name: 'Robin Spiider', manufacturer: 'Robe', category: 'moving-wash',
+    manufacturerUrl: 'https://www.robe.cz/spiider',
     datasheetUrl: 'https://www.robe.cz/spiider',
     wattage: 600, lumens: 11000, beamAngle: 4, fieldAngle: 50,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [4, 50],
@@ -347,6 +362,7 @@ export const fixtureLibrary: Fixture[] = [
   // ═══════════════════════════════════════════════════════════
   {
     id: 'martin-mac-viper-profile', name: 'MAC Viper Profile', manufacturer: 'Martin / Harman', category: 'moving-spot',
+    manufacturerUrl: 'https://www.martin.com/en-US/products/mac-viper-profile',
     datasheetUrl: 'https://www.martin.com/en/products/mac-viper-profile',
     wattage: 1000, lumens: 26000, beamAngle: 10, fieldAngle: 44,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [10, 44],
@@ -354,6 +370,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'robe-robin-t1-profile', name: 'Robin T1 Profile', manufacturer: 'Robe', category: 'moving-spot',
+    manufacturerUrl: 'https://www.robe.cz/t1-profile',
     datasheetUrl: 'https://www.robe.cz/t1-profile',
     wattage: 468, lumens: 12600, beamAngle: 5, fieldAngle: 50,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [5, 50],
@@ -361,6 +378,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'chauvet-maverick-mk3-profile', name: 'Maverick MK3 Profile', manufacturer: 'Chauvet Professional', category: 'moving-spot',
+    manufacturerUrl: 'https://chauvetprofessional.com/product/maverick-mk3-profile/',
     datasheetUrl: 'https://chauvetprofessional.com/product/maverick-mk3-profile/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [6, 46],
@@ -368,57 +386,68 @@ export const fixtureLibrary: Fixture[] = [
   },
   // ── Ayrton (LED-Movingheads; Kern-Specs laut Ayrton-Spec-Sheets/Produktdaten 2026-09) ──
   { id: 'ayrton-ghibli', name: 'Ghibli', manufacturer: 'Ayrton', category: 'moving-spot',
+  manufacturerUrl: 'https://www.ayrton.eu/produit/ghibli/',
   datasheetUrl: 'https://www.ayrton.eu/products/ghibli/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 56],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'ayrton-diablo', name: 'Diablo', manufacturer: 'Ayrton', category: 'moving-spot',
+  manufacturerUrl: 'https://www.ayrton.eu/produit/diablo/',
   datasheetUrl: 'https://www.ayrton.eu/products/diablo/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 53],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'ayrton-khamsin', name: 'Khamsin-S', manufacturer: 'Ayrton', category: 'moving-spot',
+  manufacturerUrl: 'https://www.ayrton.eu/produit/khamsin/',
   datasheetUrl: 'https://www.ayrton.eu/products/khamsin-s/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 58],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'ayrton-domino-lt', name: 'Domino LT', manufacturer: 'Ayrton', category: 'moving-spot',
+  manufacturerUrl: 'https://www.ayrton.eu/produit/domino-lt/',
   datasheetUrl: 'https://www.ayrton.eu/products/domino-lt/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [3.5, 53],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke', ipRating: 'IP65' },
   { id: 'ayrton-mistral', name: 'Mistral', manufacturer: 'Ayrton', category: 'moving-spot',
+  manufacturerUrl: 'https://www.ayrton.eu/produit/mistral/',
   datasheetUrl: 'https://www.ayrton.eu/products/mistral/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 53],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'ayrton-perseo-profile', name: 'Perseo Profile', manufacturer: 'Ayrton', category: 'moving-spot',
+  manufacturerUrl: 'https://www.ayrton.eu/produit/perseo-profile/',
   datasheetUrl: 'https://www.ayrton.eu/products/perseo-profile/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 56],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke', ipRating: 'IP65' },
   { id: 'ayrton-karif-lt', name: 'Karif LT', manufacturer: 'Ayrton', category: 'moving-spot',
+  manufacturerUrl: 'https://www.ayrton.eu/produit/karif-lt/',
   datasheetUrl: 'https://www.ayrton.eu/products/karif-lt/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [2.8, 47],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'ayrton-bora', name: 'Bora-S', manufacturer: 'Ayrton', category: 'moving-wash',
+  manufacturerUrl: 'https://www.ayrton.eu/produit/bora/',
   datasheetUrl: 'https://www.ayrton.eu/products/bora-s/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [8, 64],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   // ── Weitere Movingheads/Scheinwerfer (Kern-Specs laut Hersteller-Datenblatt 2026-09) ──
   { id: 'etc-s4-led-s3-lustr', name: 'Source Four LED Series 3 Lustr X8', manufacturer: 'ETC', category: 'profile',
+  manufacturerUrl: 'https://www.etcconnect.com/Products/Lighting-Fixtures/Source-Four-LED-Series-3/Features.aspx',
   datasheetUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Source-Four-LED-Series-3/Features.aspx',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
     colorTemp: 6800, cri: 90, weight: 42.5, mountType: 'clamp' },
   { id: 'etc-colorsource-spot', name: 'ColorSource Spot', manufacturer: 'ETC', category: 'profile',
+  manufacturerUrl: 'https://www.etcconnect.com/workarea/DownloadAsset.aspx?id=10737484146',
   datasheetUrl: 'https://www.etcconnect.com/Products/Lighting-Fixtures/ColorSource-Spot/Features.aspx',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
     colorTemp: 6800, weight: 42.5, mountType: 'clamp' },
   { id: 'chauvet-maverick-storm-1-wash', name: 'Maverick Storm 1 Wash', manufacturer: 'Chauvet Professional', category: 'moving-wash',
+  manufacturerUrl: 'https://chauvetprofessional.com/product/maverick-storm-1-wash/',
   datasheetUrl: 'https://chauvetprofessional.com/product/maverick-storm-1-wash/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [11, 42],
@@ -433,6 +462,7 @@ export const fixtureLibrary: Fixture[] = [
   // CRI 70, zoom 3.5°–52°, 49 kg, powerCON TRUE1, one DMX mode with 54
   // channels. No field angle in the leaflet; 10° stays as it was.
   { id: 'robe-iforte-ltx', name: 'iFORTE LTX WB', manufacturer: 'Robe', category: 'moving-spot',
+  manufacturerUrl: 'https://www.robe.cz/products/iforte-ltx',
   datasheetUrl: 'https://www.robe.cz/iforte-ltx-wb',
     wattage: 1250, lumens: 43800, beamAngle: 3.5, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [3.5, 52],
@@ -446,6 +476,7 @@ export const fixtureLibrary: Fixture[] = [
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [12, 48],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'martin-mac-aura-xip', name: 'MAC Aura XIP', manufacturer: 'Martin / Harman', category: 'moving-wash',
+  manufacturerUrl: 'https://www.martin.com/en-US/products/mac-aura-xip',
   datasheetUrl: 'https://www.martin.com/en/products/mac-aura-xip',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [8, 60],
@@ -466,6 +497,7 @@ export const fixtureLibrary: Fixture[] = [
     beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'astera-ax1-pixeltube', name: 'AX1 PixelTube', manufacturer: 'Astera', category: 'cyc',
+  manufacturerUrl: 'https://astera-led.com/products/ax1-pixeltube/',
   datasheetUrl: 'https://astera-led.com/products/ax1-pixeltube/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'linear', beamRatioWH: 8, lensType: 'fixed',
@@ -475,16 +507,19 @@ export const fixtureLibrary: Fixture[] = [
     beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'chauvet-colordash-par-h12x', name: 'COLORdash Par H12X IP', manufacturer: 'Chauvet Professional', category: 'par',
+  manufacturerUrl: 'https://chauvetprofessional.com/product/colordash-par-h12x-ip/',
   datasheetUrl: 'https://chauvetprofessional.com/product/colordash-par-h12x-ip/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
     colorTemp: 6800, colorTempRange: [2800, 10000], weight: 42.5, mountType: 'clamp', ipRating: 'IP65' },
   { id: 'robe-ledbeam-350', name: 'LEDBeam 350', manufacturer: 'Robe', category: 'moving-wash',
+  manufacturerUrl: 'https://www.robe.cz/ledbeam-350',
   datasheetUrl: 'https://www.robe.cz/ledbeam-350',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [4, 50],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'elation-kl-panel-xl', name: 'KL Panel XL', manufacturer: 'Elation', category: 'led-panel',
+  manufacturerUrl: 'https://elationlighting.com/kl-panel-xl',
   datasheetUrl: 'https://www.elationlighting.com/kl-panel-xl',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'rectangular', beamRatioWH: 1.33, lensType: 'fixed',
@@ -495,6 +530,7 @@ export const fixtureLibrary: Fixture[] = [
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [9, 28],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'chauvet-rogue-r1-beamwash', name: 'Rogue R1 BeamWash', manufacturer: 'Chauvet Professional', category: 'moving-wash',
+  manufacturerUrl: 'https://chauvetprofessional.com/product/rogue-r1-beamwash/',
   datasheetUrl: 'https://chauvetprofessional.com/product/rogue-r1-beamwash/',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [3.4, 67.7],
@@ -510,6 +546,7 @@ export const fixtureLibrary: Fixture[] = [
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [2, 42],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke' },
   { id: 'cameo-otos-h5', name: 'OTOS H5', manufacturer: 'Cameo', category: 'moving-beam',
+  manufacturerUrl: 'https://www.cameolight.com/en/series/otos-series/26039/otos-h5',
   datasheetUrl: 'https://www.cameolight.com/en/series/otos-series/26039/otos-h5',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [2, 42],
@@ -530,11 +567,13 @@ export const fixtureLibrary: Fixture[] = [
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 50],
     colorTemp: 6800, colorTempRange: [2700, 8000], weight: 42.5, mountType: 'yoke' },
   { id: 'cameo-otos-b5', name: 'OTOS B5', manufacturer: 'Cameo', category: 'moving-beam',
+  manufacturerUrl: 'https://www.cameolight.com/en/solutions/rental/moving-lights/beam-moving-heads/29085/otos-b5',
   datasheetUrl: 'https://www.cameolight.com/detail/index/sArticle/29085',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [2, 24],
     colorTemp: 6800, weight: 42.5, mountType: 'yoke', ipRating: 'IP65' },
   { id: 'cameo-movo-beam-z100', name: 'MOVO BEAM Z100', manufacturer: 'Cameo', category: 'moving-beam',
+  manufacturerUrl: 'https://www.cameolight.com/en/solutions/dj-musicians/moving-lights/moving-heads/17232/movo-beam-z100',
   datasheetUrl: 'https://www.cameolight.com/en/solutions/dj-musicians/moving-lights/moving-heads/17232/movo-beam-z100',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [4, 30],
@@ -545,6 +584,7 @@ export const fixtureLibrary: Fixture[] = [
   // ═══════════════════════════════════════════════════════════
   {
     id: 'robe-robin-megapointe', name: 'Robin MegaPointe', manufacturer: 'Robe', category: 'moving-beam',
+    manufacturerUrl: 'https://www.robe.cz/megapointe',
     datasheetUrl: 'https://www.robe.cz/megapointe',
     wattage: 307, lumens: 8200, beamAngle: 10, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [3, 45],
@@ -594,6 +634,7 @@ export const fixtureLibrary: Fixture[] = [
   // ═══════════════════════════════════════════════════════════
   {
     id: 'etc-cs-cyc', name: 'ColorSource CYC', manufacturer: 'ETC', category: 'cyc',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/ColorSource-CYC/Features.aspx',
     datasheetUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/ColorSource-CYC/Features.aspx',
     wattage: 133, lumens: 4117, beamAngle: 115, fieldAngle: 145,
     beamShape: 'linear', beamRatioWH: 4.0, lensType: 'fixed',
@@ -619,6 +660,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'etc-desire-d40', name: 'Desire D40', manufacturer: 'ETC', category: 'flood',
+    manufacturerUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Desire-D40/Features.aspx',
     datasheetUrl: 'https://www.etcconnect.com/Products/Entertainment-Fixtures/Desire-D40/Features.aspx',
     wattage: 100, lumens: 2593, beamAngle: 24, fieldAngle: 42,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'fixed',
@@ -649,6 +691,7 @@ export const fixtureLibrary: Fixture[] = [
   // ═══════════════════════════════════════════════════════════
   {
     id: 'aputure-ls-600x-pro', name: 'LS 600x Pro', manufacturer: 'Aputure', category: 'led-panel',
+    manufacturerUrl: 'https://aputure.com/en-US/products/ls-600x-pro',
     datasheetUrl: 'https://www.aputure.com/products/ls-600x-pro',
     wattage: 600, lumens: 36000, beamAngle: 55, fieldAngle: 80,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'reflector',
@@ -703,6 +746,7 @@ export const fixtureLibrary: Fixture[] = [
     // cutoff 2.5%: 29.2°…88.2°. Peak 158,552 cd @ spot, 25,590 cd @ flood.
     // Max output 16,505 lm / 560 W (flood). CRI 90.3–94.5, TLCI up to 94.
     id: 'elation-kl-fresnel-8-fc', name: 'KL Fresnel 8 FC', manufacturer: 'Elation', category: 'fresnel',
+    manufacturerUrl: 'https://www.elationlighting.com/products/kl-fresnel-8-fc',
     datasheetUrl: 'https://www.elationlighting.com/kl-fresnel-8-fc',
     wattage: 514, lumens: 16505, beamAngle: 10.4, fieldAngle: 20.6, cutoffAngle: 29.2,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'fresnel', zoomRange: [10.4, 50.8],
@@ -746,6 +790,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'elation-kl-profile-fc', name: 'KL Profile FC', manufacturer: 'Elation', category: 'profile',
+    manufacturerUrl: 'https://www.elationlighting.com/products/kl-profile-fc',
     datasheetUrl: 'https://www.elationlighting.com/products/kl-profile-fc',
     wattage: 305, lumens: 10600, beamAngle: 6, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [6, 50],
@@ -755,6 +800,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'elation-kl-par-fc', name: 'KL PAR FC', manufacturer: 'Elation', category: 'par',
+    manufacturerUrl: 'https://www.elationlighting.com/products/kl-par-fc',
     datasheetUrl: 'https://www.elationlighting.com/products/kl-par-fc',
     wattage: 280, lumens: 11000, beamAngle: 11, fieldAngle: 16,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'interchangeable',
@@ -764,6 +810,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'elation-fuze-wash-z350', name: 'Fuze Wash Z350', manufacturer: 'Elation', category: 'moving-wash',
+    manufacturerUrl: 'https://www.elationlighting.com/products/fuze-wash-z350',
     datasheetUrl: 'https://www.elationlighting.com/products/fuze-wash-z350',
     wattage: 399, lumens: 13000, beamAngle: 6, fieldAngle: 10,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [6, 46],
@@ -773,6 +820,7 @@ export const fixtureLibrary: Fixture[] = [
   },
   {
     id: 'elation-fuze-par-z120', name: 'Fuze Par Z120 IP', manufacturer: 'Elation', category: 'moving-wash',
+    manufacturerUrl: 'https://www.elationlighting.com/fuze-par-z120-ip',
     datasheetUrl: 'https://www.elationlighting.com/products/fuze-par-z120-ip',
     wattage: 157, lumens: 4500, beamAngle: 7, fieldAngle: 12,
     beamShape: 'circular', beamRatioWH: 1, lensType: 'zoom', zoomRange: [7, 55],
