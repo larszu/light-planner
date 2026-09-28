@@ -34,6 +34,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 
 import { footprint } from '../src/core/patch.ts';
 import { fixtureToEquipment } from '../src/integration/equipment.ts';
+import { fixtureLibrary } from '../src/core/fixtureLibrary.ts';
+import { GERAETETYP_IDS, geraetetypIdVon } from '../src/core/geraetetypIds.ts';
 import type { PlacedFixture } from '../src/types.ts';
 
 const lies = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -127,5 +129,58 @@ for (const datei of dateien) {
 assert.deepEqual(schuldige, [],
   `der Fussabdruck wird ausserhalb von core/patch.ts noch einmal gerechnet:\n${schuldige.join('\n')}`);
 console.log('✓ der Fussabdruck wird nur an einer Stelle gerechnet');
+
+// ─── DIE GERAETETYP-ID REIST MIT (2026-09-28) ──────────────────────────────
+//
+// `core/shopOrder.ts` haelt den Befund fest, aus dem dieses Feld kommt:
+//
+//   > Ob der Source Four im Plan DERSELBE Artikel ist wie der im Lager, ist
+//   > eine Behauptung — und zwar eine, die dieses Modell nicht beweisen kann:
+//   > eine `Fixture` traegt keine geraetetyp-weite Kennung. Es bleibt der
+//   > Vergleich von Hersteller und Modellname, und der ist ein VERGLEICH VON
+//   > ZEICHENKETTEN.
+//
+// Jetzt traegt sie eine, und der Kabel-Planer loest damit autoritativ auf
+// seinen Katalog-Eintrag auf. Geprueft wird dreierlei, und jedes davon waere
+// sonst unbemerkt kaputtzumachen:
+
+// 1. JEDE Leuchte ist abgedeckt. Eine Luecke hiesse: dieses Geraet wird beim
+//    Export wieder namentlich geraten, und niemand merkt es.
+const ohneId = fixtureLibrary.filter((f) => !geraetetypIdVon('fixture', f.id)).map((f) => f.id);
+assert.deepEqual(ohneId, [], `ohne Geraetetyp-Id: ${ohneId.join(', ')}`);
+console.log(`✓ alle ${fixtureLibrary.length} Leuchten haben eine Geraetetyp-Id`);
+
+// 2. Keine Id doppelt — sonst zeigten zwei Leuchten auf dasselbe Datenblatt.
+const alleIds = Object.values(GERAETETYP_IDS).flatMap((t) => Object.values(t));
+assert.equal(alleIds.length, new Set(alleIds).size, 'eine Geraetetyp-Id kommt doppelt vor');
+console.log('✓ keine Geraetetyp-Id doppelt');
+
+// 3. Die Ids sind STABIL. Sie sind UUIDv5 ueber einen festen Namensraum; ein
+//    neu gewuerfelter Namensraum liesse jede gespeicherte Verknuepfung ins
+//    Leere zeigen. Dieser Goldwert ist der Anker dafuer — er steht identisch
+//    im cable-planner, der die Tabelle erzeugt.
+assert.equal(geraetetypIdVon('fixture', 'etc-s4-19'), '117a0db0-bf94-5669-a8db-f98eec23542b',
+  'der Namensraum der Geraetetyp-Ids hat sich geaendert — jede gespeicherte Verknuepfung zeigt ins Leere');
+console.log('✓ der Namensraum steht fest (Goldwert)');
+
+// 4. Und sie kommt beim Export wirklich mit. Eine Tabelle, die niemand
+//    weiterreicht, ist eine Notiz.
+const s4 = fixtureLibrary.find((f) => f.id === 'etc-s4-19');
+assert.ok(s4, 'etc-s4-19 fehlt im Katalog');
+assert.equal(
+  fixtureToEquipment(platziert('p1', { ...s4 })).deviceTypeId,
+  '117a0db0-bf94-5669-a8db-f98eec23542b',
+  'der Export gibt die Geraetetyp-Id nicht mit',
+);
+// Eine EIGENE Leuchte hat keinen Katalog-Eintrag — dann steht das Feld NICHT
+// da. Das ist eine Auskunft und keine Luecke; eine erfundene Id waere
+// schlimmer. (`platziert` vergibt von sich aus `lib-<id>`, also ohnehin eine
+// Kennung, die im Katalog nicht vorkommt.)
+assert.equal(
+  fixtureToEquipment(platziert('p2', { ...s4, id: 'custom-1727000000000' })).deviceTypeId,
+  undefined,
+  'eine eigene Leuchte bekommt eine Id angedichtet',
+);
+console.log('✓ der Export gibt sie mit — und erfindet keine');
 
 console.log('\nalle Pruefungen bestanden');
