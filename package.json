@@ -63,7 +63,9 @@
     "plot:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/plot-page-check.ts",
     "pdf:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/pdf-table-check.ts",
     "kopfzeile:check": "node --experimental-strip-types scripts/kopfzeile-check.ts",
-    "farben:check": "node --experimental-strip-types scripts/rohe-farben-check.ts"
+    "farben:check": "node --experimental-strip-types scripts/rohe-farben-check.ts",
+    "dmxlive:check": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/dmx-live-check.ts",
+    "dmx:send": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/dmx-send.ts"
   },
   "dependencies": {
     "pdfjs-dist": "^6.0.227",

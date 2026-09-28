@@ -102,6 +102,47 @@ export interface DmxMode {
   origin: DmxModeOrigin;
   /** Freitext zur Quelle: Seitenzahl, Dateiname, Pult-Export, Datum. */
   evidence?: string;
+  /**
+   * Was auf welchem Kanal liegt. Ohne Belegung kennt der Planer nur den
+   * Fussabdruck; eingehendes DMX kann er dann nicht deuten.
+   */
+  layout?: DmxChannel[];
+}
+
+/**
+ * Was ein Kanal steuert. Das Vokabular ist das, was der Planer darstellen
+ * kann — alles andere (Gobo, Prisma, Steuerkanal) ist `other` und wird nur
+ * gezaehlt, damit die Belegung lueckenlos bleibt.
+ */
+export type DmxAttribute =
+  | 'dimmer' | 'shutter'
+  | 'red' | 'green' | 'blue' | 'white' | 'amber' | 'lime' | 'uv'
+  | 'cyan' | 'magenta' | 'yellow' | 'colorWheel'
+  | 'cct' | 'zoom' | 'pan' | 'tilt'
+  | 'other';
+
+/** Ein Abschnitt eines Kanals, als Anteil am Vollausschlag (0..1). */
+export interface DmxSlot {
+  from: number;
+  to: number;
+  /** Farbe dieses Farbrad-Platzes, sRGB 0..1. */
+  rgb?: [number, number, number];
+}
+
+export interface DmxChannel {
+  attribute: DmxAttribute;
+  /** Abstand des Grob-Bytes von der Startadresse, 0-basiert. */
+  offset: number;
+  /** Abstand des Fein-Bytes bei 16 bit. */
+  fineOffset?: number;
+  /**
+   * Physikalischer Bereich von 0 bis Vollausschlag: Grad bei Pan/Tilt/Zoom,
+   * Kelvin bei CCT. Fehlt er, gilt die Voreinstellung des Attributs.
+   */
+  range?: [number, number];
+  /** Shutter: Bereiche, in denen er offen ist. Farbrad: die Plaetze. */
+  slots?: DmxSlot[];
+  label?: string;
 }
 
 export interface Fixture {
@@ -297,6 +338,12 @@ export interface PlacedFixture {
   universe?: number;           // DMX universe (1-based)
   dmxAddress?: number;         // DMX start address within the universe (1–512)
   purpose?: string;            // focus / purpose note ("Frontlicht Bühne")
+  /**
+   * Mischfarbe einer Farbwechsel-Leuchte (RGB/RGBW/CMY/Farbrad), sRGB 0..1.
+   * Gesetzt, ersetzt sie CCT und Gele in der Darstellung. Kommt aus dem
+   * Eigenschaftenfeld oder live aus dem DMX-Eingang (`core/dmxLive.ts`).
+   */
+  mixRgb?: [number, number, number];
   // ── Temporarily mute a single lamp without deleting it: it stops
   //    contributing to the heatmap and is drawn ghosted (still selectable). ──
   hidden?: boolean;
@@ -316,6 +363,7 @@ export interface SceneFixtureState {
   hidden?: boolean;
   currentColorTemp?: number;
   currentBeamAngle?: number;
+  mixRgb?: [number, number, number];
   gelFilterIds?: string[];
   gelPlacement?: 'frame' | 'front';
   barnDoors?: { top: number; bottom: number; left: number; right: number };

@@ -11,6 +11,15 @@ import { fixtureLibrary } from '../core/fixtureLibrary';
 import { getFixtureCCT, cctToRgb } from '../core/colorTemp';
 import { isEstimate, isStaleSource } from '../types';
 import { useTranslation, translate, format } from '../i18n';
+import { DmxLayoutEditor, GdtfImportButton } from './DmxLayoutEditor';
+import { layoutOf } from '../core/dmxLayout';
+import type { DmxAttribute } from '../types';
+
+const COLOUR_ATTRS: DmxAttribute[] = ['red', 'green', 'blue', 'white', 'amber', 'lime', 'uv', 'cyan', 'magenta', 'yellow', 'colorWheel'];
+const rgbToHex = (c: [number, number, number]) =>
+  '#' + c.map((v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0')).join('');
+const hexToRgb = (h: string): [number, number, number] =>
+  [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255) as [number, number, number];
 
 /**
  * Die Herkunftsangaben eines DMX-Modus, in der Reihenfolge der Anzeige.
@@ -278,6 +287,20 @@ const PropertyPanel: React.FC<Props> = ({
                 value={f.currentColorTemp ?? f.fixture.colorTempRange[0]}
                 onChange={(e) => onUpdateFixture(f.id, { currentColorTemp: Number(e.target.value) })} />
             </label>
+          )}
+          {(f.mixRgb || f.fixture.colorTemp === 0 || layoutOf(f)?.layout.some((c) => COLOUR_ATTRS.includes(c.attribute))) && (
+            <div className="prop-field prop-mix">
+              <span>{t('prop.mixColour', 'Mixed colour')}</span>
+              <input
+                type="color"
+                value={rgbToHex(f.mixRgb ?? [1, 1, 1])}
+                onChange={(e) => onUpdateFixture(f.id, { mixRgb: hexToRgb(e.target.value) })}
+              />
+              {f.mixRgb && (
+                <button type="button" className="prop-mode-del" title={t('prop.mixClear', 'Back to CCT and gels')}
+                  onClick={() => onUpdateFixture(f.id, { mixRgb: undefined })}>x</button>
+              )}
+            </div>
           )}
           <div className="prop-derived lux-readout">
             {t('prop.beamDia', 'Beam Ø (50 %)')}: {(beamRadAtFloor * 2).toFixed(1)} m<br />
@@ -655,8 +678,10 @@ const PropertyPanel: React.FC<Props> = ({
                             title={t('prop.dmxModeRemove', 'Remove mode')}
                             onClick={() => setModes(modes.filter((x) => x.id !== m.id))}
                           >x</button>
+                          <DmxLayoutEditor mode={m} onChange={(nm) => change(m.id, nm)} />
                         </div>
                       ))}
+                      <GdtfImportButton onImport={(g) => { if (g.modes.length) setModes(g.modes); }} />
                       <button
                         type="button" className="prop-mode-add"
                         onClick={() => setModes([...modes, {

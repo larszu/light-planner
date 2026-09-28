@@ -106,6 +106,15 @@ It is **not** a replacement for Vectorworks, or Capture. It's the tool you reach
 - **Merge two copies that drifted apart**: pick the version both sides started from, load the other `.avplan`, and walk a three-way change list — added, deleted, changed, conflict. Nothing is applied without a choice, whole objects are taken rather than fields, and where the deleted-on-one-side-changed-on-the-other case appears it is a conflict, never a silent delete
 - **Pre-flight check before anything is hung**: overlapping DMX, duplicate channels, electronics patched as a dimmer load, missing channel or unit numbers — and, unusually, a verdict that includes *cannot be judged*. A plan whose load figures rest on missing weights is not ready; it is unanswered, and the report says which findings rest on assumptions
 
+### 🎛️ Live from the console (DMX input)
+- **Drive the plan from a console or lighting software** over Art-Net or sACN (E1.31), under **Tools → DMX input** — grandMA, Eos, QLC+, Chamsys, any Art-Net node. Each fixture is read at its patched universe and address; dimmer, colour mix (RGB/W/A/L/UV, CMY, colour wheel), CCT, zoom, shutter open/closed and pan/tilt act on the 2D plan, the heatmap and the 3D/render view. Nothing is sent back — the planner only listens
+- **Channel layout per DMX mode**: which channel is the dimmer, which the pan fine byte, which physical range (degrees, kelvin) the channel spans. Edited under the mode in the fixture editor and the properties panel, with templates (dimmer, RGBW, moving head …) and warnings for channels beyond the mode or assigned twice. A single-channel mode without a layout is read as a dimmer; anything else without a layout is reported, not guessed
+- **GDTF import**: a `.gdtf` file brings every mode with its full layout — 16-bit channels, pan/tilt/zoom/CTC ranges, shutter open/closed ranges, colour-wheel slot colours — and, in the fixture editor, beam and field angle, luminous flux, power, colour temperature and weight. Channels on a second DMX break and colour wheels without slot colours are listed, not dropped silently
+- Several sources on one universe merge like a node does: highest sACN priority wins, equal priorities mix HTP, a source silent for 2.5 s drops out. Art-Net numbering is selectable (plan universe 1 = Art-Net 0 or 1)
+- The live state is derived, never saved by itself: **Record as scene** keeps it as a scene, **Write into plan** takes intensity, colour, CCT, zoom and the pan/tilt focus over (one undo step). Mixed colours can also be set by hand in the properties panel
+- Needs the desktop app — a browser cannot open UDP ports. `npm run dmx:send -- artnet 1` (or `sacn 1`) sends a moving test signal when no console is at hand
+- Known simplifications: colour brightness follows the strongest component of the mix, not the emitters' real flux; strobe is shown as open; pan 0 points along the housing rotation and tilt 0 straight down, beyond 85° the aim is clamped
+
 ### 🎬 Auto-place helpers
 - One-click 3-point lighting around a person
 - "Fill an area evenly" generator for a stage or podium

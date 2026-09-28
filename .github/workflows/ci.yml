@@ -294,6 +294,12 @@ jobs:
       - name: Der DMX-Modus entscheidet den Fussabdruck
         run: npm run dmx:check
 
+      # DMX-Eingang: Art-Net/sACN lesen, Quellen zusammenfuehren, Kanaele
+      # nach Belegung deuten, GDTF einlesen. Ein Byte versetzt, und der
+      # Dimmer der dritten Leuchte faehrt die vierte.
+      - name: DMX-Eingang vom Paket bis zur Leuchte
+        run: npm run dmxlive:check
+
       # Die Geraetebibliothek (devices.zumpelars.de): Einreichen und Import
       # ergeben dasselbe Leuchtenprofil, der Abgleich schreibt ueber
       # `latestSeq` fort und zaehlt Ungueltige, die CSP laesst den

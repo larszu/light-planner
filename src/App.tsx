@@ -25,6 +25,9 @@ import FloorPlanPanel from './components/FloorPlanPanel';
 import ScaleDialog from './components/ScaleDialog';
 import PlotExportDialog, { type PlotExportWahl } from './components/PlotExportDialog';
 import ScheduleDialog from './components/ScheduleDialog';
+import DmxInputDialog from './components/DmxInputDialog';
+import { applyLive } from './core/dmxLive';
+import { useDmxLive } from './store/dmxLiveStore';
 import { autoPatch, findPatchConflicts } from './core/patch';
 import { generate3PointLighting, generateAreaLighting } from './core/autoLighting';
 import type { ThreePointConfig, AreaLightConfig, LightArea } from './core/autoLighting';
@@ -77,6 +80,7 @@ function captureLook(f: PlacedFixture): SceneFixtureState {
     hidden: f.hidden,
     currentColorTemp: f.currentColorTemp,
     currentBeamAngle: f.currentBeamAngle,
+    mixRgb: f.mixRgb,
     gelFilterIds: f.gelFilterIds,
     gelPlacement: f.gelPlacement,
     barnDoors: f.barnDoors,
@@ -223,6 +227,7 @@ const App: React.FC = () => {
   const showFocusNotes = useUiStore((s) => s.showFocusNotes);
   const toggleFocusNotes = useUiStore((s) => s.toggleFocusNotes);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [dmxInOpen, setDmxInOpen] = useState(false);
   const [areaLightOpen, setAreaLightOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
@@ -1549,6 +1554,43 @@ const App: React.FC = () => {
     preSceneRef.current = null;
   }, [fixtures]);
 
+  // ── DMX-Eingang ──
+  // Das Live-Bild ist eine Ableitung: gezeichnet wird `shownFixtures`,
+  // gespeichert bleibt `fixtures`, bis jemand ausdruecklich uebernimmt.
+  const dmxRunning = useDmxLive((s) => s.running);
+  const dmxUniverses = useDmxLive((s) => s.universes);
+  const setDmxPlanUniverses = useDmxLive((s) => s.setPlanUniverses);
+  const live = React.useMemo(
+    () => (dmxRunning ? applyLive(fixtures, dmxUniverses) : null),
+    [dmxRunning, fixtures, dmxUniverses],
+  );
+  const shownFixtures = live?.fixtures ?? fixtures;
+  const planUniverseKey = [...new Set(fixtures.filter((f) => f.dmxAddress != null).map((f) => f.universe ?? 1))]
+    .sort((a, b) => a - b).join(',');
+  const planUniverses = React.useMemo(
+    () => (planUniverseKey ? planUniverseKey.split(',').map(Number) : []),
+    [planUniverseKey],
+  );
+  useEffect(() => { setDmxPlanUniverses(planUniverses); }, [planUniverses, setDmxPlanUniverses]);
+
+  const handleRecordLiveScene = useCallback(() => {
+    if (!live) return;
+    const states: Record<string, SceneFixtureState> = {};
+    for (const f of live.fixtures) states[f.id] = captureLook(f);
+    setScenes((prev) => [...prev, { id: uid('scene'), name: `DMX ${prev.length + 1}`, states }]);
+  }, [live]);
+
+  const handleApplyLiveToPlan = useCallback(() => {
+    if (!live) return;
+    pushHistory();
+    const byId = new Map(live.fixtures.map((f) => [f.id, f]));
+    setFixtures((prev) => prev.map((f) => {
+      const l = byId.get(f.id);
+      if (!l || !live.driven.has(f.id)) return f;
+      return { ...f, ...captureLook(l), aimX: l.aimX, aimY: l.aimY };
+    }));
+  }, [live, pushHistory]);
+
   const handleRenameScene = useCallback((id: string, name: string) => {
     setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
   }, []);
@@ -1683,6 +1725,7 @@ const App: React.FC = () => {
         onUploadFloorPlan={handleUploadFloorPlan}
         onOpenSchedule={() => setScheduleOpen(true)}
         onOpenInventory={() => setInventoryOpen(true)}
+        onOpenDmxIn={() => setDmxInOpen(true)}
         onExport={handleExport}
         onExportPlot={handleExportPlot}
         onNew={handleNew}
@@ -1755,7 +1798,7 @@ const App: React.FC = () => {
           {viewMode === '2d' ? (
             <PlanCanvas
               foreignCameras={foreignCameras}
-              fixtures={fixtures}
+              fixtures={shownFixtures}
               shapes={shapes}
               persons={persons}
               stageElements={stageElements}
@@ -1807,7 +1850,7 @@ const App: React.FC = () => {
             <Suspense fallback={<div className="loading-3d">{t('app.loading3d', 'Loading the 3D view…')}</div>}>
               <Scene3D
                 ref={scene3DRef}
-                fixtures={fixtures}
+                fixtures={shownFixtures}
                 persons={persons}
                 stageElements={stageElements}
                 trusses={trusses}
@@ -1935,6 +1978,7 @@ const App: React.FC = () => {
         exposure={exposure}
         activeSceneName={activeSceneName}
         hiddenCount={hiddenCount}
+        dmxDriven={live ? live.driven.size : null}
       />
       {showThreePointDialog && (
         <ThreePointDialog
@@ -2017,6 +2061,17 @@ const App: React.FC = () => {
           />
         );
       })()}
+      {dmxInOpen && (
+        <DmxInputDialog
+          fixtures={fixtures}
+          live={live}
+          planUniverses={planUniverses}
+          onRecordScene={handleRecordLiveScene}
+          onApplyToPlan={handleApplyLiveToPlan}
+          onLocate={(ids) => { setSelectedIds(new Set(ids)); setViewMode('2d'); setDmxInOpen(false); }}
+          onClose={() => setDmxInOpen(false)}
+        />
+      )}
       {scheduleOpen && (
         <ScheduleDialog
           fixtures={fixtures}

@@ -44,6 +44,8 @@ interface Props {
   onOpenSchedule: () => void;
   /** Lager/Bestand oeffnen — seit #124 ein Menuepunkt unter „Tools". */
   onOpenInventory: () => void;
+  /** DMX-Eingang: Leuchten live aus Pult oder Software fahren. */
+  onOpenDmxIn: () => void;
   onExport: (format: 'png' | 'jpg' | 'pdf') => void;
   onExportPlot: () => void;
   onNew: () => void;
@@ -104,6 +106,7 @@ const TopBar: React.FC<Props> = (p) => {
       onDuplicate: p.onDuplicate,
       onOpenSchedule: p.onOpenSchedule,
       onOpenInventory: p.onOpenInventory,
+      onOpenDmxIn: p.onOpenDmxIn,
       onViewModeChange: (v) => p.onSetMode(v),
       onToggleHeatMap: p.onToggleHeatMap,
       onToggleSnap: p.onToggleSnap,

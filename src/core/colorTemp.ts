@@ -55,13 +55,18 @@ export function getFixtureCCT(f: PlacedFixture): number {
   return base;
 }
 
+/** Beam colour 0..255 — a mixed colour wins over CCT and gels. */
+function beamRgb(f: PlacedFixture): [number, number, number] {
+  if (f.mixRgb) return f.mixRgb.map((c) => Math.round(Math.max(0, Math.min(1, c)) * 255)) as [number, number, number];
+  return cctToRgb(getFixtureCCT(f));
+}
+
 /**
  * Get CSS rgba string for a fixture's beam cone.
  * Uses the fixture's effective CCT to tint the cone color.
  */
 export function getBeamColorRgba(f: PlacedFixture, alpha: number): string {
-  const cct = getFixtureCCT(f);
-  const [r, g, b] = cctToRgb(cct);
+  const [r, g, b] = beamRgb(f);
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
@@ -69,7 +74,6 @@ export function getBeamColorRgba(f: PlacedFixture, alpha: number): string {
  * Get a THREE.js compatible hex color number for a fixture's beam.
  */
 export function getBeamColorHex(f: PlacedFixture): number {
-  const cct = getFixtureCCT(f);
-  const [r, g, b] = cctToRgb(cct);
+  const [r, g, b] = beamRgb(f);
   return (r << 16) | (g << 8) | b;
 }
