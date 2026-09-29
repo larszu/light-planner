@@ -1,5 +1,24 @@
 {
   "name": "light-planner",
+  "description": "Quick stage and event lighting planner: drop fixtures with real DMX modes, draw trusses, aim beams on a 2D plan with 3D preview. Offline, macOS and Windows. Electron + React + Three.js.",
+  "keywords": [
+    "lighting-design",
+    "stage-lighting",
+    "light-plot",
+    "event-technology",
+    "live-production",
+    "theatre",
+    "dmx",
+    "fixtures",
+    "3d",
+    "threejs",
+    "electron",
+    "react",
+    "typescript",
+    "desktop-app",
+    "offline-first",
+    "cross-platform"
+  ],
   "private": true,
   "avplan": {
     "sourceLanguage": "en"
